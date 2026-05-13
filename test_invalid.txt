@@ -1,0 +1,2 @@
+This is not a GEDCOM file.
+Just some plain text content.
