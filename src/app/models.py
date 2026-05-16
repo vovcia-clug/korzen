@@ -85,6 +85,14 @@ class Person(db.Model):
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     
+    # Source tracking for GEDCOM imports
+    gedcom_id = db.Column(String(50), nullable=True, index=True)
+    source_batch_id = db.Column(
+        UUID(as_uuid=True),
+        ForeignKey("record_batches.id"),
+        nullable=True,
+    )
+    
     # Basic information
     first_name = db.Column(String(100), nullable=True)
     last_name = db.Column(String(100), nullable=True)
@@ -120,6 +128,7 @@ class Person(db.Model):
     updated_at = db.Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
+    source_batch = relationship("RecordBatch")
     social_status = relationship("SocialStatus", back_populates="persons")
     
     # Baptism records where this person is the child
@@ -169,6 +178,14 @@ class BaptismRecord(db.Model):
     __tablename__ = "baptism_records"
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Source tracking for GEDCOM imports
+    gedcom_id = db.Column(String(50), nullable=True, index=True)
+    source_batch_id = db.Column(
+        UUID(as_uuid=True),
+        ForeignKey("record_batches.id"),
+        nullable=True,
+    )
     
     # Record identification
     record_number = db.Column(String(50), nullable=True)
@@ -253,6 +270,14 @@ class MarriageRecord(db.Model):
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     
+    # Source tracking for GEDCOM imports
+    gedcom_id = db.Column(String(50), nullable=True, index=True)
+    source_batch_id = db.Column(
+        UUID(as_uuid=True),
+        ForeignKey("record_batches.id"),
+        nullable=True,
+    )
+    
     # Record identification
     record_number = db.Column(String(50), nullable=True)
     page_number = db.Column(String(50), nullable=True)
@@ -328,6 +353,14 @@ class DeathRecord(db.Model):
     __tablename__ = "death_records"
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Source tracking for GEDCOM imports
+    gedcom_id = db.Column(String(50), nullable=True, index=True)
+    source_batch_id = db.Column(
+        UUID(as_uuid=True),
+        ForeignKey("record_batches.id"),
+        nullable=True,
+    )
     
     # Record identification
     record_number = db.Column(String(50), nullable=True)

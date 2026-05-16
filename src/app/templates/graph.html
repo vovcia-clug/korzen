@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Korzen - Graph Visualizer</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .header h1 {
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .controls {
+            background: white;
+            padding: 15px 30px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-group label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .control-group input,
+        .control-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .graph-container {
+            flex: 1;
+            position: relative;
+            background: white;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #graph {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-width: 300px;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .info-panel.show {
+            display: block;
+        }
+        
+        .info-panel h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .info-item {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            min-width: 100px;
+        }
+        
+        .info-value {
+            color: #333;
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #999;
+            line-height: 1;
+        }
+        
+        .close-btn:hover {
+            color: #333;
+        }
+        
+        .stats {
+            background: #f8f9ff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            display: flex;
+            gap: 20px;
+            font-size: 0.9em;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #667eea;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #d32f2f;
+            padding: 20px;
+            background: #ffebee;
+            border-radius: 8px;
+            max-width: 500px;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+        }
+        
+        .legend h4 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 0.9em;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+        
+        .legend-color.male {
+            background: #64b5f6;
+        }
+        
+        .legend-color.female {
+            background: #f48fb1;
+        }
+        
+        .legend-color.unknown {
+            background: #bdbdbd;
+        }
+        
+        .legend-color.event {
+            background: #fff59d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌳 Genealogy Graph Visualizer</h1>
+        <div class="nav-buttons">
+            <a href="/" class="btn">🏠 Home</a>
+            <a href="/persons" class="btn">👥 Persons</a>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label for="limitInput">Node Limit:</label>
+            <input type="number" id="limitInput" value="100" min="10" max="1000" step="10">
+        </div>
+        <button class="btn-primary" id="loadBtn" onclick="loadGraph()">Load Graph</button>
+        <button class="btn-primary" id="resetBtn" onclick="resetView()">Reset View</button>
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-label">Nodes:</span>
+                <span class="stat-value" id="nodeCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Edges:</span>
+                <span class="stat-value" id="edgeCount">0</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="graph-container">
+        <div id="graph"></div>
+        <div id="loading" class="loading" style="display: none;">Loading graph data</div>
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div class="info-panel" id="infoPanel">
+            <button class="close-btn" onclick="closeInfo()">×</button>
+            <h3 id="infoTitle">Node Details</h3>
+            <div id="infoContent"></div>
+        </div>
+        
+        <div class="legend">
+            <h4>Legend</h4>
+            <div class="legend-item">
+                <div class="legend-color male"></div>
+                <span>Male</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color female"></div>
+                <span>Female</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color unknown"></div>
+                <span>Unknown Gender</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color event"></div>
+                <span>Event</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let network = null;
+        let nodes = null;
+        let edges = null;
+        
+        // Initialize the graph on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGraph();
+        });
+        
+        async function loadGraph() {
+            const loadBtn = document.getElementById('loadBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const graphDiv = document.getElementById('graph');
+            const limit = document.getElementById('limitInput').value;
+            
+            // Show loading state
+            loadBtn.disabled = true;
+            loadBtn.textContent = 'Loading...';
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/graph/data?limit=${limit}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load graph data');
+                }
+                
+                // Update stats
+                document.getElementById('nodeCount').textContent = data.nodes.length;
+                document.getElementById('edgeCount').textContent = data.edges.length;
+                
+                // Transform data for vis.js
+                const visNodes = data.nodes.map(node => {
+                    let color = '#bdbdbd'; // Unknown/default
+                    let shape = 'dot';
+                    
+                    if (node.type === 'Person') {
+                        if (node.gender === 'M') {
+                            color = '#64b5f6'; // Blue for male
+                        } else if (node.gender === 'F') {
+                            color = '#f48fb1'; // Pink for female
+                        }
+                        shape = 'dot';
+                    } else if (node.type === 'Event') {
+                        color = '#fff59d'; // Yellow for events
+                        shape = 'diamond';
+                    }
+                    
+                    return {
+                        id: node.id,
+                        label: node.label,
+                        title: createTooltip(node),
+                        color: color,
+                        shape: shape,
+                        size: 20,
+                        font: {
+                            size: 12,
+                            color: '#333'
+                        },
+                        data: node
+                    };
+                });
+                
+                const visEdges = data.edges.map(edge => {
+                    let color = '#999';
+                    let width = 1;
+                    let dashes = false;
+                    
+                    // Style edges based on type
+                    if (edge.type === 'PARENT_OF') {
+                        color = '#4caf50';
+                        width = 2;
+                    } else if (edge.type === 'MARRIED_TO') {
+                        color = '#e91e63';
+                        width = 2;
+                    } else if (edge.type === 'GODPARENT_OF') {
+                        color = '#9c27b0';
+                        dashes = true;
+                    } else if (edge.type === 'BAPTIZED_IN' || edge.type === 'DIED_IN') {
+                        color = '#ff9800';
+                        dashes = true;
+                    }
+                    
+                    return {
+                        from: edge.from,
+                        to: edge.to,
+                        label: edge.label,
+                        color: color,
+                        width: width,
+                        dashes: dashes,
+                        arrows: 'to',
+                        font: {
+                            size: 10,
+                            align: 'middle'
+                        }
+                    };
+                });
+                
+                // Create network
+                nodes = new vis.DataSet(visNodes);
+                edges = new vis.DataSet(visEdges);
+                
+                const container = graphDiv;
+                const graphData = {
+                    nodes: nodes,
+                    edges: edges
+                };
+                
+                const options = {
+                    physics: {
+                        enabled: true,
+                        barnesHut: {
+                            gravitationalConstant: -2000,
+                            centralGravity: 0.3,
+                            springLength: 150,
+                            springConstant: 0.04,
+                            damping: 0.09,
+                            avoidOverlap: 0.1
+                        },
+                        stabilization: {
+                            iterations: 200
+                        }
+                    },
+                    interaction: {
+                        hover: true,
+                        tooltipDelay: 200,
+                        navigationButtons: true,
+                        keyboard: true
+                    },
+                    nodes: {
+                        borderWidth: 2,
+                        borderWidthSelected: 4
+                    },
+                    edges: {
+                        smooth: {
+                            type: 'continuous'
+                        }
+                    }
+                };
+                
+                network = new vis.Network(container, graphData, options);
+                
+                // Add click event to show node details
+                network.on('click', function(params) {
+                    if (params.nodes.length > 0) {
+                        const nodeId = params.nodes[0];
+                        const node = nodes.get(nodeId);
+                        showNodeInfo(node.data);
+                    } else {
+                        closeInfo();
+                    }
+                });
+                
+                loading.style.display = 'none';
+                
+            } catch (err) {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = `Error: ${err.message}`;
+                console.error('Error loading graph:', err);
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.textContent = 'Load Graph';
+            }
+        }
+        
+        function createTooltip(node) {
+            let tooltip = `<strong>${node.label}</strong><br>`;
+            tooltip += `Type: ${node.type}<br>`;
+            
+            if (node.type === 'Person') {
+                if (node.birth_date) tooltip += `Born: ${node.birth_date}<br>`;
+                if (node.death_date) tooltip += `Died: ${node.death_date}<br>`;
+                if (node.birth_place) tooltip += `Place: ${node.birth_place}<br>`;
+                if (node.occupation) tooltip += `Occupation: ${node.occupation}<br>`;
+            } else if (node.type === 'Event') {
+                if (node.event_type) tooltip += `Event: ${node.event_type}<br>`;
+                if (node.date) tooltip += `Date: ${node.date}<br>`;
+                if (node.place) tooltip += `Place: ${node.place}<br>`;
+            }
+            
+            return tooltip;
+        }
+        
+        function showNodeInfo(node) {
+            const panel = document.getElementById('infoPanel');
+            const title = document.getElementById('infoTitle');
+            const content = document.getElementById('infoContent');
+            
+            title.textContent = node.label;
+            
+            let html = '';
+            
+            if (node.type === 'Person') {
+                html += `<div class="info-item"><span class="info-label">Type:</span><span class="info-value">Person</span></div>`;
+                if (node.gender) html += `<div class="info-item"><span class="info-label">Gender:</span><span class="info-value">${node.gender}</span></div>`;
+                if (node.birth_date) html += `<div class="info-item"><span class="info-label">Birth Date:</span><span class="info-value">${node.birth_date}</span></div>`;
+                if (node.death_date) html += `<div class="info-item"><span class="info-label">Death Date:</span><span class="info-value">${node.death_date}</span></div>`;
+                if (node.birth_place) html += `<div class="info-item"><span class="info-label">Birth Place:</span><span class="info-value">${node.birth_place}</span></div>`;
+                if (node.occupation) html += `<div class="info-item"><span class="info-label">Occupation:</span><span class="info-value">${node.occupation}</span></div>`;
+            } else if (node.type === 'Event') {
+                html += `<div class="info-item"><span class="info-label">Type:</span><span class="info-value">Event</span></div>`;
+                if (node.event_type) html += `<div class="info-item"><span class="info-label">Event Type:</span><span class="info-value">${node.event_type}</span></div>`;
+                if (node.date) html += `<div class="info-item"><span class="info-label">Date:</span><span class="info-value">${node.date}</span></div>`;
+                if (node.place) html += `<div class="info-item"><span class="info-label">Place:</span><span class="info-value">${node.place}</span></div>`;
+            }
+            
+            content.innerHTML = html;
+            panel.classList.add('show');
+        }
+        
+        function closeInfo() {
+            document.getElementById('infoPanel').classList.remove('show');
+        }
+        
+        function resetView() {
+            if (network) {
+                network.fit();
+            }
+        }
+    </script>
+</body>
+</html>

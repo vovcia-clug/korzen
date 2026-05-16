@@ -18,6 +18,7 @@ from .models import (
     DeathRecord,
     UploadedFile
 )
+from .services.age_graph_importer import AgeGraphImporter
 
 logger = logging.getLogger(__name__)
 
@@ -328,13 +329,21 @@ class GedcomParser:
     def create_person_from_individual(self, individual: Individual) -> Person:
         """
         Create a Person record from a GEDCOM Individual.
+        Checks for existing person by GEDCOM ID to prevent duplicates.
         
         Args:
             individual: ged4py Individual object
             
         Returns:
-            Person database object
+            Person database object (existing or newly created)
         """
+        # Check if person already exists by GEDCOM ID
+        existing_person = Person.query.filter_by(gedcom_id=individual.xref_id).first()
+        
+        if existing_person:
+            logger.info(f"Found existing person with GEDCOM ID {individual.xref_id}: {existing_person.first_name} {existing_person.last_name}")
+            return existing_person
+        
         # Extract name from sub_records
         first_name, last_name = None, None
         for sub in individual.sub_records:
@@ -393,8 +402,10 @@ class GedcomParser:
         if occupation and len(occupation) > 200:
             occupation = occupation[:200]
         
-        # Create Person record
+        # Create Person record with GEDCOM ID and source batch tracking
         person = Person(
+            gedcom_id=individual.xref_id,
+            source_batch_id=self.batch.id,
             first_name=first_name,
             last_name=last_name,
             gender=gender,
@@ -410,6 +421,7 @@ class GedcomParser:
     def create_baptism_record(self, individual: Individual, person: Person) -> Optional[BaptismRecord]:
         """
         Create a BaptismRecord from an Individual's baptism event.
+        Checks for existing baptism record by GEDCOM ID to prevent duplicates.
         
         Args:
             individual: ged4py Individual object
@@ -428,6 +440,15 @@ class GedcomParser:
         if not baptism_event:
             return None
         
+        # Generate GEDCOM ID for baptism event (use individual's ID + event type)
+        baptism_gedcom_id = f"{individual.xref_id}_BAPM"
+        
+        # Check if baptism record already exists
+        existing_baptism = BaptismRecord.query.filter_by(gedcom_id=baptism_gedcom_id).first()
+        if existing_baptism:
+            logger.info(f"Found existing baptism record with GEDCOM ID {baptism_gedcom_id}")
+            return existing_baptism
+        
         # Extract baptism date and place
         baptism_date = None
         parish = None
@@ -441,8 +462,10 @@ class GedcomParser:
         if not baptism_date:
             return None
         
-        # Create baptism record
+        # Create baptism record with GEDCOM ID tracking
         baptism_record = BaptismRecord(
+            gedcom_id=baptism_gedcom_id,
+            source_batch_id=self.batch.id,
             child_id=person.id,
             child_name=person.first_name,
             child_gender=person.gender,
@@ -456,6 +479,7 @@ class GedcomParser:
     def create_marriage_record(self, family: Record) -> Optional[MarriageRecord]:
         """
         Create a MarriageRecord from a GEDCOM Family record.
+        Checks for existing marriage record by GEDCOM ID to prevent duplicates.
         
         Args:
             family: ged4py Record object representing a family
@@ -463,6 +487,13 @@ class GedcomParser:
         Returns:
             MarriageRecord or None if no marriage event found
         """
+        # Check if marriage record already exists by family GEDCOM ID
+        marriage_gedcom_id = f"{family.xref_id}_MARR"
+        existing_marriage = MarriageRecord.query.filter_by(gedcom_id=marriage_gedcom_id).first()
+        if existing_marriage:
+            logger.info(f"Found existing marriage record with GEDCOM ID {marriage_gedcom_id}")
+            return existing_marriage
+        
         # Find MARR sub-record
         marriage_event = None
         for sub in family.sub_records:
@@ -501,8 +532,10 @@ class GedcomParser:
                 if xref in self.person_map:
                     spouse2_id = self.person_map[xref]
         
-        # Create marriage record
+        # Create marriage record with GEDCOM ID tracking
         marriage_record = MarriageRecord(
+            gedcom_id=marriage_gedcom_id,
+            source_batch_id=self.batch.id,
             marriage_date=marriage_date.date(),
             parish=parish,
             spouse1_id=spouse1_id,
@@ -514,6 +547,7 @@ class GedcomParser:
     def create_death_record(self, individual: Individual, person: Person) -> Optional[DeathRecord]:
         """
         Create a DeathRecord from an Individual's death event.
+        Checks for existing death record by GEDCOM ID to prevent duplicates.
         
         Args:
             individual: ged4py Individual object
@@ -522,6 +556,15 @@ class GedcomParser:
         Returns:
             DeathRecord or None if no death event found
         """
+        # Generate GEDCOM ID for death event
+        death_gedcom_id = f"{individual.xref_id}_DEAT"
+        
+        # Check if death record already exists
+        existing_death = DeathRecord.query.filter_by(gedcom_id=death_gedcom_id).first()
+        if existing_death:
+            logger.info(f"Found existing death record with GEDCOM ID {death_gedcom_id}")
+            return existing_death
+        
         # Find DEAT sub-record
         death_event = None
         for sub in individual.sub_records:
@@ -545,8 +588,10 @@ class GedcomParser:
         if not death_date:
             return None
         
-        # Create death record
+        # Create death record with GEDCOM ID tracking
         death_record = DeathRecord(
+            gedcom_id=death_gedcom_id,
+            source_batch_id=self.batch.id,
             deceased_id=person.id,
             deceased_name=person.first_name,
             deceased_surname=person.last_name,
@@ -677,14 +722,18 @@ class GedcomParser:
                             # Create baptism record
                             baptism = self.create_baptism_record(individual, person)
                             if baptism:
-                                db.session.add(baptism)
-                                stats['baptisms'] += 1
+                                # Only add if it's a new record (not already in session)
+                                if baptism not in db.session:
+                                    db.session.add(baptism)
+                                    stats['baptisms'] += 1
                             
                             # Create death record
                             death = self.create_death_record(individual, person)
                             if death:
-                                db.session.add(death)
-                                stats['deaths'] += 1
+                                # Only add if it's a new record (not already in session)
+                                if death not in db.session:
+                                    db.session.add(death)
+                                    stats['deaths'] += 1
                                 
                         except Exception as e:
                             error_msg = f"Error processing events for {individual.xref_id}: {str(e)}"
@@ -700,8 +749,10 @@ class GedcomParser:
                         try:
                             marriage = self.create_marriage_record(family)
                             if marriage:
-                                db.session.add(marriage)
-                                stats['marriages'] += 1
+                                # Only add if it's a new record (not already in session)
+                                if marriage not in db.session:
+                                    db.session.add(marriage)
+                                    stats['marriages'] += 1
                                 
                                 # Extract data from sub_records for raw data
                                 husband_xref = None
@@ -743,6 +794,15 @@ class GedcomParser:
                 db.session.commit()
                 logger.info(f"Created {stats['marriages']} marriage records")
             
+            # Import data into AGE graph
+            try:
+                logger.info("Starting AGE graph import...")
+                self._import_to_age_graph(stats)
+                logger.info("AGE graph import completed")
+            except Exception as e:
+                logger.error(f"AGE graph import failed: {e}")
+                stats['errors'].append(f"AGE graph import failed: {str(e)}")
+            
             # Update uploaded file status
             if uploaded_file:
                 uploaded_file.processing_status = 'completed'
@@ -762,4 +822,116 @@ class GedcomParser:
                 uploaded_file.processing_status = 'failed'
                 db.session.commit()
             
+            raise
+    
+    def _import_to_age_graph(self, stats: Dict[str, int]):
+        """
+        Import the parsed data into Apache AGE graph database.
+        
+        Args:
+            stats: Statistics dictionary to update with graph import info
+        """
+        try:
+            # Get raw psycopg connection for AGE
+            raw_conn = db.session.connection().connection
+            
+            # Create AGE importer
+            importer = AgeGraphImporter(raw_conn)
+            importer.create_graph_if_not_exists()
+            
+            # Create source vertex for this batch
+            source_props = {
+                'source_name': self.filepath,
+                'import_date': datetime.utcnow().isoformat(),
+                'description': f'GEDCOM import batch {self.batch.id}'
+            }
+            importer.create_source_vertex(str(self.batch.id), source_props)
+            
+            # Import all persons
+            persons = Person.query.filter_by(source_batch_id=self.batch.id).all()
+            for person in persons:
+                person_props = {
+                    'gedcom_id': person.gedcom_id,
+                    'first_name': person.first_name,
+                    'last_name': person.last_name,
+                    'maiden_name': person.maiden_name,
+                    'gender': person.gender,
+                    'birth_date': person.birth_date,
+                    'death_date': person.death_date,
+                    'birth_place': person.birth_place,
+                    'death_place': person.death_place,
+                    'occupation': person.occupation
+                }
+                importer.create_person_vertex(str(person.id), person_props)
+                importer.create_from_source_edge(str(person.id), str(self.batch.id))
+            
+            # Import baptism events
+            baptisms = BaptismRecord.query.filter_by(source_batch_id=self.batch.id).all()
+            for baptism in baptisms:
+                event_props = {
+                    'gedcom_id': baptism.gedcom_id,
+                    'event_type': 'baptism',
+                    'date': baptism.baptism_date,
+                    'place': baptism.baptism_place,
+                    'parish': baptism.parish
+                }
+                importer.create_event_vertex(str(baptism.id), event_props)
+                importer.create_baptized_in_edge(
+                    str(baptism.person_id),
+                    str(baptism.id),
+                    str(baptism.baptism_date) if baptism.baptism_date else None
+                )
+                importer.create_from_source_edge(str(baptism.id), str(self.batch.id))
+            
+            # Import death events
+            deaths = DeathRecord.query.filter_by(source_batch_id=self.batch.id).all()
+            for death in deaths:
+                event_props = {
+                    'gedcom_id': death.gedcom_id,
+                    'event_type': 'death',
+                    'date': death.death_date,
+                    'place': death.death_place,
+                    'parish': death.parish
+                }
+                importer.create_event_vertex(str(death.id), event_props)
+                importer.create_died_in_edge(
+                    str(death.person_id),
+                    str(death.id),
+                    str(death.death_date) if death.death_date else None
+                )
+                importer.create_from_source_edge(str(death.id), str(self.batch.id))
+            
+            # Import marriages and create MARRIED_TO edges
+            marriages = MarriageRecord.query.filter_by(source_batch_id=self.batch.id).all()
+            for marriage in marriages:
+                if marriage.husband_id and marriage.wife_id:
+                    importer.create_marriage_edge(
+                        str(marriage.husband_id),
+                        str(marriage.wife_id),
+                        str(marriage.marriage_date) if marriage.marriage_date else None,
+                        marriage.marriage_place,
+                        marriage.gedcom_id
+                    )
+            
+            # Import parent-child relationships
+            for person in persons:
+                if person.father_id:
+                    importer.create_parent_child_edge(
+                        str(person.father_id),
+                        str(person.id),
+                        'father'
+                    )
+                if person.mother_id:
+                    importer.create_parent_child_edge(
+                        str(person.mother_id),
+                        str(person.id),
+                        'mother'
+                    )
+            
+            # Get graph statistics
+            graph_stats = importer.get_statistics()
+            logger.info(f"AGE graph statistics: {graph_stats}")
+            
+        except Exception as e:
+            logger.error(f"Error importing to AGE graph: {e}")
             raise

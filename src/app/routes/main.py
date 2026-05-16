@@ -1,4 +1,6 @@
 import os
+import json
+import logging
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app
 from werkzeug.utils import secure_filename
@@ -7,6 +9,8 @@ from sqlalchemy import text
 from ..extensions import db
 from ..models import UploadedFile, Person
 from ..gedcom_parser import GedcomParser
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint("main", __name__)
 
@@ -213,7 +217,7 @@ def api_list_persons():
 
 @bp.route("/reset-database", methods=["POST"])
 def reset_database():
-    """Reset the database by deleting all data from all tables."""
+    """Reset the database by deleting all data from all tables and recreating AGE graph."""
     try:
         # Delete all records from tables (in correct order to respect foreign keys)
         # Using CASCADE to handle foreign key constraints automatically
@@ -229,10 +233,197 @@ def reset_database():
         db.session.execute(text("TRUNCATE TABLE record_batches CASCADE"))
         db.session.commit()
         
-        return jsonify({
-            "message": "Database reset successfully. All data has been deleted."
-        }), 200
+        # Reset AGE graph - drop and recreate
+        try:
+            # Set search path for AGE
+            db.session.execute(text("SET search_path = ag_catalog, '$user', public"))
+            
+            # Drop the graph if it exists (this removes all vertices and edges)
+            db.session.execute(text("SELECT drop_graph('genealogy', true)"))
+            
+            # Recreate the graph
+            db.session.execute(text("SELECT create_graph('genealogy')"))
+            
+            db.session.commit()
+            
+            return jsonify({
+                "message": "Database and AGE graph reset successfully. All data has been deleted."
+            }), 200
+            
+        except Exception as age_error:
+            # If AGE operations fail, still report success for relational tables
+            # but include warning about graph
+            db.session.rollback()
+            db.session.commit()  # Commit the table truncations
+            
+            return jsonify({
+                "message": "Database reset successfully. All relational data has been deleted.",
+                "warning": f"AGE graph reset failed: {str(age_error)}"
+            }), 200
         
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Failed to reset database: {str(e)}"}), 500
+
+
+@bp.route("/graph")
+def graph_visualizer():
+    """Display the graph visualizer page."""
+    return render_template("graph.html")
+
+
+@bp.route("/api/graph/data", methods=["GET"])
+def get_graph_data():
+    """
+    API endpoint to fetch graph data for visualization.
+    Returns nodes and edges in a format suitable for visualization libraries.
+    """
+    try:
+        # Get optional limit parameter (default to 100 nodes)
+        limit = request.args.get('limit', 100, type=int)
+        
+        # Set search path for AGE
+        db.session.execute(text("SET search_path = ag_catalog, '$user', public;"))
+        
+        # Execute Cypher query to get persons and relationships
+        # Note: AGE doesn't support | for multiple relationship types, so we query separately
+        query = text(f"""
+            SELECT * FROM cypher('genealogy', $$
+                MATCH (p:Person)
+                WITH p LIMIT {limit}
+                OPTIONAL MATCH (p)-[r]->(related)
+                RETURN p, r, related
+            $$) AS (person agtype, relationship agtype, related agtype);
+        """)
+        
+        result = db.session.execute(query)
+        
+        nodes = {}
+        edges = []
+        
+        for row in result:
+            person_data = row[0]
+            relationship_data = row[1]
+            related_data = row[2]
+            
+            # Parse person node - AGE returns agtype which needs special handling
+            if person_data and str(person_data) != 'null':
+                try:
+                    # AGE returns data in a special format, extract the JSON part
+                    person_str = str(person_data)
+                    # Remove AGE wrapper if present
+                    if '::vertex' in person_str:
+                        person_str = person_str.split('::')[0].strip()
+                    
+                    person = json.loads(person_str)
+                    if isinstance(person, dict):
+                        # Extract properties - AGE format has properties nested
+                        props = person.get('properties', person)
+                        node_id = props.get('uuid')
+                        
+                        if node_id and node_id not in nodes:
+                            nodes[node_id] = {
+                                'id': node_id,
+                                'label': f"{props.get('first_name', '')} {props.get('last_name', '')}".strip() or 'Unknown',
+                                'type': 'Person',
+                                'gender': props.get('gender'),
+                                'birth_date': props.get('birth_date'),
+                                'death_date': props.get('death_date'),
+                                'birth_place': props.get('birth_place'),
+                                'occupation': props.get('occupation')
+                            }
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"Could not parse person data: {e}")
+            
+            # Parse related node
+            if related_data and str(related_data) != 'null':
+                try:
+                    related_str = str(related_data)
+                    if '::vertex' in related_str:
+                        related_str = related_str.split('::')[0].strip()
+                    
+                    related = json.loads(related_str)
+                    if isinstance(related, dict):
+                        props = related.get('properties', related)
+                        node_id = props.get('uuid')
+                        
+                        if node_id and node_id not in nodes:
+                            # Determine node type and label
+                            node_type = 'Person'
+                            label = 'Unknown'
+                            
+                            if 'event_type' in props:
+                                node_type = 'Event'
+                                label = f"{props.get('event_type', 'Event')} - {props.get('date', '')}"
+                            elif 'first_name' in props or 'last_name' in props:
+                                node_type = 'Person'
+                                label = f"{props.get('first_name', '')} {props.get('last_name', '')}".strip() or 'Unknown'
+                            
+                            nodes[node_id] = {
+                                'id': node_id,
+                                'label': label,
+                                'type': node_type,
+                                'gender': props.get('gender'),
+                                'birth_date': props.get('birth_date'),
+                                'death_date': props.get('death_date'),
+                                'event_type': props.get('event_type'),
+                                'date': props.get('date'),
+                                'place': props.get('place')
+                            }
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"Could not parse related data: {e}")
+            
+            # Parse relationship
+            if relationship_data and str(relationship_data) != 'null' and person_data and related_data:
+                try:
+                    rel_str = str(relationship_data)
+                    if '::edge' in rel_str:
+                        rel_str = rel_str.split('::')[0].strip()
+                    
+                    relationship = json.loads(rel_str)
+                    if isinstance(relationship, dict):
+                        # Re-parse person and related for edge creation
+                        person_str = str(person_data)
+                        if '::vertex' in person_str:
+                            person_str = person_str.split('::')[0].strip()
+                        person = json.loads(person_str)
+                        
+                        related_str = str(related_data)
+                        if '::vertex' in related_str:
+                            related_str = related_str.split('::')[0].strip()
+                        related = json.loads(related_str)
+                        
+                        person_props = person.get('properties', person)
+                        related_props = related.get('properties', related)
+                        rel_props = relationship.get('properties', {})
+                        
+                        from_id = person_props.get('uuid')
+                        to_id = related_props.get('uuid')
+                        rel_type = relationship.get('label', 'RELATED_TO')
+                        
+                        if from_id and to_id:
+                            edge = {
+                                'from': from_id,
+                                'to': to_id,
+                                'type': rel_type,
+                                'label': rel_type.replace('_', ' '),
+                                'properties': rel_props
+                            }
+                            edges.append(edge)
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"Could not parse relationship data: {e}")
+        
+        return jsonify({
+            'nodes': list(nodes.values()),
+            'edges': edges,
+            'count': len(nodes)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error fetching graph data: {e}")
+        return jsonify({
+            'error': f"Failed to fetch graph data: {str(e)}",
+            'nodes': [],
+            'edges': [],
+            'count': 0
+        }), 500
