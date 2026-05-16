@@ -139,6 +139,109 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
         
+        .expandable-row {
+            cursor: pointer;
+        }
+        
+        .expandable-row:hover {
+            background-color: #f8f9ff !important;
+        }
+        
+        .detail-row {
+            display: none;
+            background: #f8f9ff;
+        }
+        
+        .detail-row.show {
+            display: table-row;
+        }
+        
+        .detail-cell {
+            padding: 20px !important;
+            border-bottom: 2px solid #e0e3ff !important;
+        }
+        
+        .detail-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .detail-section {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e3ff;
+        }
+        
+        .detail-section h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .detail-item {
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .detail-label {
+            color: #666;
+            font-weight: 600;
+            display: inline-block;
+            min-width: 120px;
+        }
+        
+        .detail-value {
+            color: #333;
+        }
+        
+        .expand-icon {
+            display: inline-block;
+            margin-right: 8px;
+            transition: transform 0.3s ease;
+            font-size: 0.8em;
+        }
+        
+        .expand-icon.expanded {
+            transform: rotate(90deg);
+        }
+        
+        .age-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: #e8f5e9;
+            color: #2e7d32;
+            margin-left: 8px;
+        }
+        
+        .deceased-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: #fce4ec;
+            color: #c2185b;
+            margin-left: 8px;
+        }
+        
+        .record-count {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: #e3f2fd;
+            color: #1976d2;
+            margin-left: 5px;
+        }
+        
         .persons-table thead {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -251,7 +354,10 @@
             <h1>👥 Persons</h1>
             <div class="nav-links">
                 <a href="/" class="btn-nav">🏠 Home</a>
-                <a href="/graph" class="btn-nav">🌳 Graph Visualizer</a>
+                <a href="/baptisms" class="btn-nav">⛪ Baptisms</a>
+                <a href="/marriages" class="btn-nav">💒 Marriages</a>
+                <a href="/deaths" class="btn-nav">🕊️ Deaths</a>
+                <a href="/graph" class="btn-nav">🌳 Graph</a>
             </div>
         </div>
         
@@ -290,21 +396,23 @@
                         <th>Name</th>
                         <th>Gender</th>
                         <th class="hide-mobile">Birth Date</th>
-                        <th class="hide-mobile">Birth Place</th>
                         <th class="hide-mobile">Death Date</th>
-                        <th class="hide-mobile">Death Place</th>
+                        <th class="hide-mobile">Age/Status</th>
                         <th>Occupation</th>
                         <th class="hide-mobile">Parish</th>
+                        <th class="hide-mobile">Records</th>
                     </tr>
                 </thead>
                 <tbody id="personsTableBody">
                     {% for person in persons %}
-                    <tr data-gender="{{ person.gender or 'Unknown' }}" 
-                        data-search="{{ (person.first_name or '') + ' ' + (person.last_name or '') + ' ' + (person.maiden_name or '') + ' ' + (person.birth_place or '') + ' ' + (person.death_place or '') + ' ' + (person.occupation or '') + ' ' + (person.parish or '') }}">
+                    <tr class="expandable-row" data-person-id="{{ person.id }}"
+                        data-gender="{{ person.gender or 'Unknown' }}"
+                        data-search="{{ (person.first_name or '') + ' ' + (person.last_name or '') + ' ' + (person.maiden_name or '') + ' ' + (person.birth_place or '') + ' ' + (person.death_place or '') + ' ' + (person.occupation or '') + ' ' + (person.parish or '') + ' ' + (person.residence or '') }}">
                         <td>
+                            <span class="expand-icon">▶</span>
                             <strong>{{ person.first_name or '' }} {{ person.last_name or '' }}</strong>
                             {% if person.maiden_name %}
-                            <br><small style="color: #666;">(née {{ person.maiden_name }})</small>
+                            <br><small style="color: #666; margin-left: 20px;">(née {{ person.maiden_name }})</small>
                             {% endif %}
                         </td>
                         <td>
@@ -326,7 +434,6 @@
                             <span class="no-data">—</span>
                             {% endif %}
                         </td>
-                        <td class="hide-mobile">{{ person.birth_place or '—' }}</td>
                         <td class="date-cell hide-mobile">
                             {% if person.death_date %}
                             {{ person.death_date.strftime('%Y-%m-%d') }}
@@ -337,9 +444,235 @@
                             <span class="no-data">—</span>
                             {% endif %}
                         </td>
-                        <td class="hide-mobile">{{ person.death_place or '—' }}</td>
+                        <td class="hide-mobile">
+                            {% if person.birth_date and person.death_date %}
+                                {% set age_days = (person.death_date - person.birth_date).days %}
+                                {% set age_years = (age_days / 365.25) | int %}
+                                <span class="deceased-badge">{{ age_years }} years</span>
+                            {% elif person.birth_date and not person.death_date %}
+                                {% set today = now() %}
+                                {% set age_days = (today.date() - person.birth_date).days %}
+                                {% set age_years = (age_days / 365.25) | int %}
+                                <span class="age-badge">{{ age_years }} years</span>
+                            {% elif person.death_date %}
+                                <span class="deceased-badge">Deceased</span>
+                            {% else %}
+                                <span class="no-data">—</span>
+                            {% endif %}
+                        </td>
                         <td>{{ person.occupation or '—' }}</td>
                         <td class="hide-mobile">{{ person.parish or '—' }}</td>
+                        <td class="hide-mobile">
+                            {% set baptism_count = person.baptism_as_child | length %}
+                            {% set marriage_count = (person.marriages_as_spouse1 | length) + (person.marriages_as_spouse2 | length) %}
+                            {% set death_count = person.death_records | length %}
+                            {% set total_records = baptism_count + marriage_count + death_count %}
+                            {% if total_records > 0 %}
+                            <span class="record-count" title="Baptisms: {{ baptism_count }}, Marriages: {{ marriage_count }}, Deaths: {{ death_count }}">
+                                {{ total_records }}
+                            </span>
+                            {% else %}
+                            <span class="no-data">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="detail-row" id="detail-{{ person.id }}">
+                        <td colspan="8" class="detail-cell">
+                            <div class="detail-content">
+                                <div class="detail-section">
+                                    <h4>📋 Basic Information</h4>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Full Name:</span>
+                                        <span class="detail-value">{{ person.first_name or '—' }} {{ person.last_name or '—' }}</span>
+                                    </div>
+                                    {% if person.maiden_name %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Maiden Name:</span>
+                                        <span class="detail-value">{{ person.maiden_name }}</span>
+                                    </div>
+                                    {% endif %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Gender:</span>
+                                        <span class="detail-value">{{ person.gender or 'Unknown' }}</span>
+                                    </div>
+                                    {% if person.occupation %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Occupation:</span>
+                                        <span class="detail-value">{{ person.occupation }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="detail-section">
+                                    <h4>🎂 Birth Information</h4>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Birth Date:</span>
+                                        <span class="detail-value">
+                                            {% if person.birth_date %}
+                                            {{ person.birth_date.strftime('%Y-%m-%d') }}
+                                            {% if person.birth_date_estimated %}<small>(estimated)</small>{% endif %}
+                                            {% else %}—{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Birth Place:</span>
+                                        <span class="detail-value">{{ person.birth_place or '—' }}</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-section">
+                                    <h4>🕊️ Death Information</h4>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Death Date:</span>
+                                        <span class="detail-value">
+                                            {% if person.death_date %}
+                                            {{ person.death_date.strftime('%Y-%m-%d') }}
+                                            {% if person.death_date_estimated %}<small>(estimated)</small>{% endif %}
+                                            {% else %}—{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Death Place:</span>
+                                        <span class="detail-value">{{ person.death_place or '—' }}</span>
+                                    </div>
+                                    {% if person.birth_date and person.death_date %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Lifespan:</span>
+                                        <span class="detail-value">
+                                            {% set age_days = (person.death_date - person.birth_date).days %}
+                                            {% set age_years = (age_days / 365.25) | int %}
+                                            {{ age_years }} years
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="detail-section">
+                                    <h4>📍 Location Information</h4>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Parish:</span>
+                                        <span class="detail-value">{{ person.parish or '—' }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Residence:</span>
+                                        <span class="detail-value">{{ person.residence or '—' }}</span>
+                                    </div>
+                                    {% if person.house_number %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">House Number:</span>
+                                        <span class="detail-value">{{ person.house_number }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                {% if person.notes or person.gedcom_id %}
+                                <div class="detail-section">
+                                    <h4>📝 Additional Information</h4>
+                                    {% if person.gedcom_id %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">GEDCOM ID:</span>
+                                        <span class="detail-value">{{ person.gedcom_id }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if person.notes %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Notes:</span>
+                                        <span class="detail-value">{{ person.notes }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                
+                                {% if person.father or person.mother %}
+                                <div class="detail-section">
+                                    <h4>👨‍👩‍👦 Parents</h4>
+                                    {% if person.father %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Father:</span>
+                                        <span class="detail-value">
+                                            {{ person.father.first_name or '—' }} {{ person.father.last_name or '—' }}
+                                            {% if person.father.birth_date %}
+                                            <small style="color: #666;">(b. {{ person.father.birth_date.strftime('%Y-%m-%d') }})</small>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                    {% if person.mother %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Mother:</span>
+                                        <span class="detail-value">
+                                            {{ person.mother.first_name or '—' }} {{ person.mother.last_name or '—' }}
+                                            {% if person.mother.maiden_name %}
+                                            <small style="color: #666;">(née {{ person.mother.maiden_name }})</small>
+                                            {% endif %}
+                                            {% if person.mother.birth_date %}
+                                            <small style="color: #666;">(b. {{ person.mother.birth_date.strftime('%Y-%m-%d') }})</small>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                
+                                {% set children_as_father = person.children_as_father | list %}
+                                {% set children_as_mother = person.children_as_mother | list %}
+                                {% set all_children = (children_as_father + children_as_mother) | unique | list %}
+                                {% if all_children %}
+                                <div class="detail-section">
+                                    <h4>👶 Children</h4>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Number of Children:</span>
+                                        <span class="detail-value">{{ all_children | length }}</span>
+                                    </div>
+                                    {% for child in all_children[:5] %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Child {{ loop.index }}:</span>
+                                        <span class="detail-value">
+                                            {{ child.first_name or '—' }} {{ child.last_name or '—' }}
+                                            {% if child.birth_date %}
+                                            <small style="color: #666;">(b. {{ child.birth_date.strftime('%Y-%m-%d') }})</small>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    {% endfor %}
+                                    {% if all_children | length > 5 %}
+                                    <div class="detail-item">
+                                        <span class="detail-value" style="color: #666; font-style: italic;">
+                                            ... and {{ all_children | length - 5 }} more
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                
+                                <div class="detail-section">
+                                    <h4>🔗 Related Records</h4>
+                                    {% set baptism_count = person.baptism_as_child | length %}
+                                    {% set marriage_count = (person.marriages_as_spouse1 | length) + (person.marriages_as_spouse2 | length) %}
+                                    {% set death_count = person.death_records | length %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Baptism Records:</span>
+                                        <span class="detail-value">{{ baptism_count }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Marriage Records:</span>
+                                        <span class="detail-value">{{ marriage_count }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Death Records:</span>
+                                        <span class="detail-value">{{ death_count }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">As Father:</span>
+                                        <span class="detail-value">{{ person.baptism_as_father | length }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">As Mother:</span>
+                                        <span class="detail-value">{{ person.baptism_as_mother | length }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -361,6 +694,36 @@
         const displayedCount = document.getElementById('displayedCount');
         const totalCount = document.getElementById('totalCount');
         
+        // Handle row expansion
+        document.addEventListener('DOMContentLoaded', function() {
+            const expandableRows = document.querySelectorAll('.expandable-row');
+            
+            expandableRows.forEach(row => {
+                row.addEventListener('click', function() {
+                    const personId = this.getAttribute('data-person-id');
+                    const detailRow = document.getElementById('detail-' + personId);
+                    const expandIcon = this.querySelector('.expand-icon');
+                    
+                    if (detailRow.classList.contains('show')) {
+                        detailRow.classList.remove('show');
+                        expandIcon.classList.remove('expanded');
+                    } else {
+                        // Close all other detail rows
+                        document.querySelectorAll('.detail-row.show').forEach(dr => {
+                            dr.classList.remove('show');
+                        });
+                        document.querySelectorAll('.expand-icon.expanded').forEach(ei => {
+                            ei.classList.remove('expanded');
+                        });
+                        
+                        // Open this detail row
+                        detailRow.classList.add('show');
+                        expandIcon.classList.add('expanded');
+                    }
+                });
+            });
+        });
+        
         function filterTable() {
             const searchTerm = searchInput.value.toLowerCase();
             const selectedGender = genderFilter.value;
@@ -368,17 +731,36 @@
             let visibleCount = 0;
             
             for (let row of rows) {
-                const searchData = row.getAttribute('data-search').toLowerCase();
+                // Skip detail rows
+                if (row.classList.contains('detail-row')) {
+                    continue;
+                }
+                
+                const searchData = row.getAttribute('data-search');
                 const gender = row.getAttribute('data-gender');
                 
-                const matchesSearch = searchData.includes(searchTerm);
+                if (!searchData) continue;
+                
+                const matchesSearch = searchData.toLowerCase().includes(searchTerm);
                 const matchesGender = !selectedGender || gender === selectedGender;
                 
                 if (matchesSearch && matchesGender) {
                     row.style.display = '';
                     visibleCount++;
+                    // Also show the corresponding detail row if it was expanded
+                    const personId = row.getAttribute('data-person-id');
+                    const detailRow = document.getElementById('detail-' + personId);
+                    if (detailRow && detailRow.classList.contains('show')) {
+                        detailRow.style.display = 'table-row';
+                    }
                 } else {
                     row.style.display = 'none';
+                    // Hide the corresponding detail row
+                    const personId = row.getAttribute('data-person-id');
+                    const detailRow = document.getElementById('detail-' + personId);
+                    if (detailRow) {
+                        detailRow.style.display = 'none';
+                    }
                 }
             }
             

@@ -115,6 +115,20 @@ class GedcomParser:
                 logger.debug(f"Skipping unknown date: {original_date_str}")
                 return None
             
+            # Handle year range with slash format: "1393/94"
+            if '/' in date_str and date_str.replace('/', '').isdigit():
+                parts = date_str.split('/')
+                if len(parts) == 2 and parts[0].isdigit():
+                    # Use the first year
+                    date_str = parts[0]
+            
+            # Handle year range with slash format: "1393/94"
+            if '/' in date_str and date_str.replace('/', '').isdigit():
+                parts = date_str.split('/')
+                if len(parts) == 2 and parts[0].isdigit():
+                    # Use the first year
+                    date_str = parts[0]
+            
             # Handle BETWEEN dates - extract first date
             # Examples: "BET 07 OCT AND 08 NOV 1260", "BET SEP AND NOV 1081", "BETWEEN 26 AND 27 NOV 1252"
             if 'BETWEEN' in date_str.upper() or date_str.upper().startswith('BET '):
@@ -136,44 +150,34 @@ class GedcomParser:
                     first_parts = first_part.split()
                     second_parts = second_part.split()
                     
-                    # Check if this is a year range format: "975 AND 1001"
-                    if (len(first_parts) == 1 and first_parts[0].isdigit() and len(first_parts[0]) == 4 and
-                        len(second_parts) == 1 and second_parts[0].isdigit() and len(second_parts[0]) == 4):
-                        # This is a year range, use the first year
-                        date_str = first_parts[0]
-                    # Check if this is a day range format: "26 AND 27 NOV 1252"
-                    elif len(first_parts) == 1 and first_parts[0].isdigit() and len(first_parts[0]) <= 2:
-                        # This is a day range, use the day from first part with month/year from second part
-                        # second_part should be like "27 NOV 1252" or just "NOV 1252"
-                        if len(second_parts) >= 2:
-                            # Skip the second day number if present
-                            if second_parts[0].isdigit() and len(second_parts[0]) <= 2:
-                                # Format: "day AND day MONTH YEAR"
-                                date_str = first_parts[0] + ' ' + ' '.join(second_parts[1:])
+                    # Strategy: Try to use first part, but if it lacks a year, extract year from second part
+                    
+                    # Check if first part already has a year (last token is 3+ digit number)
+                    has_year = first_parts and first_parts[-1].isdigit() and len(first_parts[-1]) >= 3
+                    
+                    if not has_year:
+                        # First part lacks a year, find year in second part
+                        year = None
+                        for part in reversed(second_parts):
+                            if part.isdigit() and len(part) >= 3:
+                                year = part
+                                break
+                        
+                        if year:
+                            # Check if first part is "day month" format (e.g., "25 SEP")
+                            # and second part is "month year" or "day month year"
+                            if (len(first_parts) == 2 and
+                                first_parts[0].isdigit() and len(first_parts[0]) <= 2):
+                                # First part is "day month", append year
+                                date_str = first_part + ' ' + year
                             else:
-                                # Format: "day AND MONTH YEAR"
-                                date_str = first_parts[0] + ' ' + ' '.join(second_parts)
+                                # Append year to first part
+                                date_str = first_part + ' ' + year
                         else:
-                            date_str = first_part
-                    # Check if this is a month range: "25 SEP AND NOV 915" or "SEP AND NOV 915"
-                    elif len(first_parts) <= 2 and len(second_parts) >= 2:
-                        # Check if second part has a year at the end
-                        if second_parts[-1].isdigit() and len(second_parts[-1]) == 4:
-                            year = second_parts[-1]
-                            # Use first part with year from second part
-                            date_str = first_part + ' ' + year
-                        else:
+                            # No year found anywhere, just use first part
                             date_str = first_part
                     else:
-                        # Normal BETWEEN format with full dates
-                        # If first part doesn't end with a year (4 digits), append year from second part
-                        if first_parts and not (first_parts[-1].isdigit() and len(first_parts[-1]) == 4):
-                            # Look for year in second part
-                            for part in reversed(second_parts):
-                                if part.isdigit() and len(part) == 4:
-                                    first_part = first_part + ' ' + part
-                                    break
-                        
+                        # First part already has a year, use it as-is
                         date_str = first_part
             
             # Handle WEEN format (shortened BETWEEN)
@@ -236,52 +240,44 @@ class GedcomParser:
                 if 1 <= year <= 9999:  # Valid year range
                     return datetime(year, 1, 1)
             
-            # Try parsing month name + year without day
-            try:
-                # Handle cases like "DEC 894" or "MAY 936" or "APR 1646"
-                parts = date_str.split()
-                if len(parts) == 2:
-                    month_str, year_str = parts
-                    if year_str.isdigit():
-                        year = int(year_str)
-                        if 1 <= year <= 9999:
-                            # Try to parse month (case-insensitive)
-                            for month_fmt in ['%b', '%B']:
+            # Try parsing full date with various separators (day month year)
+            parts = date_str.split()
+            if len(parts) == 3:
+                day_str, month_str, year_str = parts
+                if day_str.isdigit() and year_str.isdigit():
+                    day = int(day_str)
+                    year = int(year_str)
+                    if 1 <= year <= 9999 and 1 <= day <= 31:
+                        # Try to parse month
+                        for month_fmt in ['%b', '%B']:
+                            try:
+                                month_obj = datetime.strptime(month_str.upper(), month_fmt.upper())
+                                return datetime(year, month_obj.month, day)
+                            except ValueError:
                                 try:
-                                    month_obj = datetime.strptime(month_str.upper(), month_fmt.upper())
-                                    return datetime(year, month_obj.month, 1)
-                                except ValueError:
-                                    try:
-                                        # Try with original case
-                                        month_obj = datetime.strptime(month_str, month_fmt)
-                                        return datetime(year, month_obj.month, 1)
-                                    except ValueError:
-                                        continue
-            except Exception:
-                pass
-            
-            # Try parsing full date with various separators
-            try:
-                parts = date_str.split()
-                if len(parts) == 3:
-                    day_str, month_str, year_str = parts
-                    if day_str.isdigit() and year_str.isdigit():
-                        day = int(day_str)
-                        year = int(year_str)
-                        if 1 <= year <= 9999 and 1 <= day <= 31:
-                            # Try to parse month
-                            for month_fmt in ['%b', '%B']:
-                                try:
-                                    month_obj = datetime.strptime(month_str.upper(), month_fmt.upper())
+                                    month_obj = datetime.strptime(month_str, month_fmt)
                                     return datetime(year, month_obj.month, day)
                                 except ValueError:
-                                    try:
-                                        month_obj = datetime.strptime(month_str, month_fmt)
-                                        return datetime(year, month_obj.month, day)
-                                    except ValueError:
-                                        continue
-            except Exception:
-                pass
+                                    continue
+            
+            # Try parsing month name + year without day
+            if len(parts) == 2:
+                month_str, year_str = parts
+                if year_str.isdigit():
+                    year = int(year_str)
+                    if 1 <= year <= 9999:
+                        # Try to parse month (case-insensitive)
+                        for month_fmt in ['%b', '%B']:
+                            try:
+                                month_obj = datetime.strptime(month_str.upper(), month_fmt.upper())
+                                return datetime(year, month_obj.month, 1)
+                            except ValueError:
+                                try:
+                                    # Try with original case
+                                    month_obj = datetime.strptime(month_str, month_fmt)
+                                    return datetime(year, month_obj.month, 1)
+                                except ValueError:
+                                    continue
                     
             logger.warning(f"Could not parse date: {original_date_str}")
             return None
@@ -520,17 +516,55 @@ class GedcomParser:
         # Get spouse IDs from HUSB and WIFE tags
         spouse1_id = None
         spouse2_id = None
+        spouse1_name = None
+        spouse1_surname = None
+        spouse2_name = None
+        spouse2_surname = None
+        spouse2_maiden_name = None
         
         for sub in family.sub_records:
             if sub.tag == 'HUSB' and sub.value:
-                # Remove @ symbols from xref
-                xref = sub.value.strip('@')
+                # Keep xref as-is (with @ symbols) to match person_map keys
+                xref = sub.value
+                
+                # Try to find person by xref in person_map first
                 if xref in self.person_map:
                     spouse1_id = self.person_map[xref]
+                    person = db.session.get(Person, spouse1_id)
+                else:
+                    # Fallback: try to find person by GEDCOM ID in database
+                    # Person.gedcom_id is stored WITH @ symbols
+                    person = Person.query.filter_by(gedcom_id=xref, source_batch_id=self.batch.id).first()
+                    if person:
+                        spouse1_id = person.id
+                        # Update person_map for future lookups
+                        self.person_map[xref] = str(person.id)
+                
+                if person:
+                    spouse1_name = person.first_name
+                    spouse1_surname = person.last_name
+                    
             elif sub.tag == 'WIFE' and sub.value:
-                xref = sub.value.strip('@')
+                # Keep xref as-is (with @ symbols) to match person_map keys
+                xref = sub.value
+                
+                # Try to find person by xref in person_map first
                 if xref in self.person_map:
                     spouse2_id = self.person_map[xref]
+                    person = db.session.get(Person, spouse2_id)
+                else:
+                    # Fallback: try to find person by GEDCOM ID in database
+                    # Person.gedcom_id is stored WITH @ symbols
+                    person = Person.query.filter_by(gedcom_id=xref, source_batch_id=self.batch.id).first()
+                    if person:
+                        spouse2_id = person.id
+                        # Update person_map for future lookups
+                        self.person_map[xref] = str(person.id)
+                
+                if person:
+                    spouse2_name = person.first_name
+                    spouse2_surname = person.last_name
+                    spouse2_maiden_name = person.maiden_name
         
         # Create marriage record with GEDCOM ID tracking
         marriage_record = MarriageRecord(
@@ -539,7 +573,12 @@ class GedcomParser:
             marriage_date=marriage_date.date(),
             parish=parish,
             spouse1_id=spouse1_id,
-            spouse2_id=spouse2_id
+            spouse2_id=spouse2_id,
+            spouse1_name=spouse1_name,
+            spouse1_surname=spouse1_surname,
+            spouse2_name=spouse2_name,
+            spouse2_surname=spouse2_surname,
+            spouse2_maiden_name=spouse2_maiden_name
         )
         
         return marriage_record
@@ -601,6 +640,61 @@ class GedcomParser:
         
         return death_record
     
+    def process_family_children(self, family: Record) -> int:
+        """
+        Process parent-child relationships from a GEDCOM Family record.
+        Updates Person records with father_id and mother_id.
+        
+        Args:
+            family: ged4py Record object representing a family
+            
+        Returns:
+            Number of children processed
+        """
+        from uuid import UUID
+        
+        # Extract parent references - DON'T strip @ symbols, they're in person_map keys
+        father_xref = None
+        mother_xref = None
+        
+        for sub in family.sub_records:
+            if sub.tag == 'HUSB' and sub.value:
+                father_xref = sub.value  # Keep @ symbols
+            elif sub.tag == 'WIFE' and sub.value:
+                mother_xref = sub.value  # Keep @ symbols
+        
+        # Get parent UUIDs from person_map (stored as strings)
+        father_uuid_str = self.person_map.get(father_xref) if father_xref else None
+        mother_uuid_str = self.person_map.get(mother_xref) if mother_xref else None
+        
+        # Convert string UUIDs to UUID objects
+        father_id = UUID(father_uuid_str) if father_uuid_str else None
+        mother_id = UUID(mother_uuid_str) if mother_uuid_str else None
+        
+        # Process children
+        children_count = 0
+        for sub in family.sub_records:
+            if sub.tag == 'CHIL' and sub.value:
+                child_xref = sub.value  # Keep @ symbols
+                child_uuid_str = self.person_map.get(child_xref)
+                
+                if child_uuid_str:
+                    # Update person record with parent references
+                    person = db.session.get(Person, child_uuid_str)
+                    if person:
+                        # Only set if not already set (handle multiple family references)
+                        if father_id and not person.father_id:
+                            person.father_id = father_id
+                            logger.debug(f"Set father for {person.first_name} {person.last_name}")
+                        if mother_id and not person.mother_id:
+                            person.mother_id = mother_id
+                            logger.debug(f"Set mother for {person.first_name} {person.last_name}")
+                        children_count += 1
+                else:
+                    logger.warning(f"Child {child_xref} not found in person_map for family {family.xref_id}")
+        
+        return children_count
+    
     def parse_and_import(self) -> Dict[str, int]:
         """
         Parse the GEDCOM file and import data into the database.
@@ -613,6 +707,7 @@ class GedcomParser:
             'baptisms': 0,
             'marriages': 0,
             'deaths': 0,
+            'parent_child_relationships': 0,
             'errors': []
         }
         
@@ -761,9 +856,9 @@ class GedcomParser:
                                 
                                 for sub in family.sub_records:
                                     if sub.tag == 'HUSB' and sub.value:
-                                        husband_xref = sub.value.strip('@')
+                                        husband_xref = sub.value  # Keep @ symbols for consistency
                                     elif sub.tag == 'WIFE' and sub.value:
-                                        wife_xref = sub.value.strip('@')
+                                        wife_xref = sub.value  # Keep @ symbols for consistency
                                     elif sub.tag == 'MARR':
                                         for subsub in sub.sub_records:
                                             if subsub.tag == 'DATE' and subsub.value:
@@ -794,14 +889,56 @@ class GedcomParser:
                 db.session.commit()
                 logger.info(f"Created {stats['marriages']} marriage records")
             
+            # Fourth pass: Process parent-child relationships from families
+            print("\n" + "="*80)
+            print("STARTING PARENT-CHILD RELATIONSHIP PROCESSING")
+            print("="*80)
+            logger.info("Processing parent-child relationships...")
+            children_processed = 0
+            
+            with GedcomReader(self.filepath, encoding=encoding) as reader4:
+                families = list(reader4.records0('FAM'))
+                print(f"Found {len(families)} families to process")
+                
+                for family in families:
+                    try:
+                        print(f"\nProcessing family {family.xref_id}")
+                        count = self.process_family_children(family)
+                        children_processed += count
+                        print(f"  -> Processed {count} children")
+                    except Exception as e:
+                        error_msg = f"Error processing family children {family.xref_id}: {str(e)}"
+                        print(f"  -> ERROR: {error_msg}")
+                        logger.error(error_msg)
+                        stats['errors'].append(error_msg)
+                        import traceback
+                        traceback.print_exc()
+            
+            print(f"\nCommitting changes to database...")
+            db.session.commit()
+            print(f"TOTAL: Processed {children_processed} parent-child relationships")
+            print("="*80 + "\n")
+            logger.info(f"Processed {children_processed} parent-child relationships")
+            stats['parent_child_relationships'] = children_processed
+            
             # Import data into AGE graph
             try:
+                print("\n" + "="*80)
+                print("STARTING AGE GRAPH IMPORT")
+                print("="*80)
                 logger.info("Starting AGE graph import...")
                 self._import_to_age_graph(stats)
                 logger.info("AGE graph import completed")
+                print("AGE GRAPH IMPORT COMPLETED SUCCESSFULLY")
+                print("="*80 + "\n")
             except Exception as e:
+                print(f"\n!!! AGE GRAPH IMPORT FAILED !!!")
+                print(f"Error: {e}")
+                print("="*80 + "\n")
                 logger.error(f"AGE graph import failed: {e}")
                 stats['errors'].append(f"AGE graph import failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
             
             # Update uploaded file status
             if uploaded_file:
@@ -890,12 +1027,12 @@ class GedcomParser:
                     'gedcom_id': death.gedcom_id,
                     'event_type': 'death',
                     'date': death.death_date,
-                    'place': death.death_place,
+                    'place': death.village or death.cemetery,  # DeathRecord has village/cemetery, not death_place
                     'parish': death.parish
                 }
                 importer.create_event_vertex(str(death.id), event_props)
                 importer.create_died_in_edge(
-                    str(death.person_id),
+                    str(death.deceased_id),  # DeathRecord has deceased_id, not person_id
                     str(death.id),
                     str(death.death_date) if death.death_date else None
                 )
@@ -904,29 +1041,43 @@ class GedcomParser:
             # Import marriages and create MARRIED_TO edges
             marriages = MarriageRecord.query.filter_by(source_batch_id=self.batch.id).all()
             for marriage in marriages:
-                if marriage.husband_id and marriage.wife_id:
+                if marriage.spouse1_id and marriage.spouse2_id:  # MarriageRecord has spouse1_id/spouse2_id, not husband_id/wife_id
                     importer.create_marriage_edge(
-                        str(marriage.husband_id),
-                        str(marriage.wife_id),
+                        str(marriage.spouse1_id),
+                        str(marriage.spouse2_id),
                         str(marriage.marriage_date) if marriage.marriage_date else None,
-                        marriage.marriage_place,
+                        marriage.village or marriage.parish,  # MarriageRecord has village/parish, not marriage_place
                         marriage.gedcom_id
                     )
             
             # Import parent-child relationships
+            print("\n" + "="*80)
+            print("IMPORTING PARENT-CHILD RELATIONSHIPS TO AGE GRAPH")
+            print("="*80)
+            parent_edges_created = 0
             for person in persons:
                 if person.father_id:
-                    importer.create_parent_child_edge(
+                    print(f"Creating father edge: {person.father_id} -> {person.id} ({person.first_name} {person.last_name})")
+                    result = importer.create_parent_child_edge(
                         str(person.father_id),
                         str(person.id),
                         'father'
                     )
+                    if result:
+                        parent_edges_created += 1
+                    print(f"  Result: {result}")
                 if person.mother_id:
-                    importer.create_parent_child_edge(
+                    print(f"Creating mother edge: {person.mother_id} -> {person.id} ({person.first_name} {person.last_name})")
+                    result = importer.create_parent_child_edge(
                         str(person.mother_id),
                         str(person.id),
                         'mother'
                     )
+                    if result:
+                        parent_edges_created += 1
+                    print(f"  Result: {result}")
+            print(f"\nTotal PARENT_OF edges created: {parent_edges_created}")
+            print("="*80 + "\n")
             
             # Get graph statistics
             graph_stats = importer.get_statistics()

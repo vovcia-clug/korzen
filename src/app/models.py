@@ -112,6 +112,18 @@ class Person(db.Model):
     house_number = db.Column(String(50), nullable=True)
     parish = db.Column(String(200), nullable=True)
     
+    # Parent relationships
+    father_id = db.Column(
+        UUID(as_uuid=True),
+        ForeignKey("persons.id"),
+        nullable=True,
+    )
+    mother_id = db.Column(
+        UUID(as_uuid=True),
+        ForeignKey("persons.id"),
+        nullable=True,
+    )
+    
     # Social status
     social_status_id = db.Column(
         UUID(as_uuid=True),
@@ -130,6 +142,20 @@ class Person(db.Model):
     # Relationships
     source_batch = relationship("RecordBatch")
     social_status = relationship("SocialStatus", back_populates="persons")
+    
+    # Parent relationships
+    father = relationship(
+        "Person",
+        remote_side=[id],
+        foreign_keys=[father_id],
+        backref="children_as_father"
+    )
+    mother = relationship(
+        "Person",
+        remote_side=[id],
+        foreign_keys=[mother_id],
+        backref="children_as_mother"
+    )
     
     # Baptism records where this person is the child
     baptism_as_child = relationship(

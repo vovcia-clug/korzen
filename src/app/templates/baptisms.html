@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baptisms - Korzen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-nav {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        
+        .btn-nav:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .search-bar {
+            margin-bottom: 25px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 12px 16px;
+            border: 2px solid #e0e3ff;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .filter-select {
+            padding: 12px 16px;
+            border: 2px solid #e0e3ff;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .filter-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8eaff 100%);
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 1px solid #e0e3ff;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            color: #333;
+            font-size: 1.5em;
+            font-weight: 700;
+        }
+        
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .records-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .records-table th {
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .records-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+        
+        .records-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        
+        .records-table tbody tr:hover {
+            background-color: #f8f9ff;
+        }
+        
+        .records-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .gender-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .gender-m {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .gender-f {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+        
+        .gender-unknown {
+            background: #f5f5f5;
+            color: #757575;
+        }
+        
+        .legitimate-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        
+        .legitimate-yes {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .legitimate-no {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .no-data {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .no-records {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .no-records-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #f44336;
+            margin-bottom: 20px;
+        }
+        
+        .date-cell {
+            white-space: nowrap;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .records-table {
+                font-size: 0.85em;
+            }
+            
+            .records-table th,
+            .records-table td {
+                padding: 8px 6px;
+            }
+            
+            .hide-mobile {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⛪ Baptism Records</h1>
+            <div class="nav-links">
+                <a href="/" class="btn-nav">🏠 Home</a>
+                <a href="/persons" class="btn-nav">👥 Persons</a>
+                <a href="/marriages" class="btn-nav">💒 Marriages</a>
+                <a href="/deaths" class="btn-nav">🕊️ Deaths</a>
+                <a href="/graph" class="btn-nav">🌳 Graph</a>
+            </div>
+        </div>
+        
+        {% if error %}
+        <div class="error-message">
+            <strong>Error:</strong> {{ error }}
+        </div>
+        {% endif %}
+        
+        <div class="search-bar">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search by child name, parents, parish, or village...">
+            <select id="genderFilter" class="filter-select">
+                <option value="">All Genders</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="Unknown">Unknown</option>
+            </select>
+            <select id="legitimateFilter" class="filter-select">
+                <option value="">All Status</option>
+                <option value="true">Legitimate</option>
+                <option value="false">Illegitimate</option>
+            </select>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Baptisms</div>
+                <div class="stat-value" id="totalCount">{{ baptisms|length }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Displayed</div>
+                <div class="stat-value" id="displayedCount">{{ baptisms|length }}</div>
+            </div>
+        </div>
+        
+        {% if baptisms %}
+        <div style="overflow-x: auto;">
+            <table class="records-table" id="recordsTable">
+                <thead>
+                    <tr>
+                        <th>Baptism Date</th>
+                        <th>Child Name</th>
+                        <th>Gender</th>
+                        <th class="hide-mobile">Father</th>
+                        <th class="hide-mobile">Mother</th>
+                        <th>Parish</th>
+                        <th class="hide-mobile">Village</th>
+                        <th class="hide-mobile">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="recordsTableBody">
+                    {% for baptism in baptisms %}
+                    <tr data-gender="{{ baptism.child_gender or 'Unknown' }}"
+                        data-legitimate="{{ baptism.legitimate }}"
+                        data-search="{{ (baptism.child_name or '') + ' ' + (baptism.father_name or '') + ' ' + (baptism.father_surname or '') + ' ' + (baptism.mother_name or '') + ' ' + (baptism.mother_maiden_name or '') + ' ' + (baptism.parish or '') + ' ' + (baptism.village or '') }}">
+                        <td class="date-cell">
+                            {% if baptism.baptism_date %}
+                            {{ baptism.baptism_date.strftime('%Y-%m-%d') }}
+                            {% else %}
+                            <span class="no-data">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ baptism.child_name or '—' }}</strong>
+                        </td>
+                        <td>
+                            {% if baptism.child_gender == 'M' %}
+                            <span class="gender-badge gender-m">Male</span>
+                            {% elif baptism.child_gender == 'F' %}
+                            <span class="gender-badge gender-f">Female</span>
+                            {% else %}
+                            <span class="gender-badge gender-unknown">Unknown</span>
+                            {% endif %}
+                        </td>
+                        <td class="hide-mobile">
+                            {% if baptism.father_name or baptism.father_surname %}
+                            {{ baptism.father_name or '' }} {{ baptism.father_surname or '' }}
+                            {% else %}
+                            <span class="no-data">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="hide-mobile">
+                            {% if baptism.mother_name or baptism.mother_maiden_name %}
+                            {{ baptism.mother_name or '' }} {{ baptism.mother_maiden_name or '' }}
+                            {% else %}
+                            <span class="no-data">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ baptism.parish or '—' }}</td>
+                        <td class="hide-mobile">{{ baptism.village or '—' }}</td>
+                        <td class="hide-mobile">
+                            {% if baptism.legitimate == True %}
+                            <span class="legitimate-badge legitimate-yes">Legitimate</span>
+                            {% elif baptism.legitimate == False %}
+                            <span class="legitimate-badge legitimate-no">Illegitimate</span>
+                            {% else %}
+                            <span class="no-data">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="no-records">
+            <div class="no-records-icon">⛪</div>
+            <h2>No Baptism Records Found</h2>
+            <p>Upload and parse a GEDCOM file to see baptism records in the database.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const genderFilter = document.getElementById('genderFilter');
+        const legitimateFilter = document.getElementById('legitimateFilter');
+        const tableBody = document.getElementById('recordsTableBody');
+        const displayedCount = document.getElementById('displayedCount');
+        const totalCount = document.getElementById('totalCount');
+        
+        function filterTable() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedGender = genderFilter.value;
+            const selectedLegitimate = legitimateFilter.value;
+            const rows = tableBody.getElementsByTagName('tr');
+            let visibleCount = 0;
+            
+            for (let row of rows) {
+                const searchData = row.getAttribute('data-search').toLowerCase();
+                const gender = row.getAttribute('data-gender');
+                const legitimate = row.getAttribute('data-legitimate');
+                
+                const matchesSearch = searchData.includes(searchTerm);
+                const matchesGender = !selectedGender || gender === selectedGender;
+                const matchesLegitimate = !selectedLegitimate || legitimate === selectedLegitimate;
+                
+                if (matchesSearch && matchesGender && matchesLegitimate) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+            
+            displayedCount.textContent = visibleCount;
+        }
+        
+        searchInput.addEventListener('input', filterTable);
+        genderFilter.addEventListener('change', filterTable);
+        legitimateFilter.addEventListener('change', filterTable);
+    </script>
+</body>
+</html>

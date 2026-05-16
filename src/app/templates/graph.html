@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Korzen - Graph Visualizer</title>
+    <title>Korzen - Family Tree Visualizer</title>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         * {
@@ -294,28 +294,40 @@
 </head>
 <body>
     <div class="header">
-        <h1>🌳 Genealogy Graph Visualizer</h1>
+        <h1>🌳 Family Tree Visualizer</h1>
         <div class="nav-buttons">
             <a href="/" class="btn">🏠 Home</a>
             <a href="/persons" class="btn">👥 Persons</a>
+            <a href="/baptisms" class="btn">⛪ Baptisms</a>
+            <a href="/marriages" class="btn">💒 Marriages</a>
+            <a href="/deaths" class="btn">🕊️ Deaths</a>
         </div>
     </div>
     
     <div class="controls">
         <div class="control-group">
-            <label for="limitInput">Node Limit:</label>
+            <label for="limitInput">Person Limit:</label>
             <input type="number" id="limitInput" value="100" min="10" max="1000" step="10">
         </div>
-        <button class="btn-primary" id="loadBtn" onclick="loadGraph()">Load Graph</button>
+        <div class="control-group">
+            <label for="depthInput">Generations:</label>
+            <input type="number" id="depthInput" value="3" min="1" max="10" step="1" title="Number of descendant generations to show">
+        </div>
+        <button class="btn-primary" id="loadBtn" onclick="loadGraph()">Load Family Tree</button>
         <button class="btn-primary" id="resetBtn" onclick="resetView()">Reset View</button>
+        <button class="btn-primary" id="clearRootBtn" onclick="clearRoot()" style="display: none;">Clear Ancestor</button>
         <div class="stats">
             <div class="stat-item">
-                <span class="stat-label">Nodes:</span>
+                <span class="stat-label">People:</span>
                 <span class="stat-value" id="nodeCount">0</span>
             </div>
             <div class="stat-item">
-                <span class="stat-label">Edges:</span>
+                <span class="stat-label">Relationships:</span>
                 <span class="stat-value" id="edgeCount">0</span>
+            </div>
+            <div class="stat-item" id="rootIndicator" style="display: none;">
+                <span class="stat-label">Ancestor:</span>
+                <span class="stat-value" id="rootName">None</span>
             </div>
         </div>
     </div>
@@ -332,22 +344,26 @@
         </div>
         
         <div class="legend">
-            <h4>Legend</h4>
+            <h4>Family Tree Legend</h4>
             <div class="legend-item">
-                <div class="legend-color male"></div>
+                <div class="legend-color male" style="background: #e3f2fd; border-color: #1976d2;"></div>
                 <span>Male</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color female"></div>
+                <div class="legend-color female" style="background: #fce4ec; border-color: #c2185b;"></div>
                 <span>Female</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color unknown"></div>
-                <span>Unknown Gender</span>
+                <div class="legend-color unknown" style="background: #f5f5f5; border-color: #757575;"></div>
+                <span>Unknown</span>
+            </div>
+            <div class="legend-item" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                <div style="width: 30px; height: 3px; background: #2e7d32; margin-right: 10px;"></div>
+                <span>Parent → Child</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color event"></div>
-                <span>Event</span>
+                <div style="width: 30px; height: 3px; background: #c2185b; margin-right: 10px;"></div>
+                <span>Marriage 💑 (grouped together)</span>
             </div>
         </div>
     </div>
@@ -356,18 +372,20 @@
         let network = null;
         let nodes = null;
         let edges = null;
+        let currentRootId = null;
         
         // Initialize the graph on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadGraph();
         });
         
-        async function loadGraph() {
+        async function loadGraph(rootId = null) {
             const loadBtn = document.getElementById('loadBtn');
             const loading = document.getElementById('loading');
             const error = document.getElementById('error');
             const graphDiv = document.getElementById('graph');
             const limit = document.getElementById('limitInput').value;
+            const depth = document.getElementById('depthInput').value;
             
             // Show loading state
             loadBtn.disabled = true;
@@ -375,8 +393,15 @@
             loading.style.display = 'block';
             error.style.display = 'none';
             
+            // Store current root ID
+            currentRootId = rootId;
+            
             try {
-                const response = await fetch(`/api/graph/data?limit=${limit}`);
+                let url = `/api/graph/data?limit=${limit}&depth=${depth}`;
+                if (rootId) {
+                    url += `&root_id=${rootId}`;
+                }
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (!response.ok) {
@@ -390,68 +415,281 @@
                 // Transform data for vis.js
                 const visNodes = data.nodes.map(node => {
                     let color = '#bdbdbd'; // Unknown/default
-                    let shape = 'dot';
+                    let shape = 'box';
+                    let borderWidth = 2;
+                    let borderColor = '#333';
                     
                     if (node.type === 'Person') {
                         if (node.gender === 'M') {
-                            color = '#64b5f6'; // Blue for male
+                            color = '#e3f2fd'; // Light blue background for male
+                            borderColor = '#1976d2'; // Darker blue border
                         } else if (node.gender === 'F') {
-                            color = '#f48fb1'; // Pink for female
+                            color = '#fce4ec'; // Light pink background for female
+                            borderColor = '#c2185b'; // Darker pink border
+                        } else {
+                            color = '#f5f5f5'; // Light gray for unknown
+                            borderColor = '#757575';
                         }
-                        shape = 'dot';
+                        shape = 'box';
+                        
+                        // Build multi-line label for person
+                        let label = node.label;
+                        if (node.birth_date || node.death_date) {
+                            const birthYear = node.birth_date ? node.birth_date.split('-')[0] : '?';
+                            const deathYear = node.death_date ? node.death_date.split('-')[0] : '?';
+                            label += `\n(${birthYear} - ${deathYear})`;
+                        }
+                        
+                        // Highlight root node
+                        if (currentRootId && node.id === currentRootId) {
+                            borderWidth = 4;
+                            borderColor = '#ff6f00'; // Orange border for root
+                        }
+                        
+                        return {
+                            id: node.id,
+                            label: label,
+                            title: createTooltip(node),
+                            color: {
+                                background: color,
+                                border: borderColor,
+                                highlight: {
+                                    background: color,
+                                    border: '#ff6f00'
+                                }
+                            },
+                            shape: shape,
+                            font: {
+                                size: 13,
+                                color: '#333',
+                                multi: 'html',
+                                bold: {
+                                    size: 14
+                                }
+                            },
+                            borderWidth: borderWidth,
+                            data: node
+                        };
                     } else if (node.type === 'Event') {
-                        color = '#fff59d'; // Yellow for events
-                        shape = 'diamond';
+                        // Hide event nodes in family tree view
+                        return null;
+                    } else if (node.type === 'Source') {
+                        // Hide source nodes in family tree view
+                        return null;
                     }
                     
-                    return {
-                        id: node.id,
-                        label: node.label,
-                        title: createTooltip(node),
-                        color: color,
-                        shape: shape,
-                        size: 20,
-                        font: {
-                            size: 12,
-                            color: '#333'
-                        },
-                        data: node
-                    };
-                });
+                    // If we get here, it's an unknown node type - hide it
+                    return null;
+                }).filter(node => node !== null); // Remove null nodes (events)
                 
-                const visEdges = data.edges.map(edge => {
+                // Update root indicator
+                if (currentRootId) {
+                    const rootNode = data.nodes.find(n => n.id === currentRootId);
+                    if (rootNode) {
+                        document.getElementById('rootName').textContent = rootNode.label;
+                        document.getElementById('rootIndicator').style.display = 'flex';
+                        document.getElementById('clearRootBtn').style.display = 'block';
+                    }
+                } else {
+                    document.getElementById('rootIndicator').style.display = 'none';
+                    document.getElementById('clearRootBtn').style.display = 'none';
+                }
+                
+                let visEdges = data.edges.map(edge => {
                     let color = '#999';
-                    let width = 1;
+                    let width = 2;
                     let dashes = false;
+                    let label = '';
                     
-                    // Style edges based on type
+                    // Style edges based on type - focus on parent-child relationships
                     if (edge.type === 'PARENT_OF') {
-                        color = '#4caf50';
-                        width = 2;
+                        color = '#2e7d32'; // Dark green for parent-child
+                        width = 3;
+                        // Don't show label for cleaner look
                     } else if (edge.type === 'MARRIED_TO') {
-                        color = '#e91e63';
-                        width = 2;
+                        color = '#c2185b'; // Pink for marriage
+                        width = 3;
+                        dashes = false; // Solid line for marriage to show strong connection
+                        label = '💑'; // Heart emoji for marriage
                     } else if (edge.type === 'GODPARENT_OF') {
-                        color = '#9c27b0';
-                        dashes = true;
+                        // Hide godparent relationships in family tree view
+                        return null;
                     } else if (edge.type === 'BAPTIZED_IN' || edge.type === 'DIED_IN') {
-                        color = '#ff9800';
-                        dashes = true;
+                        // Hide event relationships in family tree view
+                        return null;
+                    } else if (edge.type === 'FROM_SOURCE') {
+                        // Hide source relationships in family tree view
+                        return null;
+                    } else {
+                        // Hide all other non-family relationships
+                        return null;
                     }
                     
                     return {
                         from: edge.from,
                         to: edge.to,
-                        label: edge.label,
-                        color: color,
+                        label: label,
+                        color: {
+                            color: color,
+                            highlight: '#ff6f00',
+                            hover: '#ff6f00'
+                        },
                         width: width,
                         dashes: dashes,
-                        arrows: 'to',
+                        arrows: {
+                            to: {
+                                enabled: edge.type === 'PARENT_OF',
+                                scaleFactor: 0.8
+                            }
+                        },
                         font: {
-                            size: 10,
-                            align: 'middle'
+                            size: 16,
+                            align: 'middle',
+                            strokeWidth: 0
+                        },
+                        smooth: {
+                            enabled: edge.type === 'PARENT_OF',
+                            type: edge.type === 'MARRIED_TO' ? 'horizontal' : 'cubicBezier',
+                            forceDirection: edge.type === 'PARENT_OF' ? 'vertical' : 'none',
+                            roundness: edge.type === 'MARRIED_TO' ? 0.2 : 0.5
                         }
                     };
+                }).filter(edge => edge !== null); // Remove null edges (hidden relationships)
+                
+                // Group spouses together and create family unit nodes
+                // Find all marriage relationships
+                const marriages = visEdges.filter(e => e.label === '💑');
+                const spouseGroups = new Map(); // Map to track spouse pairs
+                const familyUnits = new Map(); // Map spouse IDs to family unit node IDs
+                
+                // Track which children belong to which parents
+                const parentChildEdges = visEdges.filter(e => e.type === 'PARENT_OF');
+                const childrenByParent = new Map(); // parent ID -> Set of child IDs
+                
+                parentChildEdges.forEach(edge => {
+                    if (!childrenByParent.has(edge.from)) {
+                        childrenByParent.set(edge.from, new Set());
+                    }
+                    childrenByParent.get(edge.from).add(edge.to);
+                });
+                
+                // Create invisible family unit nodes for each married couple
+                marriages.forEach((marriage, index) => {
+                    const spouse1Id = marriage.from;
+                    const spouse2Id = marriage.to;
+                    const familyUnitId = `family_unit_${spouse1Id}_${spouse2Id}`;
+                    
+                    // Create a group ID for this couple
+                    const groupId = `couple_${spouse1Id}_${spouse2Id}`;
+                    spouseGroups.set(spouse1Id, groupId);
+                    spouseGroups.set(spouse2Id, groupId);
+                    
+                    // Store family unit mapping
+                    familyUnits.set(spouse1Id, familyUnitId);
+                    familyUnits.set(spouse2Id, familyUnitId);
+                    
+                    // Find common children (children of both parents)
+                    const spouse1Children = childrenByParent.get(spouse1Id) || new Set();
+                    const spouse2Children = childrenByParent.get(spouse2Id) || new Set();
+                    const commonChildren = new Set([...spouse1Children].filter(x => spouse2Children.has(x)));
+                    
+                    // Only create family unit node if there are common children
+                    if (commonChildren.size > 0) {
+                        // Add invisible family unit node
+                        visNodes.push({
+                            id: familyUnitId,
+                            label: '',
+                            shape: 'dot',
+                            size: 1,
+                            color: {
+                                background: 'transparent',
+                                border: 'transparent'
+                            },
+                            font: { size: 0 },
+                            fixed: { x: false, y: false },
+                            physics: true,
+                            hidden: false,
+                            data: { type: 'FamilyUnit', spouse1Id, spouse2Id }
+                        });
+                    }
+                });
+                
+                // Modify edges: remove duplicate parent-child edges and route through family units
+                const edgesToRemove = new Set();
+                const edgesToAdd = [];
+                
+                // Process parent-child edges
+                parentChildEdges.forEach((edge, index) => {
+                    const parentId = edge.from;
+                    const childId = edge.to;
+                    const familyUnitId = familyUnits.get(parentId);
+                    
+                    if (familyUnitId) {
+                        // Check if this child has both parents
+                        const spouse1Id = visNodes.find(n => n.id === familyUnitId)?.data?.spouse1Id;
+                        const spouse2Id = visNodes.find(n => n.id === familyUnitId)?.data?.spouse2Id;
+                        
+                        if (spouse1Id && spouse2Id) {
+                            const spouse1Children = childrenByParent.get(spouse1Id) || new Set();
+                            const spouse2Children = childrenByParent.get(spouse2Id) || new Set();
+                            
+                            if (spouse1Children.has(childId) && spouse2Children.has(childId)) {
+                                // This is a common child - mark original edge for removal
+                                edgesToRemove.add(index);
+                                
+                                // Add edge from family unit to child (only once per child)
+                                if (!edgesToAdd.some(e => e.from === familyUnitId && e.to === childId)) {
+                                    edgesToAdd.push({
+                                        from: familyUnitId,
+                                        to: childId,
+                                        type: 'PARENT_OF',
+                                        label: '',
+                                        color: {
+                                            color: '#2e7d32',
+                                            highlight: '#ff6f00',
+                                            hover: '#ff6f00'
+                                        },
+                                        width: 3,
+                                        dashes: false,
+                                        arrows: {
+                                            to: {
+                                                enabled: true,
+                                                scaleFactor: 0.8
+                                            }
+                                        },
+                                        font: {
+                                            size: 16,
+                                            align: 'middle',
+                                            strokeWidth: 0
+                                        },
+                                        smooth: {
+                                            enabled: true,
+                                            type: 'cubicBezier',
+                                            forceDirection: 'vertical',
+                                            roundness: 0.5
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Remove duplicate parent-child edges
+                visEdges = visEdges.filter((edge, index) => !edgesToRemove.has(index));
+                
+                // Add new family unit to child edges
+                visEdges.push(...edgesToAdd);
+                
+                // Assign levels to nodes to ensure spouses are on same level
+                visNodes.forEach(node => {
+                    const groupId = spouseGroups.get(node.id);
+                    if (groupId) {
+                        // Mark nodes that are part of a marriage
+                        node.group = groupId;
+                        // Add a fixed property to help with positioning
+                        node.fixed = { x: false, y: false };
+                    }
                 });
                 
                 // Create network
@@ -465,38 +703,134 @@
                 };
                 
                 const options = {
+                    layout: {
+                        hierarchical: {
+                            enabled: true,
+                            direction: 'UD',        // Up-Down (top to bottom)
+                            sortMethod: 'directed', // Follow edge direction
+                            nodeSpacing: 80,        // Reduced horizontal spacing to group spouses closer
+                            levelSeparation: 200,   // Vertical spacing between generations
+                            treeSpacing: 250,       // Spacing between separate family trees
+                            blockShifting: true,
+                            edgeMinimization: false, // Disable to allow custom spouse positioning
+                            parentCentralization: true,
+                            shakeTowards: 'leaves'  // Helps organize tree structure
+                        }
+                    },
                     physics: {
-                        enabled: true,
-                        barnesHut: {
-                            gravitationalConstant: -2000,
-                            centralGravity: 0.3,
-                            springLength: 150,
-                            springConstant: 0.04,
-                            damping: 0.09,
-                            avoidOverlap: 0.1
-                        },
+                        enabled: true,  // Enable physics to allow spouse grouping
                         stabilization: {
-                            iterations: 200
+                            enabled: true,
+                            iterations: 200,
+                            updateInterval: 25
+                        },
+                        hierarchicalRepulsion: {
+                            centralGravity: 0.0,
+                            springLength: 100,
+                            springConstant: 0.01,
+                            nodeDistance: 150,
+                            damping: 0.09
                         }
                     },
                     interaction: {
                         hover: true,
                         tooltipDelay: 200,
                         navigationButtons: true,
-                        keyboard: true
+                        keyboard: true,
+                        dragNodes: true,
+                        dragView: true,
+                        zoomView: true
                     },
                     nodes: {
                         borderWidth: 2,
-                        borderWidthSelected: 4
+                        borderWidthSelected: 4,
+                        shape: 'box',
+                        margin: 10,
+                        widthConstraint: {
+                            minimum: 100,
+                            maximum: 200
+                        }
                     },
                     edges: {
                         smooth: {
-                            type: 'continuous'
+                            enabled: true,
+                            type: 'cubicBezier',
+                            forceDirection: 'vertical',
+                            roundness: 0.5
+                        },
+                        arrows: {
+                            to: {
+                                enabled: true,
+                                scaleFactor: 0.5
+                            }
                         }
                     }
                 };
                 
                 network = new vis.Network(container, graphData, options);
+                
+                // After stabilization, adjust spouse positions to group them together
+                network.once('stabilizationIterationsDone', function() {
+                    const positions = network.getPositions();
+                    const updates = [];
+                    
+                    // For each marriage, position spouses side by side and family unit in middle
+                    marriages.forEach(marriage => {
+                        const spouse1Id = marriage.from;
+                        const spouse2Id = marriage.to;
+                        const familyUnitId = `family_unit_${spouse1Id}_${spouse2Id}`;
+                        
+                        if (positions[spouse1Id] && positions[spouse2Id]) {
+                            const pos1 = positions[spouse1Id];
+                            const pos2 = positions[spouse2Id];
+                            
+                            // Calculate midpoint
+                            const midX = (pos1.x + pos2.x) / 2;
+                            const midY = (pos1.y + pos2.y) / 2;
+                            
+                            // Position spouses close together horizontally
+                            const spacing = 120; // Horizontal spacing between spouses
+                            
+                            updates.push({
+                                id: spouse1Id,
+                                x: midX - spacing / 2,
+                                y: midY,
+                                fixed: { x: true, y: true }
+                            });
+                            
+                            updates.push({
+                                id: spouse2Id,
+                                x: midX + spacing / 2,
+                                y: midY,
+                                fixed: { x: true, y: true }
+                            });
+                            
+                            // Position family unit node in the middle, slightly below the couple
+                            if (positions[familyUnitId]) {
+                                updates.push({
+                                    id: familyUnitId,
+                                    x: midX,
+                                    y: midY + 40, // Slightly below the couple
+                                    fixed: { x: true, y: true }
+                                });
+                            }
+                        }
+                    });
+                    
+                    // Apply position updates
+                    if (updates.length > 0) {
+                        nodes.update(updates);
+                        // Re-fit the view after positioning
+                        setTimeout(() => {
+                            network.fit({
+                                animation: {
+                                    duration: 500,
+                                    easingFunction: 'easeInOutQuad'
+                                }
+                            });
+                        }, 100);
+                    }
+                });
                 
                 // Add click event to show node details
                 network.on('click', function(params) {
@@ -509,6 +843,23 @@
                     }
                 });
                 
+                // Add double-click event to set node as ancestor root
+                network.on('doubleClick', function(params) {
+                    if (params.nodes.length > 0) {
+                        const nodeId = params.nodes[0];
+                        const node = nodes.get(nodeId);
+                        
+                        // Only allow Person nodes to be set as root
+                        if (node.data.type === 'Person') {
+                            // Reload graph with this node as root ancestor
+                            loadGraph(nodeId);
+                            
+                            // Show notification
+                            showNotification(`Showing descendants of "${node.data.label}"`);
+                        }
+                    }
+                });
+                
                 loading.style.display = 'none';
                 
             } catch (err) {
@@ -518,7 +869,7 @@
                 console.error('Error loading graph:', err);
             } finally {
                 loadBtn.disabled = false;
-                loadBtn.textContent = 'Load Graph';
+                loadBtn.textContent = 'Load Family Tree';
             }
         }
         
@@ -535,6 +886,13 @@
                 if (node.event_type) tooltip += `Event: ${node.event_type}<br>`;
                 if (node.date) tooltip += `Date: ${node.date}<br>`;
                 if (node.place) tooltip += `Place: ${node.place}<br>`;
+            }
+            
+            // Add source information
+            if (node.source) {
+                tooltip += `Source: ${node.source}<br>`;
+            } else {
+                tooltip += `Source: Unknown<br>`;
             }
             
             return tooltip;
@@ -556,11 +914,30 @@
                 if (node.death_date) html += `<div class="info-item"><span class="info-label">Death Date:</span><span class="info-value">${node.death_date}</span></div>`;
                 if (node.birth_place) html += `<div class="info-item"><span class="info-label">Birth Place:</span><span class="info-value">${node.birth_place}</span></div>`;
                 if (node.occupation) html += `<div class="info-item"><span class="info-label">Occupation:</span><span class="info-value">${node.occupation}</span></div>`;
+                
+                // Add source information
+                if (node.source) {
+                    html += `<div class="info-item"><span class="info-label">Source:</span><span class="info-value">${node.source}</span></div>`;
+                } else {
+                    html += `<div class="info-item"><span class="info-label">Source:</span><span class="info-value">Unknown</span></div>`;
+                }
+                
+                // Add hint about double-clicking
+                html += `<div class="info-item" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                    <span class="info-value" style="color: #667eea; font-size: 0.85em;">💡 Double-click to show this person's descendants</span>
+                </div>`;
             } else if (node.type === 'Event') {
                 html += `<div class="info-item"><span class="info-label">Type:</span><span class="info-value">Event</span></div>`;
                 if (node.event_type) html += `<div class="info-item"><span class="info-label">Event Type:</span><span class="info-value">${node.event_type}</span></div>`;
                 if (node.date) html += `<div class="info-item"><span class="info-label">Date:</span><span class="info-value">${node.date}</span></div>`;
                 if (node.place) html += `<div class="info-item"><span class="info-label">Place:</span><span class="info-value">${node.place}</span></div>`;
+                
+                // Add source information for events too
+                if (node.source) {
+                    html += `<div class="info-item"><span class="info-label">Source:</span><span class="info-value">${node.source}</span></div>`;
+                } else {
+                    html += `<div class="info-item"><span class="info-label">Source:</span><span class="info-value">Unknown</span></div>`;
+                }
             }
             
             content.innerHTML = html;
@@ -575,6 +952,59 @@
             if (network) {
                 network.fit();
             }
+        }
+        
+        function clearRoot() {
+            currentRootId = null;
+            loadGraph();
+            showNotification('Ancestor cleared - showing all families');
+        }
+        
+        function showNotification(message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 15px 30px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                z-index: 10000;
+                font-weight: 600;
+                animation: slideDown 0.3s ease-out;
+            `;
+            
+            // Add animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(-20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideDown 0.3s ease-out reverse';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                    document.head.removeChild(style);
+                }, 300);
+            }, 3000);
         }
     </script>
 </body>
