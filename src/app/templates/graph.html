@@ -82,6 +82,16 @@
         .control-group label {
             font-weight: 600;
             color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        .control-group input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
         }
         
         .control-group input,
@@ -290,6 +300,37 @@
         .legend-color.event {
             background: #fff59d;
         }
+        
+        .mode-toggle {
+            display: flex;
+            gap: 5px;
+            background: #f0f0f0;
+            padding: 3px;
+            border-radius: 6px;
+        }
+        
+        .btn-mode {
+            background: transparent;
+            color: #666;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .btn-mode.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-mode:hover:not(.active) {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
     </style>
 </head>
 <body>
@@ -316,6 +357,23 @@
         <button class="btn-primary" id="loadBtn" onclick="loadGraph()">Load Family Tree</button>
         <button class="btn-primary" id="resetBtn" onclick="resetView()">Reset View</button>
         <button class="btn-primary" id="clearRootBtn" onclick="clearRoot()" style="display: none;">Clear Ancestor</button>
+        <div class="control-group">
+            <label>View Mode:</label>
+            <div class="mode-toggle">
+                <button class="btn-mode active" id="modeHierarchical" onclick="switchMode('hierarchical')">
+                    📊 Tree View
+                </button>
+                <button class="btn-mode" id="modeClusters" onclick="switchMode('clusters')">
+                    🌐 Family Clusters
+                </button>
+            </div>
+        </div>
+        <div class="control-group" id="clusterOptions" style="display: none;">
+            <label>
+                <input type="checkbox" id="hideFatherEdges" checked onchange="toggleFatherEdges()">
+                Hide father-to-child edges
+            </label>
+        </div>
         <div class="stats">
             <div class="stat-item">
                 <span class="stat-label">People:</span>
@@ -373,11 +431,329 @@
         let nodes = null;
         let edges = null;
         let currentRootId = null;
+        let currentMode = 'hierarchical'; // 'hierarchical' or 'clusters'
+        let cachedGraphData = null; // Cache the last loaded data for mode switching
+        let hideFatherEdges = true; // Default: hide father-to-child edges in cluster mode
+        
+        const MODES = {
+            HIERARCHICAL: 'hierarchical',
+            CLUSTERS: 'clusters'
+        };
         
         // Initialize the graph on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Load saved mode preference
+            const savedMode = localStorage.getItem('graphMode');
+            if (savedMode && (savedMode === MODES.HIERARCHICAL || savedMode === MODES.CLUSTERS)) {
+                currentMode = savedMode;
+                updateModeIndicator(currentMode);
+            }
+            
+            // Load saved father edges preference
+            const savedHideFatherEdges = localStorage.getItem('hideFatherEdges');
+            if (savedHideFatherEdges !== null) {
+                hideFatherEdges = savedHideFatherEdges === 'true';
+                document.getElementById('hideFatherEdges').checked = hideFatherEdges;
+            }
+            
+            // Show/hide cluster options based on initial mode
+            const clusterOptions = document.getElementById('clusterOptions');
+            if (currentMode === MODES.CLUSTERS) {
+                clusterOptions.style.display = 'flex';
+            } else {
+                clusterOptions.style.display = 'none';
+            }
+            
             loadGraph();
         });
+        
+        /**
+         * Update the mode indicator buttons
+         */
+        function updateModeIndicator(mode) {
+            const hierarchicalBtn = document.getElementById('modeHierarchical');
+            const clustersBtn = document.getElementById('modeClusters');
+            
+            if (mode === MODES.HIERARCHICAL) {
+                hierarchicalBtn.classList.add('active');
+                clustersBtn.classList.remove('active');
+            } else {
+                hierarchicalBtn.classList.remove('active');
+                clustersBtn.classList.add('active');
+            }
+        }
+        
+        /**
+         * Switch between visualization modes
+         */
+        function switchMode(newMode) {
+            if (newMode === currentMode) return;
+            
+            // Validate mode
+            if (newMode !== MODES.HIERARCHICAL && newMode !== MODES.CLUSTERS) {
+                console.error('Invalid mode:', newMode);
+                return;
+            }
+            
+            currentMode = newMode;
+            localStorage.setItem('graphMode', newMode);
+            
+            // Update UI indicator
+            updateModeIndicator(newMode);
+            
+            // Show/hide cluster options based on mode
+            const clusterOptions = document.getElementById('clusterOptions');
+            if (newMode === MODES.CLUSTERS) {
+                clusterOptions.style.display = 'flex';
+            } else {
+                clusterOptions.style.display = 'none';
+            }
+            
+            // If we have cached data, recreate the network with new mode
+            if (cachedGraphData) {
+                createNetwork(cachedGraphData);
+            } else {
+                // Otherwise reload the graph
+                loadGraph();
+            }
+            
+            showNotification(`Switched to ${newMode === MODES.HIERARCHICAL ? 'Tree View' : 'Family Clusters'} mode`);
+        }
+        
+        /**
+         * Toggle father-to-child edges in cluster mode
+         */
+        function toggleFatherEdges() {
+            const checkbox = document.getElementById('hideFatherEdges');
+            hideFatherEdges = checkbox.checked;
+            
+            // Save preference
+            localStorage.setItem('hideFatherEdges', hideFatherEdges);
+            
+            // Reload the graph to apply the new edge filtering
+            if (currentMode === MODES.CLUSTERS) {
+                loadGraph(currentRootId);
+                showNotification(hideFatherEdges ? 'Father edges hidden' : 'Father edges shown');
+            }
+        }
+        
+        /**
+         * Get hierarchical layout options for tree view mode
+         */
+        function getHierarchicalOptions() {
+            return {
+                layout: {
+                    hierarchical: {
+                        enabled: true,
+                        direction: 'UD',        // Up-Down (top to bottom)
+                        sortMethod: 'directed', // Follow edge direction
+                        nodeSpacing: 120,       // Increased to give spouses more room
+                        levelSeparation: 200,   // Vertical spacing between generations
+                        treeSpacing: 250,       // Spacing between separate family trees
+                        blockShifting: true,
+                        edgeMinimization: true, // Re-enable for better edge routing
+                        parentCentralization: true,
+                        shakeTowards: 'leaves'  // Helps organize tree structure
+                    }
+                },
+                physics: {
+                    enabled: false  // Disable physics when using fixed hierarchical levels
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 200,
+                    navigationButtons: true,
+                    keyboard: true,
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true
+                },
+                nodes: {
+                    borderWidth: 2,
+                    borderWidthSelected: 4,
+                    shape: 'box',
+                    margin: 10,
+                    widthConstraint: {
+                        minimum: 100,
+                        maximum: 200
+                    }
+                },
+                edges: {
+                    smooth: {
+                        enabled: true,
+                        type: 'cubicBezier',
+                        forceDirection: 'vertical',
+                        roundness: 0.5
+                    },
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 0.5
+                        }
+                    }
+                }
+            };
+        }
+        
+        /**
+         * Get spring physics options for family clusters mode
+         */
+        function getClusterOptions() {
+            return {
+                layout: {
+                    hierarchical: {
+                        enabled: false
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    solver: 'forceAtlas2Based',
+                    forceAtlas2Based: {
+                        gravitationalConstant: -50,
+                        centralGravity: 0.01,
+                        springLength: 100,
+                        springConstant: 0.08,
+                        damping: 0.4,
+                        avoidOverlap: 0.5
+                    },
+                    stabilization: {
+                        enabled: true,
+                        iterations: 1000,
+                        updateInterval: 25,
+                        fit: true
+                    }
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 200,
+                    navigationButtons: true,
+                    keyboard: true,
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true
+                },
+                nodes: {
+                    borderWidth: 2,
+                    borderWidthSelected: 4,
+                    shape: 'box',
+                    margin: 10,
+                    widthConstraint: {
+                        minimum: 100,
+                        maximum: 200
+                    }
+                },
+                edges: {
+                    smooth: {
+                        enabled: true,
+                        type: 'continuous'
+                    },
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 0.5
+                        }
+                    }
+                }
+            };
+        }
+        
+        /**
+         * Calculate hierarchical levels for nodes to ensure spouses are on same level.
+         * Uses BFS traversal starting from root ancestors.
+         */
+        function calculateNodeLevels(visNodes, marriages, parentChildEdges) {
+            const levels = new Map();
+            const parentMap = new Map(); // child ID -> Set of parent IDs
+            const spouseMap = new Map(); // person ID -> spouse ID
+            
+            // Build parent map from PARENT_OF edges
+            parentChildEdges.forEach(edge => {
+                if (!parentMap.has(edge.to)) {
+                    parentMap.set(edge.to, new Set());
+                }
+                parentMap.get(edge.to).add(edge.from);
+            });
+            
+            // Build spouse map from marriages
+            marriages.forEach(marriage => {
+                spouseMap.set(marriage.spouse1Id, marriage.spouse2Id);
+                spouseMap.set(marriage.spouse2Id, marriage.spouse1Id);
+            });
+            
+            // Find root nodes (people with no parents in the graph)
+            const nodeIds = visNodes.map(n => n.id);
+            const roots = nodeIds.filter(id => !parentMap.has(id) || parentMap.get(id).size === 0);
+            
+            // If no roots found (circular references or all have parents),
+            // use nodes with minimum parent count
+            if (roots.length === 0) {
+                const minParents = Math.min(...Array.from(parentMap.values()).map(s => s.size));
+                roots.push(...nodeIds.filter(id =>
+                    parentMap.has(id) && parentMap.get(id).size === minParents
+                ));
+            }
+            
+            // BFS to assign levels
+            const queue = roots.map(id => ({ id, level: 0 }));
+            const visited = new Set();
+            
+            while (queue.length > 0) {
+                const { id, level } = queue.shift();
+                
+                // Skip if already visited
+                if (visited.has(id)) {
+                    // If we encounter a node again at a different level, use the minimum level
+                    if (levels.has(id) && levels.get(id) > level) {
+                        levels.set(id, level);
+                        // Also update spouse to same level
+                        const spouseId = spouseMap.get(id);
+                        if (spouseId && levels.has(spouseId)) {
+                            levels.set(spouseId, level);
+                        }
+                    }
+                    continue;
+                }
+                
+                visited.add(id);
+                levels.set(id, level);
+                
+                // Check if spouse exists and ensure they're on same level
+                const spouseId = spouseMap.get(id);
+                if (spouseId) {
+                    // If spouse already has a level, use the maximum of the two
+                    // (both should be at the level of whoever has parents)
+                    if (levels.has(spouseId)) {
+                        const spouseLevel = levels.get(spouseId);
+                        const finalLevel = Math.max(level, spouseLevel);
+                        levels.set(id, finalLevel);
+                        levels.set(spouseId, finalLevel);
+                    } else {
+                        // Spouse not yet processed, set to same level
+                        levels.set(spouseId, level);
+                    }
+                }
+                
+                // Add children to queue at next level
+                parentChildEdges.forEach(edge => {
+                    if (edge.from === id && !visited.has(edge.to)) {
+                        queue.push({ id: edge.to, level: level + 1 });
+                    }
+                    // Also check spouse's children
+                    if (spouseId && edge.from === spouseId && !visited.has(edge.to)) {
+                        queue.push({ id: edge.to, level: level + 1 });
+                    }
+                });
+            }
+            
+            // Assign levels to any remaining unvisited nodes (disconnected components)
+            nodeIds.forEach(id => {
+                if (!levels.has(id)) {
+                    levels.set(id, 0);
+                }
+            });
+            
+            return levels;
+        }
         
         async function loadGraph(rootId = null) {
             const loadBtn = document.getElementById('loadBtn');
@@ -495,50 +871,219 @@
                     document.getElementById('clearRootBtn').style.display = 'none';
                 }
                 
-                let visEdges = data.edges.map(edge => {
-                    let color = '#999';
-                    let width = 2;
-                    let dashes = false;
-                    let label = '';
-                    
-                    // Style edges based on type - focus on parent-child relationships
-                    if (edge.type === 'PARENT_OF') {
-                        color = '#2e7d32'; // Dark green for parent-child
-                        width = 3;
-                        // Don't show label for cleaner look
-                    } else if (edge.type === 'MARRIED_TO') {
-                        color = '#c2185b'; // Pink for marriage
-                        width = 3;
-                        dashes = false; // Solid line for marriage to show strong connection
-                        label = '💑'; // Heart emoji for marriage
-                    } else if (edge.type === 'GODPARENT_OF') {
-                        // Hide godparent relationships in family tree view
-                        return null;
-                    } else if (edge.type === 'BAPTIZED_IN' || edge.type === 'DIED_IN') {
-                        // Hide event relationships in family tree view
-                        return null;
-                    } else if (edge.type === 'FROM_SOURCE') {
-                        // Hide source relationships in family tree view
-                        return null;
-                    } else {
-                        // Hide all other non-family relationships
-                        return null;
+                // First pass: collect all edges and identify marriages
+                const parentChildEdges = [];
+                const marriages = [];
+                const marriageSet = new Set(); // Track unique marriages to avoid duplicates
+                
+                data.edges.forEach(edge => {
+                    if (edge.type === 'MARRIED_TO') {
+                        // Create a unique key for this marriage (sorted IDs to avoid duplicates)
+                        const coupleKey = [edge.from, edge.to].sort().join('_');
+                        
+                        // Only add if we haven't seen this marriage yet
+                        if (!marriageSet.has(coupleKey)) {
+                            marriageSet.add(coupleKey);
+                            marriages.push({
+                                spouse1Id: edge.from,
+                                spouse2Id: edge.to
+                            });
+                        }
+                    } else if (edge.type === 'PARENT_OF') {
+                        parentChildEdges.push(edge);
                     }
+                    // Ignore other edge types for family tree view
+                });
+                
+                // Build parent-child mapping
+                const childrenByParent = new Map(); // parent ID -> Set of child IDs
+                parentChildEdges.forEach(edge => {
+                    if (!childrenByParent.has(edge.from)) {
+                        childrenByParent.set(edge.from, new Set());
+                    }
+                    childrenByParent.get(edge.from).add(edge.to);
+                });
+                
+                // Find married couples and their common children
+                const spouseGroups = new Map(); // spouse ID -> group ID
+                const marriedCouples = new Map(); // couple key -> { spouse1Id, spouse2Id, commonChildren }
+                
+                marriages.forEach((marriage) => {
+                    const spouse1Id = marriage.spouse1Id;
+                    const spouse2Id = marriage.spouse2Id;
+                    const coupleKey = `${Math.min(spouse1Id, spouse2Id)}_${Math.max(spouse1Id, spouse2Id)}`;
                     
-                    return {
-                        from: edge.from,
-                        to: edge.to,
-                        label: label,
+                    // Create a group ID for this couple
+                    const groupId = `couple_${coupleKey}`;
+                    spouseGroups.set(spouse1Id, groupId);
+                    spouseGroups.set(spouse2Id, groupId);
+                    
+                    // Find common children (children of both parents)
+                    const spouse1Children = childrenByParent.get(spouse1Id) || new Set();
+                    const spouse2Children = childrenByParent.get(spouse2Id) || new Set();
+                    const commonChildren = new Set([...spouse1Children].filter(x => spouse2Children.has(x)));
+                    
+                    marriedCouples.set(coupleKey, {
+                        spouse1Id,
+                        spouse2Id,
+                        commonChildren
+                    });
+                });
+                
+                // Build final edge list
+                let visEdges = [];
+                
+                // Add marriage edges
+                marriages.forEach(marriage => {
+                    const marriageEdge = {
+                        from: marriage.spouse1Id,
+                        to: marriage.spouse2Id,
+                        label: '💑',
                         color: {
-                            color: color,
+                            color: '#c2185b',
                             highlight: '#ff6f00',
                             hover: '#ff6f00'
                         },
-                        width: width,
-                        dashes: dashes,
+                        width: 3,
+                        dashes: false,
                         arrows: {
                             to: {
-                                enabled: edge.type === 'PARENT_OF',
+                                enabled: false
+                            }
+                        },
+                        font: {
+                            size: 16,
+                            align: 'middle',
+                            strokeWidth: 0
+                        },
+                        smooth: {
+                            enabled: true,
+                            type: 'horizontal',
+                            forceDirection: 'none',
+                            roundness: 0.2
+                        }
+                    };
+                    
+                    // Add physics properties for clusters mode
+                    if (currentMode === MODES.CLUSTERS) {
+                        marriageEdge.length = 50;   // Very short distance
+                        marriageEdge.physics = true;
+                        marriageEdge.smooth = { enabled: true, type: 'continuous' };
+                    }
+                    
+                    visEdges.push(marriageEdge);
+                });
+                
+                // Build edges: handle common children first, then individual parent-child relationships
+                const processedEdges = new Set(); // Track parent-child pairs as "parentId->childId"
+                
+                // Helper function to get parent's gender
+                const getParentGender = (parentId) => {
+                    const parentNode = visNodes.find(n => n.id === parentId);
+                    return parentNode?.data?.gender;
+                };
+                
+                // Step 1: Add edges for common children (one edge per child from spouse1)
+                marriedCouples.forEach((couple, coupleKey) => {
+                    couple.commonChildren.forEach(childId => {
+                        // Determine which parent to use for the edge
+                        let fromParentId = couple.spouse1Id;
+                        
+                        // In cluster mode with hideFatherEdges enabled, prefer mother
+                        if (currentMode === MODES.CLUSTERS && hideFatherEdges) {
+                            const spouse1Gender = getParentGender(couple.spouse1Id);
+                            const spouse2Gender = getParentGender(couple.spouse2Id);
+                            
+                            // If spouse2 is female (mother), use spouse2
+                            if (spouse2Gender === 'F') {
+                                fromParentId = couple.spouse2Id;
+                            }
+                            // If spouse1 is male and spouse2 is not female, still use spouse1
+                            // (this handles cases where gender is unknown)
+                        }
+                        
+                        // Create single edge from selected parent to common child
+                        const childEdge = {
+                            from: fromParentId,
+                            to: childId,
+                            label: '',
+                            color: {
+                                color: '#2e7d32',
+                                highlight: '#ff6f00',
+                                hover: '#ff6f00'
+                            },
+                            width: 3,
+                            dashes: false,
+                            arrows: {
+                                to: {
+                                    enabled: true,
+                                    scaleFactor: 0.8
+                                }
+                            },
+                            font: {
+                                size: 16,
+                                align: 'middle',
+                                strokeWidth: 0
+                            },
+                            smooth: {
+                                enabled: true,
+                                type: 'cubicBezier',
+                                forceDirection: 'vertical',
+                                roundness: 0.5
+                            }
+                        };
+                        
+                        // Add physics properties for clusters mode
+                        if (currentMode === MODES.CLUSTERS) {
+                            childEdge.length = 150;  // Medium distance for parent-child
+                            childEdge.physics = true;
+                            childEdge.smooth = { enabled: true, type: 'continuous' };
+                        }
+                        
+                        visEdges.push(childEdge);
+                        
+                        // Mark BOTH parent edges to this child as processed
+                        processedEdges.add(`${couple.spouse1Id}->${childId}`);
+                        processedEdges.add(`${couple.spouse2Id}->${childId}`);
+                    });
+                });
+                
+                // Step 2: Add edges for non-common children (children of single parents or non-married parents)
+                parentChildEdges.forEach(edge => {
+                    const parentId = edge.from;
+                    const childId = edge.to;
+                    const edgeKey = `${parentId}->${childId}`;
+                    
+                    // Skip if already processed (common child edge)
+                    if (processedEdges.has(edgeKey)) {
+                        return;
+                    }
+                    
+                    // In cluster mode with hideFatherEdges enabled, skip father edges
+                    if (currentMode === MODES.CLUSTERS && hideFatherEdges) {
+                        const parentGender = getParentGender(parentId);
+                        if (parentGender === 'M') {
+                            // Skip this edge - it's from a father
+                            processedEdges.add(edgeKey);
+                            return;
+                        }
+                    }
+                    
+                    // Add edge for non-common child
+                    const nonCommonChildEdge = {
+                        from: parentId,
+                        to: childId,
+                        label: '',
+                        color: {
+                            color: '#2e7d32',
+                            highlight: '#ff6f00',
+                            hover: '#ff6f00'
+                        },
+                        width: 3,
+                        dashes: false,
+                        arrows: {
+                            to: {
+                                enabled: true,
                                 scaleFactor: 0.8
                             }
                         },
@@ -548,317 +1093,71 @@
                             strokeWidth: 0
                         },
                         smooth: {
-                            enabled: edge.type === 'PARENT_OF',
-                            type: edge.type === 'MARRIED_TO' ? 'horizontal' : 'cubicBezier',
-                            forceDirection: edge.type === 'PARENT_OF' ? 'vertical' : 'none',
-                            roundness: edge.type === 'MARRIED_TO' ? 0.2 : 0.5
-                        }
-                    };
-                }).filter(edge => edge !== null); // Remove null edges (hidden relationships)
-                
-                // Group spouses together and create family unit nodes
-                // Find all marriage relationships
-                const marriages = visEdges.filter(e => e.label === '💑');
-                const spouseGroups = new Map(); // Map to track spouse pairs
-                const familyUnits = new Map(); // Map spouse IDs to family unit node IDs
-                
-                // Track which children belong to which parents
-                const parentChildEdges = visEdges.filter(e => e.type === 'PARENT_OF');
-                const childrenByParent = new Map(); // parent ID -> Set of child IDs
-                
-                parentChildEdges.forEach(edge => {
-                    if (!childrenByParent.has(edge.from)) {
-                        childrenByParent.set(edge.from, new Set());
-                    }
-                    childrenByParent.get(edge.from).add(edge.to);
-                });
-                
-                // Create invisible family unit nodes for each married couple
-                marriages.forEach((marriage, index) => {
-                    const spouse1Id = marriage.from;
-                    const spouse2Id = marriage.to;
-                    const familyUnitId = `family_unit_${spouse1Id}_${spouse2Id}`;
-                    
-                    // Create a group ID for this couple
-                    const groupId = `couple_${spouse1Id}_${spouse2Id}`;
-                    spouseGroups.set(spouse1Id, groupId);
-                    spouseGroups.set(spouse2Id, groupId);
-                    
-                    // Store family unit mapping
-                    familyUnits.set(spouse1Id, familyUnitId);
-                    familyUnits.set(spouse2Id, familyUnitId);
-                    
-                    // Find common children (children of both parents)
-                    const spouse1Children = childrenByParent.get(spouse1Id) || new Set();
-                    const spouse2Children = childrenByParent.get(spouse2Id) || new Set();
-                    const commonChildren = new Set([...spouse1Children].filter(x => spouse2Children.has(x)));
-                    
-                    // Only create family unit node if there are common children
-                    if (commonChildren.size > 0) {
-                        // Add invisible family unit node
-                        visNodes.push({
-                            id: familyUnitId,
-                            label: '',
-                            shape: 'dot',
-                            size: 1,
-                            color: {
-                                background: 'transparent',
-                                border: 'transparent'
-                            },
-                            font: { size: 0 },
-                            fixed: { x: false, y: false },
-                            physics: true,
-                            hidden: false,
-                            data: { type: 'FamilyUnit', spouse1Id, spouse2Id }
-                        });
-                    }
-                });
-                
-                // Modify edges: remove duplicate parent-child edges and route through family units
-                const edgesToRemove = new Set();
-                const edgesToAdd = [];
-                
-                // Process parent-child edges
-                parentChildEdges.forEach((edge, index) => {
-                    const parentId = edge.from;
-                    const childId = edge.to;
-                    const familyUnitId = familyUnits.get(parentId);
-                    
-                    if (familyUnitId) {
-                        // Check if this child has both parents
-                        const spouse1Id = visNodes.find(n => n.id === familyUnitId)?.data?.spouse1Id;
-                        const spouse2Id = visNodes.find(n => n.id === familyUnitId)?.data?.spouse2Id;
-                        
-                        if (spouse1Id && spouse2Id) {
-                            const spouse1Children = childrenByParent.get(spouse1Id) || new Set();
-                            const spouse2Children = childrenByParent.get(spouse2Id) || new Set();
-                            
-                            if (spouse1Children.has(childId) && spouse2Children.has(childId)) {
-                                // This is a common child - mark original edge for removal
-                                edgesToRemove.add(index);
-                                
-                                // Add edge from family unit to child (only once per child)
-                                if (!edgesToAdd.some(e => e.from === familyUnitId && e.to === childId)) {
-                                    edgesToAdd.push({
-                                        from: familyUnitId,
-                                        to: childId,
-                                        type: 'PARENT_OF',
-                                        label: '',
-                                        color: {
-                                            color: '#2e7d32',
-                                            highlight: '#ff6f00',
-                                            hover: '#ff6f00'
-                                        },
-                                        width: 3,
-                                        dashes: false,
-                                        arrows: {
-                                            to: {
-                                                enabled: true,
-                                                scaleFactor: 0.8
-                                            }
-                                        },
-                                        font: {
-                                            size: 16,
-                                            align: 'middle',
-                                            strokeWidth: 0
-                                        },
-                                        smooth: {
-                                            enabled: true,
-                                            type: 'cubicBezier',
-                                            forceDirection: 'vertical',
-                                            roundness: 0.5
-                                        }
-                                    });
-                                }
-                            }
-                        }
-                    }
-                });
-                
-                // Remove duplicate parent-child edges
-                visEdges = visEdges.filter((edge, index) => !edgesToRemove.has(index));
-                
-                // Add new family unit to child edges
-                visEdges.push(...edgesToAdd);
-                
-                // Assign levels to nodes to ensure spouses are on same level
-                visNodes.forEach(node => {
-                    const groupId = spouseGroups.get(node.id);
-                    if (groupId) {
-                        // Mark nodes that are part of a marriage
-                        node.group = groupId;
-                        // Add a fixed property to help with positioning
-                        node.fixed = { x: false, y: false };
-                    }
-                });
-                
-                // Create network
-                nodes = new vis.DataSet(visNodes);
-                edges = new vis.DataSet(visEdges);
-                
-                const container = graphDiv;
-                const graphData = {
-                    nodes: nodes,
-                    edges: edges
-                };
-                
-                const options = {
-                    layout: {
-                        hierarchical: {
-                            enabled: true,
-                            direction: 'UD',        // Up-Down (top to bottom)
-                            sortMethod: 'directed', // Follow edge direction
-                            nodeSpacing: 80,        // Reduced horizontal spacing to group spouses closer
-                            levelSeparation: 200,   // Vertical spacing between generations
-                            treeSpacing: 250,       // Spacing between separate family trees
-                            blockShifting: true,
-                            edgeMinimization: false, // Disable to allow custom spouse positioning
-                            parentCentralization: true,
-                            shakeTowards: 'leaves'  // Helps organize tree structure
-                        }
-                    },
-                    physics: {
-                        enabled: true,  // Enable physics to allow spouse grouping
-                        stabilization: {
-                            enabled: true,
-                            iterations: 200,
-                            updateInterval: 25
-                        },
-                        hierarchicalRepulsion: {
-                            centralGravity: 0.0,
-                            springLength: 100,
-                            springConstant: 0.01,
-                            nodeDistance: 150,
-                            damping: 0.09
-                        }
-                    },
-                    interaction: {
-                        hover: true,
-                        tooltipDelay: 200,
-                        navigationButtons: true,
-                        keyboard: true,
-                        dragNodes: true,
-                        dragView: true,
-                        zoomView: true
-                    },
-                    nodes: {
-                        borderWidth: 2,
-                        borderWidthSelected: 4,
-                        shape: 'box',
-                        margin: 10,
-                        widthConstraint: {
-                            minimum: 100,
-                            maximum: 200
-                        }
-                    },
-                    edges: {
-                        smooth: {
                             enabled: true,
                             type: 'cubicBezier',
                             forceDirection: 'vertical',
                             roundness: 0.5
-                        },
-                        arrows: {
-                            to: {
-                                enabled: true,
-                                scaleFactor: 0.5
-                            }
                         }
-                    }
-                };
-                
-                network = new vis.Network(container, graphData, options);
-                
-                // After stabilization, adjust spouse positions to group them together
-                network.once('stabilizationIterationsDone', function() {
-                    const positions = network.getPositions();
-                    const updates = [];
+                    };
                     
-                    // For each marriage, position spouses side by side and family unit in middle
-                    marriages.forEach(marriage => {
-                        const spouse1Id = marriage.from;
-                        const spouse2Id = marriage.to;
-                        const familyUnitId = `family_unit_${spouse1Id}_${spouse2Id}`;
+                    // Add physics properties for clusters mode
+                    if (currentMode === MODES.CLUSTERS) {
+                        nonCommonChildEdge.length = 150;  // Medium distance for parent-child
+                        nonCommonChildEdge.physics = true;
+                        nonCommonChildEdge.smooth = { enabled: true, type: 'continuous' };
+                    }
+                    
+                    visEdges.push(nonCommonChildEdge);
+                    
+                    // Mark this edge as processed
+                    processedEdges.add(edgeKey);
+                });
+                
+                // Apply mode-specific node processing
+                if (currentMode === MODES.HIERARCHICAL) {
+                    // Calculate and assign hierarchical levels to ensure spouses are on same level
+                    const nodeLevels = calculateNodeLevels(visNodes, marriages, parentChildEdges);
+                    
+                    visNodes.forEach(node => {
+                        // Assign calculated level
+                        const level = nodeLevels.get(node.id);
+                        if (level !== undefined) {
+                            node.level = level;
+                            node.fixed = { y: true }; // Fix Y position to maintain level
+                        }
                         
-                        if (positions[spouse1Id] && positions[spouse2Id]) {
-                            const pos1 = positions[spouse1Id];
-                            const pos2 = positions[spouse2Id];
-                            
-                            // Calculate midpoint
-                            const midX = (pos1.x + pos2.x) / 2;
-                            const midY = (pos1.y + pos2.y) / 2;
-                            
-                            // Position spouses close together horizontally
-                            const spacing = 120; // Horizontal spacing between spouses
-                            
-                            updates.push({
-                                id: spouse1Id,
-                                x: midX - spacing / 2,
-                                y: midY,
-                                fixed: { x: true, y: true }
-                            });
-                            
-                            updates.push({
-                                id: spouse2Id,
-                                x: midX + spacing / 2,
-                                y: midY,
-                                fixed: { x: true, y: true }
-                            });
-                            
-                            // Position family unit node in the middle, slightly below the couple
-                            if (positions[familyUnitId]) {
-                                updates.push({
-                                    id: familyUnitId,
-                                    x: midX,
-                                    y: midY + 40, // Slightly below the couple
-                                    fixed: { x: true, y: true }
-                                });
-                            }
+                        // Keep group assignment for visual grouping
+                        const groupId = spouseGroups.get(node.id);
+                        if (groupId) {
+                            node.group = groupId;
                         }
                     });
-                    
-                    // Apply position updates
-                    if (updates.length > 0) {
-                        nodes.update(updates);
-                        // Re-fit the view after positioning
-                        setTimeout(() => {
-                            network.fit({
-                                animation: {
-                                    duration: 500,
-                                    easingFunction: 'easeInOutQuad'
-                                }
-                            });
-                        }, 100);
-                    }
-                });
-                
-                // Add click event to show node details
-                network.on('click', function(params) {
-                    if (params.nodes.length > 0) {
-                        const nodeId = params.nodes[0];
-                        const node = nodes.get(nodeId);
-                        showNodeInfo(node.data);
-                    } else {
-                        closeInfo();
-                    }
-                });
-                
-                // Add double-click event to set node as ancestor root
-                network.on('doubleClick', function(params) {
-                    if (params.nodes.length > 0) {
-                        const nodeId = params.nodes[0];
-                        const node = nodes.get(nodeId);
+                } else {
+                    // In clusters mode, don't fix positions - let physics handle it
+                    visNodes.forEach(node => {
+                        // Remove any fixed positioning
+                        delete node.level;
+                        delete node.fixed;
                         
-                        // Only allow Person nodes to be set as root
-                        if (node.data.type === 'Person') {
-                            // Reload graph with this node as root ancestor
-                            loadGraph(nodeId);
-                            
-                            // Show notification
-                            showNotification(`Showing descendants of "${node.data.label}"`);
+                        // Keep group assignment for visual grouping
+                        const groupId = spouseGroups.get(node.id);
+                        if (groupId) {
+                            node.group = groupId;
                         }
-                    }
-                });
+                    });
+                }
+                
+                // Cache the graph data for mode switching
+                cachedGraphData = {
+                    visNodes: visNodes,
+                    visEdges: visEdges,
+                    marriages: marriages,
+                    parentChildEdges: parentChildEdges,
+                    spouseGroups: spouseGroups
+                };
+                
+                // Create network with mode-specific options
+                createNetwork(cachedGraphData);
                 
                 loading.style.display = 'none';
                 
@@ -871,6 +1170,75 @@
                 loadBtn.disabled = false;
                 loadBtn.textContent = 'Load Family Tree';
             }
+        }
+        
+        /**
+         * Create or recreate the network visualization with current mode settings
+         */
+        function createNetwork(graphData) {
+            const graphDiv = document.getElementById('graph');
+            
+            // Destroy existing network if it exists
+            if (network) {
+                network.destroy();
+                network = null;
+            }
+            
+            // Create new DataSets
+            nodes = new vis.DataSet(graphData.visNodes);
+            edges = new vis.DataSet(graphData.visEdges);
+            
+            const container = graphDiv;
+            const data = {
+                nodes: nodes,
+                edges: edges
+            };
+            
+            // Get mode-specific options
+            const options = (currentMode === MODES.HIERARCHICAL)
+                ? getHierarchicalOptions()
+                : getClusterOptions();
+            
+            // Create the network
+            network = new vis.Network(container, data, options);
+            
+            // Fit the view to show all nodes
+            setTimeout(() => {
+                network.fit({
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }, 100);
+            
+            // Add click event to show node details
+            network.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = nodes.get(nodeId);
+                    showNodeInfo(node.data);
+                } else {
+                    closeInfo();
+                }
+            });
+            
+            // Add double-click event to set node as ancestor root
+            network.on('doubleClick', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = nodes.get(nodeId);
+                    
+                    // Only allow Person nodes to be set as root
+                    if (node.data.type === 'Person') {
+                        // Reload graph with this node as root ancestor
+                        loadGraph(nodeId);
+                        
+                        // Show notification
+                        showNotification(`Showing descendants of "${node.data.label}"`);
+                    }
+                }
+            });
         }
         
         function createTooltip(node) {
