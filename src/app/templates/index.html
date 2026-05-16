@@ -26,7 +26,7 @@
             border-radius: 16px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             padding: 40px;
-            max-width: 500px;
+            max-width: 600px;
             width: 100%;
         }
         
@@ -127,6 +127,28 @@
             cursor: not-allowed;
         }
         
+        .btn-parse {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-parse:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn-parse:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
         .message {
             padding: 15px;
             border-radius: 8px;
@@ -200,22 +222,30 @@
         .file-item:hover {
             background: #f0f1ff;
             border-color: #667eea;
-            transform: translateX(5px);
+        }
+        
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            gap: 10px;
+            margin-bottom: 10px;
         }
         
         .file-name {
             font-weight: 600;
             color: #333;
-            margin-bottom: 5px;
             word-break: break-word;
+            flex: 1;
         }
         
         .file-meta {
             display: flex;
-            gap: 20px;
+            gap: 15px;
             font-size: 0.85em;
             color: #666;
             flex-wrap: wrap;
+            align-items: center;
         }
         
         .file-meta-item {
@@ -224,18 +254,183 @@
             gap: 5px;
         }
         
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-uploaded {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status-processing {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .status-completed {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .status-failed {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
         .no-files {
             text-align: center;
             padding: 30px;
             color: #999;
             font-style: italic;
         }
+        
+        .btn-nav-persons {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        
+        .btn-nav-persons:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-reset {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        
+        .btn-reset:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(244, 67, 54, 0.4);
+        }
+        
+        .btn-reset:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #d32f2f;
+            margin-bottom: 15px;
+        }
+        
+        .modal-body {
+            color: #666;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .btn-modal {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-modal-cancel {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .btn-modal-cancel:hover {
+            background: #d0d0d0;
+        }
+        
+        .btn-modal-confirm {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            color: white;
+        }
+        
+        .btn-modal-confirm:hover {
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📜 Korzen</h1>
-        <p class="subtitle">Upload your GEDCOM file to begin processing genealogical data</p>
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+            <div>
+                <h1>📜 Korzen</h1>
+                <p class="subtitle">Upload your GEDCOM file to begin processing genealogical data</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="/persons" class="btn-nav-persons">
+                    👥 View Persons
+                </a>
+                <button class="btn-reset" id="resetBtn" onclick="showResetModal()">
+                    🗑️ Reset Database
+                </button>
+            </div>
+        </div>
         
         <div id="message" class="message"></div>
         
@@ -254,7 +449,7 @@
                 <div class="progress-fill" id="progressFill"></div>
             </div>
             
-            <button type="submit" class="btn-upload" id="uploadBtn">Upload & Process</button>
+            <button type="submit" class="btn-upload" id="uploadBtn">Upload File</button>
         </form>
         
         {% if files %}
@@ -263,15 +458,23 @@
             <ul class="files-list">
                 {% for file in files %}
                 <li class="file-item">
-                    <div class="file-name">{{ file.name }}</div>
+                    <div class="file-header">
+                        <div class="file-name">{{ file.original_filename }}</div>
+                        {% if file.processing_status == 'uploaded' %}
+                        <button class="btn-parse" onclick="parseFile('{{ file.id }}')">Parse GEDCOM</button>
+                        {% endif %}
+                    </div>
                     <div class="file-meta">
                         <span class="file-meta-item">
                             <span>📦</span>
-                            <span>{{ (file.size / 1024)|round(2) }} KB</span>
+                            <span>{{ (file.file_size / 1024)|round(2) }} KB</span>
                         </span>
                         <span class="file-meta-item">
                             <span>🕐</span>
-                            <span>{{ file.modified.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span>{{ file.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </span>
+                        <span class="status-badge status-{{ file.processing_status }}">
+                            {{ file.processing_status }}
                         </span>
                     </div>
                 </li>
@@ -284,6 +487,26 @@
             <div class="no-files">No files uploaded yet. Upload your first GEDCOM file above!</div>
         </div>
         {% endif %}
+    </div>
+    
+    <!-- Reset Confirmation Modal -->
+    <div id="resetModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">⚠️ Confirm Database Reset</div>
+            <div class="modal-body">
+                <p><strong>Warning:</strong> This action will permanently delete all data from the database, including:</p>
+                <ul style="margin: 15px 0; padding-left: 25px;">
+                    <li>All uploaded files</li>
+                    <li>All persons</li>
+                    <li>All baptisms, marriages, and deaths</li>
+                </ul>
+                <p><strong>This action cannot be undone!</strong></p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal btn-modal-cancel" onclick="hideResetModal()">Cancel</button>
+                <button class="btn-modal btn-modal-confirm" onclick="confirmReset()">Reset Database</button>
+            </div>
+        </div>
     </div>
     
     <script>
@@ -376,20 +599,10 @@
                 if (response.ok) {
                     showMessage(`✓ ${data.message}`, 'success');
                     
-                    // Show processing details if available
-                    if (data.details) {
-                        const details = data.details;
-                        let detailsHTML = '<br><strong>Processing Results:</strong><br>';
-                        if (details.individuals) detailsHTML += `• Individuals: ${details.individuals}<br>`;
-                        if (details.families) detailsHTML += `• Families: ${details.families}<br>`;
-                        if (details.places) detailsHTML += `• Places: ${details.places}<br>`;
-                        fileInfo.innerHTML += detailsHTML;
-                    }
-                    
                     // Reload page after delay to show updated file list
                     setTimeout(() => {
                         window.location.reload();
-                    }, 2000);
+                    }, 1500);
                 } else {
                     showMessage(`✗ ${data.error || 'Upload failed'}`, 'error');
                 }
@@ -397,13 +610,97 @@
                 showMessage(`✗ Error: ${error.message}`, 'error');
             } finally {
                 uploadBtn.disabled = false;
-                uploadBtn.textContent = 'Upload & Process';
+                uploadBtn.textContent = 'Upload File';
             }
         });
+        
+        // Parse GEDCOM file
+        async function parseFile(fileId) {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Parsing...';
+            
+            try {
+                const response = await fetch(`/parse/${fileId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage(`✓ ${data.message}. Persons: ${data.statistics.persons}, Baptisms: ${data.statistics.baptisms}, Marriages: ${data.statistics.marriages}, Deaths: ${data.statistics.deaths}`, 'success');
+                    
+                    // Reload page after delay to show updated status
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 3000);
+                } else {
+                    showMessage(`✗ ${data.error || 'Parsing failed'}`, 'error');
+                    button.disabled = false;
+                    button.textContent = 'Parse GEDCOM';
+                }
+            } catch (error) {
+                showMessage(`✗ Error: ${error.message}`, 'error');
+                button.disabled = false;
+                button.textContent = 'Parse GEDCOM';
+            }
+        }
         
         function showMessage(text, type) {
             message.textContent = text;
             message.className = `message ${type}`;
+        }
+        
+        // Reset database functionality
+        function showResetModal() {
+            document.getElementById('resetModal').style.display = 'block';
+        }
+        
+        function hideResetModal() {
+            document.getElementById('resetModal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('resetModal');
+            if (event.target === modal) {
+                hideResetModal();
+            }
+        }
+        
+        async function confirmReset() {
+            const resetBtn = document.getElementById('resetBtn');
+            const confirmBtn = event.target;
+            
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Resetting...';
+            
+            try {
+                const response = await fetch('/reset-database', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    hideResetModal();
+                    showMessage(`✓ ${data.message}`, 'success');
+                    
+                    // Reload page after delay to show empty state
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    hideResetModal();
+                    showMessage(`✗ ${data.error || 'Reset failed'}`, 'error');
+                }
+            } catch (error) {
+                hideResetModal();
+                showMessage(`✗ Error: ${error.message}`, 'error');
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Reset Database';
+            }
         }
     </script>
 </body>

@@ -2,7 +2,18 @@ from flask import Flask
 
 from .config import Config
 from .extensions import db, migrate
-from .models import GenealogicalRecord, RecordBatch, UploadedFile
+from .models import (
+    BaptismRecord,
+    DeathRecord,
+    GenealogicalRecord,
+    GodparentRelationship,
+    MarriageRecord,
+    Person,
+    RecordBatch,
+    SocialStatus,
+    UploadedFile,
+    WitnessRelationship,
+)
 from .routes import health, main
 
 
