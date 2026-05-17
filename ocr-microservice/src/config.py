@@ -25,6 +25,8 @@ class Config:
     S3_INPUT_BUCKET: Optional[str] = os.getenv("S3_INPUT_BUCKET")
     S3_OUTPUT_BUCKET: Optional[str] = os.getenv("S3_OUTPUT_BUCKET")
     S3_OUTPUT_PREFIX: str = os.getenv("S3_OUTPUT_PREFIX", "ocr-results/")
+    S3_STRUCTURED_PREFIX: str = os.getenv("S3_STRUCTURED_PREFIX", "structured-data/")
+    S3_GEDCOM_PREFIX: str = os.getenv("S3_GEDCOM_PREFIX", "gedcom-files/")
     
     # Application Configuration
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
@@ -37,8 +39,24 @@ class Config:
     
     # OCR Configuration
     OCR_OUTPUT_FORMAT: str = os.getenv("OCR_OUTPUT_FORMAT", "markdown")
-    OCR_MODE: str = os.getenv("OCR_MODE", "balanced")
+    OCR_MODE: str = os.getenv("OCR_MODE", "accurate")
     OCR_PAGINATE: bool = os.getenv("OCR_PAGINATE", "true").lower() == "true"
+    
+    # OpenRouter Configuration
+    OPENROUTER_API_KEY: Optional[str] = os.getenv("OPENROUTER_API_KEY")
+    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "google/gemini-3-flash-preview")
+    OPENROUTER_BASE_URL: str = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    OPENROUTER_TIMEOUT: int = int(os.getenv("OPENROUTER_TIMEOUT", "120"))
+    
+    # Processing Options
+    ENABLE_OPENROUTER: bool = os.getenv("ENABLE_OPENROUTER", "true").lower() == "true"
+    ENABLE_GEDCOM_GENERATION: bool = os.getenv("ENABLE_GEDCOM_GENERATION", "true").lower() == "true"
+    SAVE_INTERMEDIATE_RESULTS: bool = os.getenv("SAVE_INTERMEDIATE_RESULTS", "true").lower() == "true"
+    
+    # Hosted Application Integration
+    HOSTED_APP_URL: str = os.getenv("HOSTED_APP_URL", "")
+    HOSTED_APP_API_KEY: str = os.getenv("HOSTED_APP_API_KEY", "")
+    ENABLE_AUTO_UPLOAD: bool = os.getenv("ENABLE_AUTO_UPLOAD", "true").lower() == "true"
     
     @classmethod
     def validate(cls) -> None:

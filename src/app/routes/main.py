@@ -83,7 +83,7 @@ def index():
 
 @bp.route("/upload", methods=["POST"])
 def upload_file():
-    """Handle GEDCOM file upload and processing."""
+    """Handle GEDCOM file upload and automatic parsing."""
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
     
@@ -127,15 +127,40 @@ def upload_file():
         db.session.add(uploaded_file)
         db.session.commit()
         
-        return jsonify({
-            "message": "File uploaded successfully",
-            "filename": filename,
-            "file_id": str(uploaded_file.id)
-        }), 201
+        # Automatically parse the uploaded file
+        file_id = str(uploaded_file.id)
+        logger.info(f"Automatically parsing uploaded file {file_id}: {filename}")
+        
+        try:
+            # Create parser and import data
+            parser = GedcomParser(relative_filepath, file_id)
+            stats = parser.parse_and_import()
+            
+            logger.info(f"File {file_id} parsed successfully. Statistics: {stats}")
+            
+            return jsonify({
+                "message": "File uploaded and parsed successfully",
+                "filename": filename,
+                "file_id": file_id,
+                "statistics": stats
+            }), 201
+            
+        except Exception as parse_error:
+            logger.error(f"Failed to parse uploaded file {file_id}: {parse_error}", exc_info=True)
+            # Update file status to failed
+            uploaded_file.processing_status = 'failed'
+            db.session.commit()
+            
+            return jsonify({
+                "error": f"File uploaded but parsing failed: {str(parse_error)}",
+                "filename": filename,
+                "file_id": file_id
+            }), 500
     
     except Exception as e:
         # Rollback any database changes on error
         db.session.rollback()
+        logger.error(f"Upload failed: {e}", exc_info=True)
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
 

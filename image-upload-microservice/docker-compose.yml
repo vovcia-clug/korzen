@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  image-upload-microservice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: image-upload-microservice
+    restart: unless-stopped
+    
+    environment:
+      # AWS Configuration
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      
+      # S3 Configuration
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - S3_PREFIX=${S3_PREFIX:-uploads/}
+      - S3_SERVER_SIDE_ENCRYPTION=${S3_SERVER_SIDE_ENCRYPTION:-AES256}
+      - S3_STORAGE_CLASS=${S3_STORAGE_CLASS:-STANDARD}
+      - MULTIPART_THRESHOLD_MB=${MULTIPART_THRESHOLD_MB:-5}
+      
+      # SQS Configuration
+      - AWS_SQS_QUEUE_URL=${AWS_SQS_QUEUE_URL}
+      - SQS_BATCH_SIZE=${SQS_BATCH_SIZE:-10}
+      
+      # Directory Watching
+      - WATCH_DIRECTORY=/app/watched-images
+      - WATCH_RECURSIVE=${WATCH_RECURSIVE:-false}
+      - DEBOUNCE_SECONDS=${DEBOUNCE_SECONDS:-2}
+      
+      # Image Detection
+      - SUPPORTED_EXTENSIONS=${SUPPORTED_EXTENSIONS:-jpg,jpeg,png,gif,bmp,tiff,tif,webp}
+      - MIN_IMAGE_SIZE_BYTES=${MIN_IMAGE_SIZE_BYTES:-1024}
+      - MAX_IMAGE_SIZE_BYTES=${MAX_IMAGE_SIZE_BYTES:-104857600}
+      - STRICT_VALIDATION=${STRICT_VALIDATION:-true}
+      
+      # Post-Upload Actions
+      - POST_UPLOAD_ACTION=${POST_UPLOAD_ACTION:-keep}
+      - ARCHIVE_DIRECTORY=/app/processed-images
+      
+      # Application Configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MAX_CONCURRENT_UPLOADS=${MAX_CONCURRENT_UPLOADS:-3}
+      - UPLOAD_TIMEOUT_SECONDS=${UPLOAD_TIMEOUT_SECONDS:-300}
+      
+      # Retry Configuration
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_BACKOFF_BASE=${RETRY_BACKOFF_BASE:-2.0}
+      - RETRY_BACKOFF_MAX=${RETRY_BACKOFF_MAX:-60.0}
+    
+    volumes:
+      # Mount watched directory from host
+      - ${HOST_WATCH_DIRECTORY:-./watched-images}:/app/watched-images
+      # Mount archive directory
+      - ${HOST_ARCHIVE_DIRECTORY:-./processed-images}:/app/processed-images
+      # Optional: mount logs directory
+      - ./logs:/app/logs
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  watched-images:
+    driver: local
+  processed-images:
+    driver: local
