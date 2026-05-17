@@ -1,4 +1,4 @@
-cimport os
+import os
 import json
 import logging
 from datetime import datetime
@@ -340,20 +340,22 @@ def get_graph_data():
         # If root_id is provided, start from that ancestor and show descendants
         # Focus on PARENT_OF (parent to child) and MARRIED_TO relationships
         if root_id:
-            # Query for descendants: start from root and get connected people
-            # We'll get people within depth levels and show family relationships
-            query = text(f"""
+            # Query for descendants: start from root and follow PARENT_OF relationships
+            # PARENT_OF goes from parent to child, so we follow outgoing edges
+            # Use text() with bindparams to avoid SQLAlchemy treating :PARENT_OF as a bind parameter
+            query_str = f"""
                 SELECT * FROM cypher('genealogy', $$
                     MATCH (root:Person {{uuid: '{root_id}'}})
-                    OPTIONAL MATCH path = (root)-[*0..{depth}]-(connected:Person)
-                    WITH DISTINCT connected AS p
+                    OPTIONAL MATCH path = (root)-[r_parent:PARENT_OF*0..{depth}]->(descendant:Person)
+                    WITH DISTINCT descendant AS p
                     LIMIT {limit}
                     OPTIONAL MATCH (p)-[r]->(related)
                     OPTIONAL MATCH (p)-[fs]->(source:Source)
                     OPTIONAL MATCH (related)-[rfs]->(related_source:Source)
                     RETURN p, r, related, source, related_source
                 $$) AS (person agtype, relationship agtype, related agtype, source agtype, related_source agtype);
-            """)
+            """
+            query = text(query_str)
         else:
             # Default query - get persons with all relationships
             query = text(f"""
