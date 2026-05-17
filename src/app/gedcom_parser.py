@@ -24,7 +24,9 @@ from .models import (
     BaptismRecord,
     MarriageRecord,
     DeathRecord,
-    UploadedFile
+    UploadedFile,
+    DuplicateCandidate,
+    DuplicateResolution
 )
 from .services.age_graph_importer import AgeGraphImporter
 from .services.phonetic_encoder import PhoneticEncoder
@@ -36,7 +38,9 @@ from .utils.name_parser import NameParser
 from .gedcom_constants import (
     UNICODE_REPLACEMENTS,
     DEFAULT_ENCODING,
-    DUPLICATE_THRESHOLD
+    DUPLICATE_THRESHOLD,
+    AUTO_MERGE_THRESHOLD,
+    ENABLE_AUTO_MERGE
 )
 
 logger = logging.getLogger(__name__)
@@ -210,6 +214,7 @@ class GedcomParser:
         """
         Create a Person record from a GEDCOM Individual.
         Checks for existing person by GEDCOM ID to prevent duplicates.
+        Also checks for 100% duplicates and auto-merges if enabled.
         
         Args:
             individual: ged4py Individual object
@@ -384,8 +389,13 @@ class GedcomParser:
         except Exception as e:
             logger.warning(f"Failed to generate embedding for death: {e}")
     
-    def _check_for_duplicates(self, person: Person) -> None:
-        """Check for potential duplicates and log warnings."""
+    def _check_for_duplicates(self, person: Person) -> list:
+        """
+        Check for potential duplicates and log warnings.
+        
+        Returns:
+            List of tuples (candidate_person, composite_score, score_breakdown)
+        """
         try:
             duplicates = self.duplicate_detector.detect_person_duplicates(person, limit=5)
             
@@ -401,8 +411,346 @@ class GedcomParser:
                         f"Vector: {breakdown['vector']:.2f}, "
                         f"Phonetic: {breakdown['phonetic']:.2f})"
                     )
+            
+            return duplicates
         except Exception as e:
             logger.warning(f"Failed to check for duplicates: {e}")
+            return []
+    
+    def _auto_merge_duplicate(self, existing_person: Person, new_person: Person,
+                             composite_score: float, score_breakdown: dict) -> None:
+        """
+        Automatically merge a 100% duplicate by creating audit trail.
+        
+        Args:
+            existing_person: The existing Person record that matches
+            new_person: The newly created person that will be deleted
+            composite_score: The similarity score (should be 1.0)
+            score_breakdown: Dictionary with individual similarity scores
+        """
+        try:
+            # Delete any pending duplicate candidates created by the detector
+            # (these were auto-created during detection)
+            DuplicateCandidate.query.filter(
+                DuplicateCandidate.record_type == 'person',
+                DuplicateCandidate.status == 'pending',
+                (
+                    (DuplicateCandidate.record1_id == existing_person.id) &
+                    (DuplicateCandidate.record2_id == new_person.id)
+                ) | (
+                    (DuplicateCandidate.record1_id == new_person.id) &
+                    (DuplicateCandidate.record2_id == existing_person.id)
+                )
+            ).delete(synchronize_session=False)
+            
+            # Store new person data for audit trail
+            new_person_data = {
+                'gedcom_id': new_person.gedcom_id,
+                'first_name': new_person.first_name,
+                'last_name': new_person.last_name,
+                'gender': new_person.gender,
+                'birth_date': str(new_person.birth_date) if new_person.birth_date else None,
+                'birth_place': new_person.birth_place,
+                'death_date': str(new_person.death_date) if new_person.death_date else None,
+                'death_place': new_person.death_place,
+                'occupation': new_person.occupation
+            }
+            
+            # Create DuplicateCandidate record with 'confirmed' status
+            candidate = DuplicateCandidate(
+                record_type='person',
+                record1_id=existing_person.id,
+                record2_id=existing_person.id,  # Same ID since record2 will be deleted
+                vector_similarity=score_breakdown.get('vector', 0.0),
+                phonetic_similarity=score_breakdown.get('phonetic', 0.0),
+                date_similarity=score_breakdown.get('date', 0.0),
+                location_similarity=score_breakdown.get('location', 0.0),
+                composite_score=composite_score,
+                status='confirmed',
+                reviewed_by='system_auto_merge',
+                reviewed_at=datetime.utcnow(),
+                review_notes=f"Automatically merged - 100% match during GEDCOM import",
+                detection_method='import'
+            )
+            db.session.add(candidate)
+            db.session.flush()
+            
+            # Create DuplicateResolution audit entry
+            resolution = DuplicateResolution(
+                candidate_id=candidate.id,
+                action='merge',
+                kept_record_id=existing_person.id,
+                merged_record_id=existing_person.id,  # Same ID since duplicate will be deleted
+                resolved_by='system_auto_merge',
+                resolved_at=datetime.utcnow(),
+                resolution_notes=(
+                    f"Automatically merged 100% duplicate during GEDCOM import. "
+                    f"New GEDCOM ID {new_person_data.get('gedcom_id')} mapped to existing record. "
+                    f"Person: {new_person_data.get('first_name')} {new_person_data.get('last_name')} "
+                    f"({new_person_data.get('birth_date')} - {new_person_data.get('death_date')})"
+                ),
+                merged_data=new_person_data  # Store what would have been created
+            )
+            db.session.add(resolution)
+            
+            # Log the auto-merge action
+            logger.info(
+                f"Auto-merged 100% duplicate: {new_person_data.get('first_name')} "
+                f"{new_person_data.get('last_name')} (GEDCOM: {new_person_data.get('gedcom_id')}) "
+                f"-> Existing ID: {existing_person.id}. Score: {composite_score:.2f}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to auto-merge duplicate: {e}")
+    
+    def _auto_merge_baptism_duplicate(self, existing_baptism: BaptismRecord, new_baptism: BaptismRecord,
+                                     composite_score: float, score_breakdown: dict) -> None:
+        """
+        Automatically merge a 100% duplicate baptism by creating audit trail.
+        
+        Args:
+            existing_baptism: The existing BaptismRecord that matches
+            new_baptism: The newly created baptism that will be deleted
+            composite_score: The similarity score (should be 1.0)
+            score_breakdown: Dictionary with individual similarity scores
+        """
+        try:
+            # Delete any pending duplicate candidates created by the detector
+            DuplicateCandidate.query.filter(
+                DuplicateCandidate.record_type == 'baptism',
+                DuplicateCandidate.status == 'pending',
+                (
+                    (DuplicateCandidate.record1_id == existing_baptism.id) &
+                    (DuplicateCandidate.record2_id == new_baptism.id)
+                ) | (
+                    (DuplicateCandidate.record1_id == new_baptism.id) &
+                    (DuplicateCandidate.record2_id == existing_baptism.id)
+                )
+            ).delete(synchronize_session=False)
+            
+            # Store new baptism data for audit trail
+            new_baptism_data = {
+                'gedcom_id': new_baptism.gedcom_id,
+                'child_name': new_baptism.child_name,
+                'father_name': new_baptism.father_name,
+                'father_surname': new_baptism.father_surname,
+                'mother_name': new_baptism.mother_name,
+                'mother_maiden_name': new_baptism.mother_maiden_name,
+                'baptism_date': str(new_baptism.baptism_date) if new_baptism.baptism_date else None,
+                'birth_date': str(new_baptism.birth_date) if new_baptism.birth_date else None,
+                'parish': new_baptism.parish
+            }
+            
+            # Create DuplicateCandidate record with 'confirmed' status
+            candidate = DuplicateCandidate(
+                record_type='baptism',
+                record1_id=existing_baptism.id,
+                record2_id=existing_baptism.id,  # Same ID since record2 will be deleted
+                vector_similarity=score_breakdown.get('vector', 0.0),
+                phonetic_similarity=score_breakdown.get('phonetic', 0.0),
+                date_similarity=score_breakdown.get('date', 0.0),
+                location_similarity=score_breakdown.get('location', 0.0),
+                composite_score=composite_score,
+                status='confirmed',
+                reviewed_by='system_auto_merge',
+                reviewed_at=datetime.utcnow(),
+                review_notes=f"Automatically merged - 100% match during GEDCOM import",
+                detection_method='import'
+            )
+            db.session.add(candidate)
+            db.session.flush()
+            
+            # Create DuplicateResolution audit entry
+            resolution = DuplicateResolution(
+                candidate_id=candidate.id,
+                action='merge',
+                kept_record_id=existing_baptism.id,
+                merged_record_id=existing_baptism.id,  # Same ID since duplicate will be deleted
+                resolved_by='system_auto_merge',
+                resolved_at=datetime.utcnow(),
+                resolution_notes=(
+                    f"Automatically merged 100% duplicate baptism during GEDCOM import. "
+                    f"New GEDCOM ID {new_baptism_data.get('gedcom_id')} mapped to existing record. "
+                    f"Child: {new_baptism_data.get('child_name')}, Baptism: {new_baptism_data.get('baptism_date')}"
+                ),
+                merged_data=new_baptism_data
+            )
+            db.session.add(resolution)
+            
+            logger.info(
+                f"Auto-merged 100% duplicate baptism: {new_baptism_data.get('child_name')} "
+                f"(GEDCOM: {new_baptism_data.get('gedcom_id')}) -> Existing ID: {existing_baptism.id}. "
+                f"Score: {composite_score:.2f}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to auto-merge duplicate baptism: {e}")
+    
+    def _auto_merge_marriage_duplicate(self, existing_marriage: MarriageRecord, new_marriage: MarriageRecord,
+                                      composite_score: float, score_breakdown: dict) -> None:
+        """
+        Automatically merge a 100% duplicate marriage by creating audit trail.
+        
+        Args:
+            existing_marriage: The existing MarriageRecord that matches
+            new_marriage: The newly created marriage that will be deleted
+            composite_score: The similarity score (should be 1.0)
+            score_breakdown: Dictionary with individual similarity scores
+        """
+        try:
+            # Delete any pending duplicate candidates created by the detector
+            DuplicateCandidate.query.filter(
+                DuplicateCandidate.record_type == 'marriage',
+                DuplicateCandidate.status == 'pending',
+                (
+                    (DuplicateCandidate.record1_id == existing_marriage.id) &
+                    (DuplicateCandidate.record2_id == new_marriage.id)
+                ) | (
+                    (DuplicateCandidate.record1_id == new_marriage.id) &
+                    (DuplicateCandidate.record2_id == existing_marriage.id)
+                )
+            ).delete(synchronize_session=False)
+            
+            # Store new marriage data for audit trail
+            new_marriage_data = {
+                'gedcom_id': new_marriage.gedcom_id,
+                'spouse1_name': new_marriage.spouse1_name,
+                'spouse1_surname': new_marriage.spouse1_surname,
+                'spouse2_name': new_marriage.spouse2_name,
+                'spouse2_surname': new_marriage.spouse2_surname,
+                'spouse2_maiden_name': new_marriage.spouse2_maiden_name,
+                'marriage_date': str(new_marriage.marriage_date) if new_marriage.marriage_date else None,
+                'parish': new_marriage.parish
+            }
+            
+            # Create DuplicateCandidate record with 'confirmed' status
+            candidate = DuplicateCandidate(
+                record_type='marriage',
+                record1_id=existing_marriage.id,
+                record2_id=existing_marriage.id,  # Same ID since record2 will be deleted
+                vector_similarity=score_breakdown.get('vector', 0.0),
+                phonetic_similarity=score_breakdown.get('phonetic', 0.0),
+                date_similarity=score_breakdown.get('date', 0.0),
+                location_similarity=score_breakdown.get('location', 0.0),
+                composite_score=composite_score,
+                status='confirmed',
+                reviewed_by='system_auto_merge',
+                reviewed_at=datetime.utcnow(),
+                review_notes=f"Automatically merged - 100% match during GEDCOM import",
+                detection_method='import'
+            )
+            db.session.add(candidate)
+            db.session.flush()
+            
+            # Create DuplicateResolution audit entry
+            resolution = DuplicateResolution(
+                candidate_id=candidate.id,
+                action='merge',
+                kept_record_id=existing_marriage.id,
+                merged_record_id=existing_marriage.id,  # Same ID since duplicate will be deleted
+                resolved_by='system_auto_merge',
+                resolved_at=datetime.utcnow(),
+                resolution_notes=(
+                    f"Automatically merged 100% duplicate marriage during GEDCOM import. "
+                    f"New GEDCOM ID {new_marriage_data.get('gedcom_id')} mapped to existing record. "
+                    f"Spouses: {new_marriage_data.get('spouse1_name')} {new_marriage_data.get('spouse1_surname')} & "
+                    f"{new_marriage_data.get('spouse2_name')} {new_marriage_data.get('spouse2_surname')}, "
+                    f"Date: {new_marriage_data.get('marriage_date')}"
+                ),
+                merged_data=new_marriage_data
+            )
+            db.session.add(resolution)
+            
+            logger.info(
+                f"Auto-merged 100% duplicate marriage: {new_marriage_data.get('spouse1_name')} & "
+                f"{new_marriage_data.get('spouse2_name')} (GEDCOM: {new_marriage_data.get('gedcom_id')}) "
+                f"-> Existing ID: {existing_marriage.id}. Score: {composite_score:.2f}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to auto-merge duplicate marriage: {e}")
+    
+    def _auto_merge_death_duplicate(self, existing_death: DeathRecord, new_death: DeathRecord,
+                                   composite_score: float, score_breakdown: dict) -> None:
+        """
+        Automatically merge a 100% duplicate death by creating audit trail.
+        
+        Args:
+            existing_death: The existing DeathRecord that matches
+            new_death: The newly created death that will be deleted
+            composite_score: The similarity score (should be 1.0)
+            score_breakdown: Dictionary with individual similarity scores
+        """
+        try:
+            # Delete any pending duplicate candidates created by the detector
+            DuplicateCandidate.query.filter(
+                DuplicateCandidate.record_type == 'death',
+                DuplicateCandidate.status == 'pending',
+                (
+                    (DuplicateCandidate.record1_id == existing_death.id) &
+                    (DuplicateCandidate.record2_id == new_death.id)
+                ) | (
+                    (DuplicateCandidate.record1_id == new_death.id) &
+                    (DuplicateCandidate.record2_id == existing_death.id)
+                )
+            ).delete(synchronize_session=False)
+            
+            # Store new death data for audit trail
+            new_death_data = {
+                'gedcom_id': new_death.gedcom_id,
+                'deceased_name': new_death.deceased_name,
+                'deceased_surname': new_death.deceased_surname,
+                'deceased_maiden_name': new_death.deceased_maiden_name,
+                'death_date': str(new_death.death_date) if new_death.death_date else None,
+                'age_years': new_death.age_years,
+                'parish': new_death.parish
+            }
+            
+            # Create DuplicateCandidate record with 'confirmed' status
+            candidate = DuplicateCandidate(
+                record_type='death',
+                record1_id=existing_death.id,
+                record2_id=existing_death.id,  # Same ID since record2 will be deleted
+                vector_similarity=score_breakdown.get('vector', 0.0),
+                phonetic_similarity=score_breakdown.get('phonetic', 0.0),
+                date_similarity=score_breakdown.get('date', 0.0),
+                location_similarity=score_breakdown.get('location', 0.0),
+                composite_score=composite_score,
+                status='confirmed',
+                reviewed_by='system_auto_merge',
+                reviewed_at=datetime.utcnow(),
+                review_notes=f"Automatically merged - 100% match during GEDCOM import",
+                detection_method='import'
+            )
+            db.session.add(candidate)
+            db.session.flush()
+            
+            # Create DuplicateResolution audit entry
+            resolution = DuplicateResolution(
+                candidate_id=candidate.id,
+                action='merge',
+                kept_record_id=existing_death.id,
+                merged_record_id=existing_death.id,  # Same ID since duplicate will be deleted
+                resolved_by='system_auto_merge',
+                resolved_at=datetime.utcnow(),
+                resolution_notes=(
+                    f"Automatically merged 100% duplicate death during GEDCOM import. "
+                    f"New GEDCOM ID {new_death_data.get('gedcom_id')} mapped to existing record. "
+                    f"Deceased: {new_death_data.get('deceased_name')} {new_death_data.get('deceased_surname')}, "
+                    f"Date: {new_death_data.get('death_date')}"
+                ),
+                merged_data=new_death_data
+            )
+            db.session.add(resolution)
+            
+            logger.info(
+                f"Auto-merged 100% duplicate death: {new_death_data.get('deceased_name')} "
+                f"{new_death_data.get('deceased_surname')} (GEDCOM: {new_death_data.get('gedcom_id')}) "
+                f"-> Existing ID: {existing_death.id}. Score: {composite_score:.2f}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to auto-merge duplicate death: {e}")
     
     def create_baptism_record(self, individual: Individual, person: Person) -> Optional[BaptismRecord]:
         """
@@ -710,12 +1058,43 @@ class GedcomParser:
                 db.session.add(person)
                 db.session.flush()
                 
-                # Check for potential duplicates
-                self._check_for_duplicates(person)
+                # IMPORTANT: Commit the person to make it visible to pgvector similarity search
+                # Vector indices are only updated after commit, not just flush
+                db.session.commit()
                 
-                # Map GEDCOM ID to Person UUID
-                self.person_map[individual.xref_id] = str(person.id)
-                stats['persons'] += 1
+                # Check for potential duplicates and handle 100% matches
+                # Note: During first-pass parsing, duplicate detection may not find matches
+                # due to pgvector index visibility. Post-parse auto-merge handles this.
+                duplicates = self._check_for_duplicates(person)
+                
+                # Check if any duplicate is a 100% match and handle auto-merge
+                should_keep_person = True
+                if ENABLE_AUTO_MERGE and duplicates:
+                    for candidate, score, breakdown in duplicates:
+                        # Use tolerance-based comparison to account for floating-point precision
+                        # (e.g., 0.40 + 0.30 + 0.20 + 0.10 may equal 0.9999999999999999)
+                        if score >= AUTO_MERGE_THRESHOLD - 0.0001:
+                            # This is a 100% match - auto-merge
+                            logger.info(f"Detected 100% match for {person.first_name} {person.last_name}, auto-merging...")
+                            
+                            # Create audit trail (handles deleting pending candidates)
+                            self._auto_merge_duplicate(candidate, person, score, breakdown)
+                            
+                            # Remove the newly added person (it's a duplicate)
+                            db.session.delete(person)
+                            db.session.flush()
+                            
+                            # Map GEDCOM ID to the existing person's UUID
+                            self.person_map[individual.xref_id] = str(candidate.id)
+                            should_keep_person = False
+                            logger.info(f"Auto-merge complete. GEDCOM ID {individual.xref_id} mapped to existing person {candidate.id}")
+                            break
+                
+                #  If not auto-merged, map normally and increment counter
+                if should_keep_person:
+                    # Map GEDCOM ID to Person UUID
+                    self.person_map[individual.xref_id] = str(person.id)
+                    stats['persons'] += 1
                 
                 # Create genealogical record for raw data
                 name_value = None
@@ -798,14 +1177,62 @@ class GedcomParser:
                     if baptism:
                         if baptism not in db.session:
                             db.session.add(baptism)
-                            stats['baptisms'] += 1
+                            db.session.flush()
+                            
+                            # Check for duplicates and handle 100% matches
+                            if ENABLE_AUTO_MERGE:
+                                try:
+                                    duplicates = self.duplicate_detector.detect_baptism_duplicates(baptism, limit=5)
+                                    should_keep_baptism = True
+                                    
+                                    for candidate, score, breakdown in duplicates:
+                                        if score >= AUTO_MERGE_THRESHOLD - 0.0001:
+                                            logger.info(f"Detected 100% match for baptism {baptism.child_name}, auto-merging...")
+                                            self._auto_merge_baptism_duplicate(candidate, baptism, score, breakdown)
+                                            db.session.delete(baptism)
+                                            db.session.flush()
+                                            should_keep_baptism = False
+                                            logger.info(f"Auto-merge complete for baptism GEDCOM ID {baptism.gedcom_id}")
+                                            break
+                                    
+                                    if should_keep_baptism:
+                                        stats['baptisms'] += 1
+                                except Exception as e:
+                                    logger.error(f"Error during baptism auto-merge: {e}")
+                                    stats['baptisms'] += 1  # Count it anyway
+                            else:
+                                stats['baptisms'] += 1
                     
                     # Create death record
                     death = self.create_death_record(individual, person)
                     if death:
                         if death not in db.session:
                             db.session.add(death)
-                            stats['deaths'] += 1
+                            db.session.flush()
+                            
+                            # Check for duplicates and handle 100% matches
+                            if ENABLE_AUTO_MERGE:
+                                try:
+                                    duplicates = self.duplicate_detector.detect_death_duplicates(death, limit=5)
+                                    should_keep_death = True
+                                    
+                                    for candidate, score, breakdown in duplicates:
+                                        if score >= AUTO_MERGE_THRESHOLD - 0.0001:
+                                            logger.info(f"Detected 100% match for death {death.deceased_name} {death.deceased_surname}, auto-merging...")
+                                            self._auto_merge_death_duplicate(candidate, death, score, breakdown)
+                                            db.session.delete(death)
+                                            db.session.flush()
+                                            should_keep_death = False
+                                            logger.info(f"Auto-merge complete for death GEDCOM ID {death.gedcom_id}")
+                                            break
+                                    
+                                    if should_keep_death:
+                                        stats['deaths'] += 1
+                                except Exception as e:
+                                    logger.error(f"Error during death auto-merge: {e}")
+                                    stats['deaths'] += 1  # Count it anyway
+                            else:
+                                stats['deaths'] += 1
                         
                 except Exception as e:
                     error_msg = f"Error processing events for {individual.xref_id}: {str(e)}"
@@ -833,7 +1260,31 @@ class GedcomParser:
                     if marriage:
                         if marriage not in db.session:
                             db.session.add(marriage)
-                            stats['marriages'] += 1
+                            db.session.flush()
+                            
+                            # Check for duplicates and handle 100% matches
+                            if ENABLE_AUTO_MERGE:
+                                try:
+                                    duplicates = self.duplicate_detector.detect_marriage_duplicates(marriage, limit=5)
+                                    should_keep_marriage = True
+                                    
+                                    for candidate, score, breakdown in duplicates:
+                                        if score >= AUTO_MERGE_THRESHOLD - 0.0001:
+                                            logger.info(f"Detected 100% match for marriage {marriage.spouse1_name} & {marriage.spouse2_name}, auto-merging...")
+                                            self._auto_merge_marriage_duplicate(candidate, marriage, score, breakdown)
+                                            db.session.delete(marriage)
+                                            db.session.flush()
+                                            should_keep_marriage = False
+                                            logger.info(f"Auto-merge complete for marriage GEDCOM ID {marriage.gedcom_id}")
+                                            break
+                                    
+                                    if should_keep_marriage:
+                                        stats['marriages'] += 1
+                                except Exception as e:
+                                    logger.error(f"Error during marriage auto-merge: {e}")
+                                    stats['marriages'] += 1  # Count it anyway
+                            else:
+                                stats['marriages'] += 1
                         
                         # Extract data from sub_records for raw data
                         husband_xref = None
@@ -915,6 +1366,95 @@ class GedcomParser:
         logger.info(f"Processed {children_processed} parent-child relationships")
         stats['parent_child_relationships'] = children_processed
     
+    def _post_parse_auto_merge(self, stats: Dict[str, int]) -> None:
+        """
+        Run duplicate detection and auto-merge after all persons are imported.
+        
+        This phase runs AFTER the transaction is committed, so pgvector indices
+        are available for similarity search. Detects 100% matches and automatically
+        merges them with audit trail.
+        
+        Args:
+            stats: Statistics dictionary to update with auto-merge info
+        """
+        if not ENABLE_AUTO_MERGE:
+            logger.info("Auto-merge is disabled, skipping post-parse auto-merge phase")
+            return
+        
+        print("\n" + "="*80)
+        print("STARTING POST-PARSE AUTO-MERGE")
+        print("="*80)
+        logger.info("Starting post-parse auto-merge phase...")
+        
+        # Get all persons from this batch
+        persons = Person.query.filter_by(source_batch_id=self.batch.id).all()
+        total_persons = len(persons)
+        auto_merged_count = 0
+        
+        logger.info(f"Checking {total_persons} persons for 100% duplicates...")
+        print(f"Checking {total_persons} persons for 100% duplicates...")
+        
+        # Track which persons have been merged to avoid duplicate processing
+        merged_person_ids = set()
+        
+        for i, person in enumerate(persons, 1):
+            # Skip if this person was already merged
+            if person.id in merged_person_ids:
+                continue
+            
+            try:
+                # Detect duplicates for this person
+                duplicates = self.duplicate_detector.detect_person_duplicates(person, limit=5)
+                
+                if duplicates:
+                    # Check for 100% matches
+                    for candidate, score, breakdown in duplicates:
+                        # Skip if candidate was already merged
+                        if candidate.id in merged_person_ids:
+                            continue
+                        
+                        # Use tolerance-based comparison for floating-point precision
+                        if score >= AUTO_MERGE_THRESHOLD - 0.0001:
+                            logger.info(f"  ✓ Found 100% match: {person.first_name} {person.last_name} "
+                                      f"(ID: {person.id}) matches {candidate.first_name} {candidate.last_name} "
+                                      f"(ID: {candidate.id}, Score: {score:.4f})")
+                            print(f"  ✓ Auto-merging: {person.first_name} {person.last_name} -> {candidate.first_name} {candidate.last_name}")
+                            
+                            # Auto-merge: keep candidate, delete person
+                            self._auto_merge_duplicate(candidate, person, score, breakdown)
+                            
+                            # Remove the merged person from database
+                            db.session.delete(person)
+                            db.session.flush()
+                            
+                            # Update GEDCOM ID mapping to point to kept record
+                            if person.gedcom_id in self.person_map:
+                                self.person_map[person.gedcom_id] = str(candidate.id)
+                            
+                            # Track merged persons
+                            merged_person_ids.add(person.id)
+                            auto_merged_count += 1
+                            
+                            logger.info(f"  ✓ Auto-merge complete: Kept {candidate.id}, removed {person.id}")
+                            break  # Only merge with first 100% match
+                
+                # Log progress every 10%
+                if i % max(1, total_persons // 10) == 0:
+                    percentage = (i / total_persons) * 100
+                    logger.info(f"  Progress: {i}/{total_persons} persons checked ({percentage:.1f}%), {auto_merged_count} auto-merged so far")
+                    
+            except Exception as e:
+                logger.error(f"Error during auto-merge for person {person.id}: {e}", exc_info=True)
+                continue
+        
+        # Commit all auto-merge changes
+        db.session.commit()
+        
+        stats['auto_merged'] = auto_merged_count
+        logger.info(f"Post-parse auto-merge complete: {auto_merged_count} duplicates automatically merged")
+        print(f"\n✓ Post-parse auto-merge complete: {auto_merged_count} records auto-merged")
+        print("="*80 + "\n")
+    
     def parse_and_import(self) -> Dict[str, int]:
         """
         Parse the GEDCOM file and import data into the database.
@@ -987,6 +1527,9 @@ class GedcomParser:
             self._second_pass_create_events(self.filepath, encoding, stats)
             self._third_pass_create_marriages(self.filepath, encoding, stats)
             self._fourth_pass_process_relationships(self.filepath, encoding, stats)
+            
+            # Run post-parse auto-merge for 100% duplicates
+            self._post_parse_auto_merge(stats)
             
             # Import data into AGE graph
             try:

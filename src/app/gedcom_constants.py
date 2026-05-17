@@ -45,3 +45,7 @@ MAX_DAY = 31
 
 # Duplicate detection threshold
 DUPLICATE_THRESHOLD = 0.85
+
+# Auto-merge configuration
+AUTO_MERGE_THRESHOLD = 1.0  # Only auto-merge at 100% similarity
+ENABLE_AUTO_MERGE = True    # Feature flag to enable/disable auto-merge

@@ -8,8 +8,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import joinedload, selectinload
 
 from ..extensions import db
-from ..models import UploadedFile, Person, BaptismRecord, MarriageRecord, DeathRecord, SocialStatus
+from ..models import UploadedFile, Person, BaptismRecord, MarriageRecord, DeathRecord, SocialStatus, DuplicateCandidate, DuplicateResolution
 from ..gedcom_parser import GedcomParser
+from ..services.age_graph_importer import AgeGraphImporter
 
 logger = logging.getLogger(__name__)
 
@@ -1160,3 +1161,338 @@ def api_list_deaths():
         
     except Exception as e:
         return jsonify({"error": f"Failed to list deaths: {str(e)}"}), 500
+
+
+@bp.route("/duplicates")
+def duplicates():
+    """View duplicate candidates for review."""
+    try:
+        # Get filter parameters
+        record_type = request.args.get('record_type', 'all')
+        status = request.args.get('status', 'pending')
+        min_score = request.args.get('min_score', 0.0, type=float)
+        
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 20, type=int), 100)
+        sort_by = request.args.get('sort_by', 'composite_score')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        # Build query
+        query = DuplicateCandidate.query
+        
+        # Apply filters
+        if record_type != 'all':
+            query = query.filter(DuplicateCandidate.record_type == record_type)
+        
+        if status != 'all':
+            query = query.filter(DuplicateCandidate.status == status)
+        
+        if min_score > 0:
+            query = query.filter(DuplicateCandidate.composite_score >= min_score)
+        
+        # Apply sorting
+        sort_column = get_sort_column(DuplicateCandidate, sort_by, DuplicateCandidate.composite_score)
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc())
+        else:
+            query = query.order_by(sort_column.desc())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Enrich candidates with actual record data
+        enriched_candidates = []
+        for candidate in pagination.items:
+            enriched = {
+                'id': str(candidate.id),
+                'record_type': candidate.record_type,
+                'composite_score': candidate.composite_score,
+                'vector_similarity': candidate.vector_similarity,
+                'phonetic_similarity': candidate.phonetic_similarity,
+                'date_similarity': candidate.date_similarity,
+                'location_similarity': candidate.location_similarity,
+                'status': candidate.status,
+                'detected_at': candidate.detected_at,
+                'detection_method': candidate.detection_method,
+                'reviewed_by': candidate.reviewed_by,
+                'reviewed_at': candidate.reviewed_at,
+                'review_notes': candidate.review_notes,
+                'record1': None,
+                'record2': None
+            }
+            
+            # Fetch actual records based on type
+            if candidate.record_type == 'person':
+                record1 = db.session.get(Person, candidate.record1_id)
+                record2 = db.session.get(Person, candidate.record2_id)
+                if record1:
+                    enriched['record1'] = {
+                        'id': str(record1.id),
+                        'name': f"{record1.first_name or ''} {record1.last_name or ''}".strip(),
+                        'birth_date': record1.birth_date.isoformat() if record1.birth_date else None,
+                        'death_date': record1.death_date.isoformat() if record1.death_date else None,
+                        'birth_place': record1.birth_place,
+                        'death_place': record1.death_place,
+                        'gender': record1.gender
+                    }
+                if record2:
+                    enriched['record2'] = {
+                        'id': str(record2.id),
+                        'name': f"{record2.first_name or ''} {record2.last_name or ''}".strip(),
+                        'birth_date': record2.birth_date.isoformat() if record2.birth_date else None,
+                        'death_date': record2.death_date.isoformat() if record2.death_date else None,
+                        'birth_place': record2.birth_place,
+                        'death_place': record2.death_place,
+                        'gender': record2.gender
+                    }
+            
+            elif candidate.record_type == 'baptism':
+                record1 = db.session.get(BaptismRecord, candidate.record1_id)
+                record2 = db.session.get(BaptismRecord, candidate.record2_id)
+                if record1:
+                    enriched['record1'] = {
+                        'id': str(record1.id),
+                        'child_name': record1.child_name,
+                        'baptism_date': record1.baptism_date.isoformat() if record1.baptism_date else None,
+                        'parish': record1.parish,
+                        'father_surname': record1.father_surname,
+                        'mother_maiden_name': record1.mother_maiden_name
+                    }
+                if record2:
+                    enriched['record2'] = {
+                        'id': str(record2.id),
+                        'child_name': record2.child_name,
+                        'baptism_date': record2.baptism_date.isoformat() if record2.baptism_date else None,
+                        'parish': record2.parish,
+                        'father_surname': record2.father_surname,
+                        'mother_maiden_name': record2.mother_maiden_name
+                    }
+            
+            elif candidate.record_type == 'marriage':
+                record1 = db.session.get(MarriageRecord, candidate.record1_id)
+                record2 = db.session.get(MarriageRecord, candidate.record2_id)
+                if record1:
+                    enriched['record1'] = {
+                        'id': str(record1.id),
+                        'spouse1_name': f"{record1.spouse1_name or ''} {record1.spouse1_surname or ''}".strip(),
+                        'spouse2_name': f"{record1.spouse2_name or ''} {record1.spouse2_surname or ''}".strip(),
+                        'marriage_date': record1.marriage_date.isoformat() if record1.marriage_date else None,
+                        'parish': record1.parish
+                    }
+                if record2:
+                    enriched['record2'] = {
+                        'id': str(record2.id),
+                        'spouse1_name': f"{record2.spouse1_name or ''} {record2.spouse1_surname or ''}".strip(),
+                        'spouse2_name': f"{record2.spouse2_name or ''} {record2.spouse2_surname or ''}".strip(),
+                        'marriage_date': record2.marriage_date.isoformat() if record2.marriage_date else None,
+                        'parish': record2.parish
+                    }
+            
+            elif candidate.record_type == 'death':
+                record1 = db.session.get(DeathRecord, candidate.record1_id)
+                record2 = db.session.get(DeathRecord, candidate.record2_id)
+                if record1:
+                    enriched['record1'] = {
+                        'id': str(record1.id),
+                        'deceased_name': f"{record1.deceased_name or ''} {record1.deceased_surname or ''}".strip(),
+                        'death_date': record1.death_date.isoformat() if record1.death_date else None,
+                        'parish': record1.parish,
+                        'age_years': record1.age_years
+                    }
+                if record2:
+                    enriched['record2'] = {
+                        'id': str(record2.id),
+                        'deceased_name': f"{record2.deceased_name or ''} {record2.deceased_surname or ''}".strip(),
+                        'death_date': record2.death_date.isoformat() if record2.death_date else None,
+                        'parish': record2.parish,
+                        'age_years': record2.age_years
+                    }
+            
+            enriched_candidates.append(enriched)
+        
+        # Get statistics
+        stats = {
+            'total_pending': DuplicateCandidate.query.filter_by(status='pending').count(),
+            'total_confirmed': DuplicateCandidate.query.filter_by(status='confirmed').count(),
+            'total_rejected': DuplicateCandidate.query.filter_by(status='rejected').count(),
+            'by_type': {
+                'person': DuplicateCandidate.query.filter_by(record_type='person', status='pending').count(),
+                'baptism': DuplicateCandidate.query.filter_by(record_type='baptism', status='pending').count(),
+                'marriage': DuplicateCandidate.query.filter_by(record_type='marriage', status='pending').count(),
+                'death': DuplicateCandidate.query.filter_by(record_type='death', status='pending').count()
+            }
+        }
+        
+        return render_template(
+            "duplicates.html",
+            candidates=enriched_candidates,
+            pagination=pagination,
+            stats=stats,
+            filters={
+                'record_type': record_type,
+                'status': status,
+                'min_score': min_score
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error loading duplicates page: {e}", exc_info=True)
+        db.session.rollback()
+        return render_template("duplicates.html", candidates=[], error=str(e), pagination=None, stats={})
+
+
+@bp.route("/api/duplicates/<candidate_id>/review", methods=["POST"])
+def review_duplicate(candidate_id):
+    """Review a duplicate candidate (confirm or reject)."""
+    try:
+        candidate = db.session.get(DuplicateCandidate, candidate_id)
+        if not candidate:
+            return jsonify({"error": "Duplicate candidate not found"}), 404
+        
+        data = request.get_json()
+        action = data.get('action')  # 'confirm' or 'reject'
+        notes = data.get('notes', '')
+        reviewer = data.get('reviewer', 'system')
+        
+        if action not in ['confirm', 'reject']:
+            return jsonify({"error": "Invalid action. Must be 'confirm' or 'reject'"}), 400
+        
+        # Update candidate status
+        candidate.status = 'confirmed' if action == 'confirm' else 'rejected'
+        candidate.reviewed_by = reviewer
+        candidate.reviewed_at = datetime.utcnow()
+        candidate.review_notes = notes
+        
+        # If confirming, delete the duplicate record (record2_id is the duplicate)
+        if action == 'confirm':
+            # Get the duplicate record based on record type
+            duplicate_record = None
+            kept_record = None
+            record_data = None
+            
+            if candidate.record_type == 'person':
+                duplicate_record = db.session.get(Person, candidate.record2_id)
+                kept_record = db.session.get(Person, candidate.record1_id)
+            elif candidate.record_type == 'baptism':
+                duplicate_record = db.session.get(BaptismRecord, candidate.record2_id)
+                kept_record = db.session.get(BaptismRecord, candidate.record1_id)
+            elif candidate.record_type == 'marriage':
+                duplicate_record = db.session.get(MarriageRecord, candidate.record2_id)
+                kept_record = db.session.get(MarriageRecord, candidate.record1_id)
+            elif candidate.record_type == 'death':
+                duplicate_record = db.session.get(DeathRecord, candidate.record2_id)
+                kept_record = db.session.get(DeathRecord, candidate.record1_id)
+            
+            if duplicate_record:
+                # Store record data for audit trail
+                if candidate.record_type == 'person':
+                    record_data = {
+                        'id': str(duplicate_record.id),
+                        'first_name': duplicate_record.first_name,
+                        'last_name': duplicate_record.last_name,
+                        'maiden_name': duplicate_record.maiden_name,
+                        'gender': duplicate_record.gender,
+                        'birth_date': duplicate_record.birth_date.isoformat() if duplicate_record.birth_date else None,
+                        'death_date': duplicate_record.death_date.isoformat() if duplicate_record.death_date else None,
+                        'birth_place': duplicate_record.birth_place,
+                        'death_place': duplicate_record.death_place,
+                        'gedcom_id': duplicate_record.gedcom_id
+                    }
+                elif candidate.record_type == 'baptism':
+                    record_data = {
+                        'id': str(duplicate_record.id),
+                        'baptism_date': duplicate_record.baptism_date.isoformat() if duplicate_record.baptism_date else None,
+                        'birth_date': duplicate_record.birth_date.isoformat() if duplicate_record.birth_date else None,
+                        'child_name': duplicate_record.child_name,
+                        'father_name': duplicate_record.father_name,
+                        'father_surname': duplicate_record.father_surname,
+                        'mother_name': duplicate_record.mother_name,
+                        'mother_maiden_name': duplicate_record.mother_maiden_name,
+                        'parish': duplicate_record.parish,
+                        'gedcom_id': duplicate_record.gedcom_id
+                    }
+                elif candidate.record_type == 'marriage':
+                    record_data = {
+                        'id': str(duplicate_record.id),
+                        'marriage_date': duplicate_record.marriage_date.isoformat() if duplicate_record.marriage_date else None,
+                        'spouse1_name': duplicate_record.spouse1_name,
+                        'spouse1_surname': duplicate_record.spouse1_surname,
+                        'spouse2_name': duplicate_record.spouse2_name,
+                        'spouse2_surname': duplicate_record.spouse2_surname,
+                        'spouse2_maiden_name': duplicate_record.spouse2_maiden_name,
+                        'parish': duplicate_record.parish,
+                        'gedcom_id': duplicate_record.gedcom_id
+                    }
+                elif candidate.record_type == 'death':
+                    record_data = {
+                        'id': str(duplicate_record.id),
+                        'death_date': duplicate_record.death_date.isoformat() if duplicate_record.death_date else None,
+                        'deceased_name': duplicate_record.deceased_name,
+                        'deceased_surname': duplicate_record.deceased_surname,
+                        'deceased_maiden_name': duplicate_record.deceased_maiden_name,
+                        'age_years': duplicate_record.age_years,
+                        'parish': duplicate_record.parish,
+                        'gedcom_id': duplicate_record.gedcom_id
+                    }
+                
+                # Create resolution record for audit trail
+                resolution = DuplicateResolution(
+                    candidate_id=candidate.id,
+                    action='merge',
+                    kept_record_id=candidate.record1_id,
+                    merged_record_id=candidate.record2_id,
+                    resolved_by=reviewer,
+                    resolved_at=datetime.utcnow(),
+                    resolution_notes=notes,
+                    merged_data=record_data
+                )
+                db.session.add(resolution)
+                
+                # Delete from graph database first (before PostgreSQL deletion)
+                # This ensures consistency between graph and relational storage
+                try:
+                    raw_conn = db.session.connection().connection
+                    graph_importer = AgeGraphImporter(raw_conn)
+                    
+                    record_uuid = str(duplicate_record.id)
+                    graph_deleted = graph_importer.delete_record_from_graph(
+                        candidate.record_type,
+                        record_uuid
+                    )
+                    
+                    if graph_deleted:
+                        logger.info(f"Deleted {candidate.record_type} from graph: {record_uuid}")
+                    else:
+                        logger.warning(f"Graph deletion returned False for {candidate.record_type}: {record_uuid} (may not exist in graph)")
+                except Exception as graph_error:
+                    logger.error(f"Error deleting from graph: {graph_error}", exc_info=True)
+                    # Continue with PostgreSQL deletion even if graph deletion fails
+                    # This prevents blocking duplicate resolution if graph is unavailable
+                
+                # Delete the duplicate record from PostgreSQL
+                # Note: Foreign key relationships should be handled by ON DELETE CASCADE or SET NULL
+                db.session.delete(duplicate_record)
+                
+                logger.info(f"Deleted duplicate {candidate.record_type} record {candidate.record2_id}, kept {candidate.record1_id}")
+            else:
+                logger.warning(f"Duplicate record not found: {candidate.record_type} {candidate.record2_id}")
+        
+        db.session.commit()
+        
+        logger.info(f"Duplicate candidate {candidate_id} {action}ed by {reviewer}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Duplicate {action}ed successfully" + (" and duplicate record deleted" if action == 'confirm' else ""),
+            "candidate": {
+                "id": str(candidate.id),
+                "status": candidate.status,
+                "reviewed_by": candidate.reviewed_by,
+                "reviewed_at": candidate.reviewed_at.isoformat() if candidate.reviewed_at else None
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error reviewing duplicate {candidate_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500

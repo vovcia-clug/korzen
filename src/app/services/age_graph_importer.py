@@ -734,6 +734,150 @@ class AgeGraphImporter:
             self.progress.add_error(error_msg)
             return False
     
+    def delete_person_vertex_with_edges(self, person_uuid: str) -> bool:
+        """
+        Delete a Person vertex and all connected edges from the graph.
+        
+        This method handles the complete removal of a person from the graph,
+        including all relationships (edges) connected to that person.
+        
+        Args:
+            person_uuid: UUID of the person to delete
+            
+        Returns:
+            True if deleted successfully, False if not found or error
+        """
+        try:
+            with self.conn.cursor() as cur:
+                # Delete all edges connected to this person first
+                # This includes PARENT_OF, MARRIED_TO, BAPTIZED_IN, DIED_IN,
+                # GODPARENT_OF, and FROM_SOURCE relationships
+                query = f"""
+                    SELECT * FROM cypher('{self.graph_name}', $$
+                        MATCH (p:Person {{uuid: $uuid}})
+                        OPTIONAL MATCH (p)-[r]-()
+                        DELETE r, p
+                        RETURN count(p) as deleted
+                    $$, %s) AS (deleted agtype);
+                """
+                params = json.dumps({'uuid': person_uuid})
+                cur.execute(query, (params,))
+                result = cur.fetchone()
+                self.conn.commit()
+                
+                if result and int(str(result[0])) > 0:
+                    logger.info(f"Deleted Person vertex and edges: {person_uuid}")
+                    return True
+                else:
+                    logger.warning(f"Person vertex not found for deletion: {person_uuid}")
+                    return False
+                    
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Error deleting Person vertex {person_uuid}: {e}")
+            return False
+    
+    def delete_event_vertex_with_edges(self, event_uuid: str) -> bool:
+        """
+        Delete an Event vertex and all connected edges from the graph.
+        
+        Args:
+            event_uuid: UUID of the event to delete
+            
+        Returns:
+            True if deleted successfully, False if not found or error
+        """
+        try:
+            with self.conn.cursor() as cur:
+                # Delete all edges connected to this event first
+                query = f"""
+                    SELECT * FROM cypher('{self.graph_name}', $$
+                        MATCH (e:Event {{uuid: $uuid}})
+                        OPTIONAL MATCH (e)-[r]-()
+                        DELETE r, e
+                        RETURN count(e) as deleted
+                    $$, %s) AS (deleted agtype);
+                """
+                params = json.dumps({'uuid': event_uuid})
+                cur.execute(query, (params,))
+                result = cur.fetchone()
+                self.conn.commit()
+                
+                if result and int(str(result[0])) > 0:
+                    logger.info(f"Deleted Event vertex and edges: {event_uuid}")
+                    return True
+                else:
+                    logger.warning(f"Event vertex not found for deletion: {event_uuid}")
+                    return False
+                    
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Error deleting Event vertex {event_uuid}: {e}")
+            return False
+    
+    def delete_source_vertex_with_edges(self, source_uuid: str) -> bool:
+        """
+        Delete a Source vertex and all connected edges from the graph.
+        
+        Args:
+            source_uuid: UUID of the source to delete
+            
+        Returns:
+            True if deleted successfully, False if not found or error
+        """
+        try:
+            with self.conn.cursor() as cur:
+                # Delete all edges connected to this source first
+                query = f"""
+                    SELECT * FROM cypher('{self.graph_name}', $$
+                        MATCH (s:Source {{uuid: $uuid}})
+                        OPTIONAL MATCH (s)-[r]-()
+                        DELETE r, s
+                        RETURN count(s) as deleted
+                    $$, %s) AS (deleted agtype);
+                """
+                params = json.dumps({'uuid': source_uuid})
+                cur.execute(query, (params,))
+                result = cur.fetchone()
+                self.conn.commit()
+                
+                if result and int(str(result[0])) > 0:
+                    logger.info(f"Deleted Source vertex and edges: {source_uuid}")
+                    return True
+                else:
+                    logger.warning(f"Source vertex not found for deletion: {source_uuid}")
+                    return False
+                    
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Error deleting Source vertex {source_uuid}: {e}")
+            return False
+    
+    def delete_record_from_graph(self, record_type: str, record_uuid: str) -> bool:
+        """
+        Delete a record from the graph based on its type.
+        
+        This is a convenience method that routes to the appropriate
+        deletion method based on record type.
+        
+        Args:
+            record_type: Type of record ('person', 'baptism', 'marriage', 'death')
+            record_uuid: UUID of the record to delete
+            
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        record_type = record_type.lower()
+        
+        if record_type == 'person':
+            return self.delete_person_vertex_with_edges(record_uuid)
+        elif record_type in ['baptism', 'marriage', 'death']:
+            # For event records, we need to delete the Event vertex
+            return self.delete_event_vertex_with_edges(record_uuid)
+        else:
+            logger.error(f"Unknown record type for graph deletion: {record_type}")
+            return False
+    
     def get_statistics(self) -> Dict[str, int]:
         """
         Get graph statistics (vertex and edge counts).

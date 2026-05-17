@@ -1,0 +1,149 @@
+0 HEAD
+1 SOUR Korzen Test Data - Duplicates
+2 NAME Korzen Genealogy Application
+1 DEST ANY
+1 DATE 17 MAY 2026
+1 SUBM @SUBM1@
+1 FILE test_duplicates_set2.ged
+1 GEDC
+2 VERS 5.5
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @SUBM1@ SUBM
+1 NAME Test Submitter
+0 @I001@ INDI
+1 NAME Jan /Kowalski/
+2 GIVN Jan
+2 SURN Kowalski
+1 SEX M
+1 BIRT
+2 DATE 1850
+2 PLAC Kraków, Poland
+1 DEAT
+2 DATE 1920
+2 PLAC Warszawa, Poland
+1 FAMS @F001@
+0 @I002@ INDI
+1 NAME Jan /Kowalsky/
+2 GIVN Jan
+2 SURN Kowalsky
+1 SEX M
+1 BIRT
+2 DATE 1850
+2 PLAC Kraków, Poland
+1 DEAT
+2 DATE 1920
+2 PLAC Warszawa, Poland
+1 FAMS @F002@
+0 @I003@ INDI
+1 NAME Jan /Kowalewski/
+2 GIVN Jan
+2 SURN Kowalewski
+1 SEX M
+1 BIRT
+2 DATE 1850
+2 PLAC Kraków, Poland
+1 DEAT
+2 DATE 1920
+0 @I004@ INDI
+1 NAME Maria /Nowak/
+2 GIVN Maria
+2 SURN Nowak
+1 SEX F
+1 BIRT
+2 DATE 1855
+2 PLAC Poznań, Poland
+1 DEAT
+2 DATE 1925
+2 PLAC Poznań, Poland
+1 FAMS @F001@
+0 @I005@ INDI
+1 NAME Marja /Nowak/
+2 GIVN Marja
+2 SURN Nowak
+1 SEX F
+1 BIRT
+2 DATE 1856
+2 PLAC Poznań, Poland
+1 DEAT
+2 DATE 1925
+2 PLAC Poznań, Poland
+1 FAMS @F002@
+0 @I006@ INDI
+1 NAME Piotr /Wiśniewski/
+2 GIVN Piotr
+2 SURN Wiśniewski
+1 SEX M
+1 BIRT
+2 DATE 1880
+2 PLAC Wrocław, Poland
+1 DEAT
+2 DATE 1960
+2 PLAC Kraków, Poland
+1 FAMS @F003@
+0 @I007@ INDI
+1 NAME Anna /Wojcik/
+2 GIVN Anna
+2 SURN Wojcik
+1 SEX F
+1 BIRT
+2 DATE 1885
+2 PLAC Lublin, Poland
+1 DEAT
+2 DATE 1965
+2 PLAC Lublin, Poland
+1 FAMS @F003@
+0 @I008@ INDI
+1 NAME Tomasz /Kaminski/
+2 GIVN Tomasz
+2 SURN Kaminski
+1 SEX M
+1 BIRT
+2 DATE 1900
+2 PLAC Gdańsk, Poland
+1 DEAT
+2 DATE 1980
+2 PLAC Gdańsk, Poland
+1 FAMC @F003@
+0 @I009@ INDI
+1 NAME Stanisław /Zieliński/
+2 GIVN Stanisław
+2 SURN Zieliński
+1 SEX M
+1 BIRT
+2 DATE 1900
+2 PLAC Łódź, Poland
+1 DEAT
+2 DATE 1975
+2 PLAC Łódź, Poland
+0 @I010@ INDI
+1 NAME Zofia /Lewandowska/
+2 GIVN Zofia
+2 SURN Lewandowska
+1 SEX F
+1 BIRT
+2 DATE 1910
+2 PLAC Szczecin, Poland
+1 DEAT
+2 DATE 1990
+2 PLAC Szczecin, Poland
+0 @F001@ FAM
+1 HUSB @I001@
+1 WIFE @I004@
+1 MARR
+2 DATE 1875
+2 PLAC Kraków, Poland
+0 @F002@ FAM
+1 HUSB @I002@
+1 WIFE @I005@
+1 MARR
+2 DATE 1875
+2 PLAC Kraków, Poland
+0 @F003@ FAM
+1 HUSB @I006@
+1 WIFE @I007@
+1 CHIL @I008@
+1 MARR
+2 DATE 1905
+2 PLAC Wrocław, Poland
+0 TRLR
