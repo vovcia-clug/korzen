@@ -7,5 +7,5 @@ CREATE EXTENSION IF NOT EXISTS age;
 LOAD 'age';
 SET search_path = ag_catalog, "$user", public;
 
--- Create pgvector extension
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Create pgvector extension in public schema (not ag_catalog)
+CREATE EXTENSION IF NOT EXISTS vector SCHEMA public;
