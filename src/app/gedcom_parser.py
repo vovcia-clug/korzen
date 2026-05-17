@@ -19,6 +19,10 @@ from .models import (
     UploadedFile
 )
 from .services.age_graph_importer import AgeGraphImporter
+from .services.phonetic_encoder import PhoneticEncoder
+from .services.feature_extractor import FeatureExtractor
+from .services.embedding_generator import EmbeddingGenerator
+from .services.duplicate_detector import DuplicateDetector
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +42,12 @@ class GedcomParser:
         self.uploaded_file_id = uploaded_file_id
         self.batch = None
         self.person_map: Dict[str, str] = {}  # Maps GEDCOM ID to Person UUID
+        
+        # Initialize duplicate detection services
+        self.phonetic_encoder = PhoneticEncoder()
+        self.feature_extractor = FeatureExtractor()
+        self.embedding_generator = EmbeddingGenerator()
+        self.duplicate_detector = DuplicateDetector(threshold=0.85)
     
     def _detect_encoding(self) -> str:
         """
@@ -412,7 +422,49 @@ class GedcomParser:
             occupation=occupation
         )
         
+        # Generate embedding and phonetic codes for duplicate detection
+        self._generate_person_embedding(person)
+        
         return person
+    
+    def _generate_person_embedding(self, person: Person) -> None:
+        """Generate and store embedding and phonetic codes for a person."""
+        try:
+            # Extract features
+            features = self.feature_extractor.extract_person_features(person)
+            
+            # Generate phonetic codes
+            person.first_name_phonetic = self.phonetic_encoder.encode(person.first_name)
+            person.last_name_phonetic = self.phonetic_encoder.encode(person.last_name)
+            person.maiden_name_phonetic = self.phonetic_encoder.encode(person.maiden_name)
+            
+            # Generate embedding
+            embedding = self.embedding_generator.generate_person_embedding(features)
+            person.embedding = embedding.tolist()
+            
+            logger.debug(f"Generated embedding for person: {person.first_name} {person.last_name}")
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for person: {e}")
+    
+    def _check_for_duplicates(self, person: Person) -> None:
+        """Check for potential duplicates and log warnings."""
+        try:
+            duplicates = self.duplicate_detector.detect_person_duplicates(person, limit=5)
+            
+            if duplicates:
+                logger.warning(
+                    f"Found {len(duplicates)} potential duplicate(s) for "
+                    f"{person.first_name} {person.last_name} (GEDCOM ID: {person.gedcom_id})"
+                )
+                for candidate, score, breakdown in duplicates:
+                    logger.warning(
+                        f"  - Match: {candidate.first_name} {candidate.last_name} "
+                        f"(ID: {candidate.id}, Score: {score:.2f}, "
+                        f"Vector: {breakdown['vector']:.2f}, "
+                        f"Phonetic: {breakdown['phonetic']:.2f})"
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to check for duplicates: {e}")
     
     def create_baptism_record(self, individual: Individual, person: Person) -> Optional[BaptismRecord]:
         """
@@ -712,6 +764,12 @@ class GedcomParser:
         }
         
         try:
+            # Ensure session is in a clean state before starting
+            try:
+                db.session.rollback()
+            except:
+                pass
+            
             # Update uploaded file status
             uploaded_file = db.session.get(UploadedFile, self.uploaded_file_id)
             if uploaded_file:
@@ -744,6 +802,9 @@ class GedcomParser:
                         person = self.create_person_from_individual(individual)
                         db.session.add(person)
                         db.session.flush()
+                        
+                        # Check for potential duplicates
+                        self._check_for_duplicates(person)
                         
                         # Map GEDCOM ID to Person UUID
                         self.person_map[individual.xref_id] = str(person.id)
@@ -794,8 +855,12 @@ class GedcomParser:
                         error_msg = f"Error processing individual {individual.xref_id}: {str(e)}"
                         logger.error(error_msg)
                         stats['errors'].append(error_msg)
-                        # Recreate batch after rollback
-                        if not db.session.get(RecordBatch, self.batch.id):
+                        # Recreate batch after rollback - need to re-add to session
+                        try:
+                            # Check if batch exists in session
+                            db.session.merge(self.batch)
+                        except:
+                            # If merge fails, create new batch reference
                             db.session.add(self.batch)
                 
                 db.session.commit()

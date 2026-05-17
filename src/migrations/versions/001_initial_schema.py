@@ -17,6 +17,9 @@ depends_on = None
 
 
 def upgrade():
+    # Enable pgvector extension first
+    op.execute('CREATE EXTENSION IF NOT EXISTS vector')
+    
     # Create record_batches table
     op.create_table('record_batches',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),

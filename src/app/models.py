@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
 
 from .extensions import db
@@ -138,6 +139,14 @@ class Person(db.Model):
     # Metadata
     created_at = db.Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = db.Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Vector embedding for duplicate detection (128 dimensions)
+    embedding = db.Column(Vector(128), nullable=True)
+    
+    # Phonetic codes for name matching
+    first_name_phonetic = db.Column(JSONB, nullable=True)  # List of D-M codes
+    last_name_phonetic = db.Column(JSONB, nullable=True)   # List of D-M codes
+    maiden_name_phonetic = db.Column(JSONB, nullable=True) # List of D-M codes
     
     # Relationships
     source_batch = relationship("RecordBatch")
@@ -281,6 +290,14 @@ class BaptismRecord(db.Model):
     created_at = db.Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = db.Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Vector embedding for duplicate detection
+    embedding = db.Column(Vector(128), nullable=True)
+    
+    # Phonetic codes
+    child_name_phonetic = db.Column(JSONB, nullable=True)
+    father_surname_phonetic = db.Column(JSONB, nullable=True)
+    mother_maiden_name_phonetic = db.Column(JSONB, nullable=True)
+    
     # Relationships
     child = relationship("Person", foreign_keys=[child_id], back_populates="baptism_as_child")
     father = relationship("Person", foreign_keys=[father_id], back_populates="baptism_as_father")
@@ -366,6 +383,13 @@ class MarriageRecord(db.Model):
     created_at = db.Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = db.Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Vector embedding for duplicate detection
+    embedding = db.Column(Vector(128), nullable=True)
+    
+    # Phonetic codes
+    spouse1_surname_phonetic = db.Column(JSONB, nullable=True)
+    spouse2_surname_phonetic = db.Column(JSONB, nullable=True)
+    
     # Relationships
     spouse1 = relationship("Person", foreign_keys=[spouse1_id], back_populates="marriages_as_spouse1")
     spouse2 = relationship("Person", foreign_keys=[spouse2_id], back_populates="marriages_as_spouse2")
@@ -443,6 +467,13 @@ class DeathRecord(db.Model):
     created_at = db.Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = db.Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Vector embedding for duplicate detection
+    embedding = db.Column(Vector(128), nullable=True)
+    
+    # Phonetic codes
+    deceased_surname_phonetic = db.Column(JSONB, nullable=True)
+    deceased_maiden_name_phonetic = db.Column(JSONB, nullable=True)
+    
     # Relationships
     deceased = relationship("Person", back_populates="death_records")
 
@@ -489,3 +520,73 @@ class WitnessRelationship(db.Model):
     )
     witness_order = db.Column(Integer, nullable=True)  # Order in which witness appears
     created_at = db.Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class DuplicateCandidate(db.Model):
+    """
+    Stores potential duplicate pairs for review.
+    Links two records that may be duplicates based on similarity analysis.
+    """
+    __tablename__ = "duplicate_candidates"
+
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Record type and IDs
+    record_type = db.Column(String(50), nullable=False)  # 'person', 'baptism', 'marriage', 'death'
+    record1_id = db.Column(UUID(as_uuid=True), nullable=False)
+    record2_id = db.Column(UUID(as_uuid=True), nullable=False)
+    
+    # Similarity scores
+    vector_similarity = db.Column(db.Float, nullable=False)
+    phonetic_similarity = db.Column(db.Float, nullable=True)
+    date_similarity = db.Column(db.Float, nullable=True)
+    location_similarity = db.Column(db.Float, nullable=True)
+    composite_score = db.Column(db.Float, nullable=False)
+    
+    # Review status
+    status = db.Column(String(20), nullable=False, default='pending')  # pending, confirmed, rejected
+    reviewed_by = db.Column(String(100), nullable=True)
+    reviewed_at = db.Column(DateTime(timezone=True), nullable=True)
+    review_notes = db.Column(Text, nullable=True)
+    
+    # Metadata
+    detected_at = db.Column(DateTime(timezone=True), default=datetime.utcnow)
+    detection_method = db.Column(String(50), nullable=True)  # 'import', 'batch', 'manual'
+    
+    # Indexes for efficient querying
+    __table_args__ = (
+        db.Index('ix_duplicate_candidates_record1', 'record_type', 'record1_id'),
+        db.Index('ix_duplicate_candidates_record2', 'record_type', 'record2_id'),
+        db.Index('ix_duplicate_candidates_status', 'status'),
+        db.Index('ix_duplicate_candidates_score', 'composite_score'),
+    )
+
+
+class DuplicateResolution(db.Model):
+    """
+    Tracks resolution actions taken on duplicate candidates.
+    Records merge operations and maintains audit trail.
+    """
+    __tablename__ = "duplicate_resolutions"
+
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    
+    # Link to candidate
+    candidate_id = db.Column(
+        UUID(as_uuid=True),
+        ForeignKey("duplicate_candidates.id"),
+        nullable=False,
+    )
+    
+    # Resolution details
+    action = db.Column(String(20), nullable=False)  # 'merge', 'reject', 'defer'
+    kept_record_id = db.Column(UUID(as_uuid=True), nullable=True)  # Which record was kept in merge
+    merged_record_id = db.Column(UUID(as_uuid=True), nullable=True)  # Which record was merged/deleted
+    
+    # Audit trail
+    resolved_by = db.Column(String(100), nullable=False)
+    resolved_at = db.Column(DateTime(timezone=True), default=datetime.utcnow)
+    resolution_notes = db.Column(Text, nullable=True)
+    
+    # Merged data snapshot (for potential rollback)
+    merged_data = db.Column(JSONB, nullable=True)

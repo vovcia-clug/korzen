@@ -1,4 +1,4 @@
-import os
+cimport os
 import json
 import logging
 from datetime import datetime
@@ -46,9 +46,14 @@ def get_uploaded_files():
 @bp.route("/")
 def index():
     """Main page with upload form."""
-    # Get files from database instead of filesystem
-    db_files = UploadedFile.query.order_by(UploadedFile.uploaded_at.desc()).all()
-    return render_template("index.html", files=db_files)
+    try:
+        # Get files from database instead of filesystem
+        db_files = UploadedFile.query.order_by(UploadedFile.uploaded_at.desc()).all()
+        return render_template("index.html", files=db_files)
+    except Exception as e:
+        logger.error(f"Error loading index page: {e}")
+        db.session.rollback()
+        return render_template("index.html", files=[], error=str(e))
 
 
 @bp.route("/upload", methods=["POST"])
@@ -140,6 +145,7 @@ def parse_gedcom(file_id):
         }), 200
         
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": f"Parsing failed: {str(e)}"}), 500
 
 
