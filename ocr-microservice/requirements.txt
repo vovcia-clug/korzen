@@ -1,0 +1,8 @@
+# AWS SDK
+boto3>=1.28.0
+
+# Datalab SDK for OCR
+datalab-sdk>=1.0.0
+
+# Environment variable management
+python-dotenv>=1.0.0
