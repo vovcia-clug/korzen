@@ -78,22 +78,14 @@ def create_app() -> Flask:
     # Run database initialization automatically on startup
     with app.app_context():
         try:
-            # Step 0: Initialize pgvector extension (must be done before creating tables)
+            # Step 1: Initialize pgvector extension (must be done before migrations)
             initialize_pgvector_extension(app)
         except Exception as e:
             app.logger.error(f"Error initializing pgvector extension: {e}")
             # Continue anyway - app can work without vector features
-        
-        try:
-            # Step 1: Create all tables if they don't exist (for initial setup)
-            db.create_all()
-            app.logger.info("Database tables created/verified")
-        except Exception as e:
-            app.logger.error(f"Error creating database tables: {e}")
-            # Continue anyway - migrations might handle it
 
         try:
-            # Step 2: Run Flask-Migrate migrations
+            # Step 2: Run Flask-Migrate migrations (this creates/updates all tables)
             upgrade()
             app.logger.info("Database migrations applied successfully")
         except Exception as e:
