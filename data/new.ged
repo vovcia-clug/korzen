@@ -1,0 +1,863 @@
+0 HEAD
+1 SOUR ClaudeOpusLatest
+2 NAME Claude Genealogy Converter
+2 VERS 1.0
+1 DEST ANY
+1 DATE 17 MAY 2026
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+1 LANG Polish
+1 SUBM @SUB1@
+1 FILE zielonki_baptisms_1903.ged
+1 NOTE @N1@
+0 @N1@ NOTE OCR-converted baptism register (Liber Natorum et Baptisatorum), Catholic parish of Zielonki, Galicia, 1903. Some dates and house numbers are uncertain due to OCR quality. Closing annotation on the document: "zmieniona 25.09.1909r. w Inflanach; AZ Nr 60/2009 USC Zielonki; KIEROWNIK USC; K. GU - 904".
+0 @SUB1@ SUBM
+1 NAME Genealogy Researcher
+0 @R1@ REPO
+1 NAME Urząd Stanu Cywilnego Zielonki
+1 ADDR
+2 CITY Zielonki
+2 CTRY Poland
+0 @S1@ SOUR
+1 TITL Liber Natorum et Baptisatorum - Parochia Zielonki, A.D. 1903
+1 AUTH Franciscus Wojciech, parochus
+1 PUBL Parish Register, 1903
+1 REPO @R1@
+2 CALN AZ Nr 60/2009 USC Zielonki
+0 @I_PRIEST@ INDI
+1 NAME Franciszek /Wojciech/
+2 GIVN Franciszek
+2 SURN Wojciech
+1 SEX M
+1 OCCU Parochus (parish priest of Zielonki)
+1 NOTE Officiating priest for all baptisms in this register
+0 @I_MID1@ INDI
+1 NAME Marianna /Pichorz/
+1 SEX F
+1 OCCU Obstetrix (midwife)
+0 @I_MID2@ INDI
+1 NAME Katarzyna /Pichorz/
+1 SEX F
+1 OCCU Obstetrix (midwife)
+0 @I_MID3@ INDI
+1 NAME Katarzyna /Pysz/
+1 SEX F
+1 OCCU Obstetrix (midwife)
+0 @I101@ INDI
+1 NAME Wincenty /Crapiuski/
+2 GIVN Wincenty
+2 SURN Crapiuski
+1 SEX M
+1 RELI Catholic
+1 BIRT
+2 DATE 27 JUN 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 7
+1 CHR
+2 DATE 29 JUN 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F101@
+1 ASSO @I108@
+2 RELA Godfather
+1 ASSO @I109@
+2 RELA Godmother
+1 ASSO @I_MID1@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE June 1903, Liber Natorum
+0 @I102@ INDI
+1 NAME Wincenty /Crapiuski/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F101@
+1 FAMC @F102@
+0 @I103@ INDI
+1 NAME Antonina /Jantos/
+1 SEX F
+1 FAMS @F101@
+1 FAMC @F103@
+0 @I104@ INDI
+1 NAME Tadeusz /Crapiuski/
+1 SEX M
+1 FAMS @F102@
+0 @I105@ INDI
+1 NAME Agnieszka /Rudzi/
+1 SEX F
+1 FAMS @F102@
+0 @I106@ INDI
+1 NAME Piotr /Jantos/
+1 SEX M
+1 FAMS @F103@
+0 @I107@ INDI
+1 NAME Małgorzata /Ledwicz/
+1 SEX F
+1 FAMS @F103@
+0 @I108@ INDI
+1 NAME Jan /Jantos/
+1 SEX M
+0 @I109@ INDI
+1 NAME Agata /Solonowicz/
+1 SEX F
+0 @F101@ FAM
+1 HUSB @I102@
+1 WIFE @I103@
+1 CHIL @I101@
+0 @F102@ FAM
+1 HUSB @I104@
+1 WIFE @I105@
+1 CHIL @I102@
+0 @F103@ FAM
+1 HUSB @I106@
+1 WIFE @I107@
+1 CHIL @I103@
+0 @I201@ INDI
+1 NAME Marianna /Zabiegaj/
+1 SEX F
+1 RELI Catholic
+1 BIRT
+2 DATE 7 JUL 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 31
+1 CHR
+2 DATE 13 JUL 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F201@
+1 ASSO @I208@
+2 RELA Godfather
+1 ASSO @I209@
+2 RELA Godmother
+1 ASSO @I_MID3@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE July 1903, Entry 8
+0 @I202@ INDI
+1 NAME Franciszek /Zabiegaj/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F201@
+1 FAMC @F202@
+0 @I203@ INDI
+1 NAME Anna Maria /Siemiacki/
+1 SEX F
+1 FAMS @F201@
+1 FAMC @F203@
+0 @I204@ INDI
+1 NAME Andrzej /Zabiegaj/
+1 SEX M
+1 FAMS @F202@
+0 @I205@ INDI
+1 NAME Marianna /Dęty/
+1 SEX F
+1 FAMS @F202@
+0 @I206@ INDI
+1 NAME Teofil /Siemiacki/
+1 SEX M
+1 FAMS @F203@
+0 @I207@ INDI
+1 NAME Katarzyna /Ehran/
+1 SEX F
+1 FAMS @F203@
+0 @I208@ INDI
+1 NAME Franciszek /Piszczek/
+1 SEX M
+1 RESI
+2 PLAC Cracovia (Kraków)
+0 @I209@ INDI
+1 NAME Marianna /Motyka/
+1 SEX F
+1 RESI
+2 PLAC Bolan
+0 @F201@ FAM
+1 HUSB @I202@
+1 WIFE @I203@
+1 CHIL @I201@
+0 @F202@ FAM
+1 HUSB @I204@
+1 WIFE @I205@
+1 CHIL @I202@
+0 @F203@ FAM
+1 HUSB @I206@
+1 WIFE @I207@
+1 CHIL @I203@
+0 @I301@ INDI
+1 NAME Antonina /Chodurek/
+1 SEX F
+1 RELI Catholic
+1 BIRT
+2 DATE 18 JUL 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 59
+1 CHR
+2 DATE 20 JUL 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F301@
+1 ASSO @I308@
+2 RELA Godfather
+1 ASSO @I309@
+2 RELA Godmother
+1 ASSO @I_MID2@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE July 1903, Entry 9
+0 @I302@ INDI
+1 NAME Franciszek /Chodurek/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F301@
+1 FAMC @F302@
+0 @I303@ INDI
+1 NAME Katarzyna /Siwek/
+1 SEX F
+1 FAMS @F301@
+1 FAMC @F303@
+0 @I304@ INDI
+1 NAME Ludwik /Chodurek/
+1 SEX M
+1 FAMS @F302@
+0 @I305@ INDI
+1 NAME Rozalia /Kotla/
+1 SEX F
+1 FAMS @F302@
+0 @I306@ INDI
+1 NAME Ludwik Kini /Siwek/
+1 SEX M
+1 FAMS @F303@
+0 @I307@ INDI
+1 NAME Barbara /Frątkowicz/
+1 SEX F
+1 FAMS @F303@
+0 @I308@ INDI
+1 NAME Jan /Siwek/
+1 SEX M
+0 @I309@ INDI
+1 NAME Antonina /Piotrykowska/
+1 SEX F
+0 @F301@ FAM
+1 HUSB @I302@
+1 WIFE @I303@
+1 CHIL @I301@
+0 @F302@ FAM
+1 HUSB @I304@
+1 WIFE @I305@
+1 CHIL @I302@
+0 @F303@ FAM
+1 HUSB @I306@
+1 WIFE @I307@
+1 CHIL @I303@
+0 @I401@ INDI
+1 NAME Zofia /Siwek/
+1 SEX F
+1 RELI Catholic
+1 BIRT
+2 DATE 25 JUL 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 15
+1 CHR
+2 DATE 3 AUG 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F401@
+1 ASSO @I408@
+2 RELA Godfather
+1 ASSO @I409@
+2 RELA Godmother
+1 ASSO @I_MID2@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE July-August 1903, Entry 10
+0 @I402@ INDI
+1 NAME Jakub /Siwek/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F401@
+1 FAMC @F402@
+0 @I403@ INDI
+1 NAME Agnieszka /Polak/
+1 SEX F
+1 FAMS @F401@
+1 FAMC @F403@
+0 @I404@ INDI
+1 NAME Paweł /Siwek/
+1 SEX M
+1 FAMS @F402@
+0 @I405@ INDI
+1 NAME Katarzyna /Bajak/
+1 SEX F
+1 FAMS @F402@
+0 @I406@ INDI
+1 NAME Jakub /Polak/
+1 SEX M
+1 FAMS @F403@
+0 @I407@ INDI
+1 NAME Antonina /Pachowska/
+1 SEX F
+1 FAMS @F403@
+0 @I408@ INDI
+1 NAME Wojciech /Polak/
+1 SEX M
+0 @I409@ INDI
+1 NAME Zofia /Zakawa/
+1 SEX F
+0 @F401@ FAM
+1 HUSB @I402@
+1 WIFE @I403@
+1 CHIL @I401@
+0 @F402@ FAM
+1 HUSB @I404@
+1 WIFE @I405@
+1 CHIL @I402@
+0 @F403@ FAM
+1 HUSB @I406@
+1 WIFE @I407@
+1 CHIL @I403@
+0 @I501@ INDI
+1 NAME Paweł /Polak/
+1 SEX M
+1 RELI Catholic
+1 BIRT
+2 DATE 11 AUG 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 15
+1 CHR
+2 DATE 12 AUG 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F501@
+1 ASSO @I508@
+2 RELA Godfather
+1 ASSO @I509@
+2 RELA Godmother
+1 ASSO @I_MID2@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE August 1903, Entry 11
+0 @I502@ INDI
+1 NAME Jan /Polak/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F501@
+1 FAMC @F502@
+0 @I503@ INDI
+1 NAME Marianna /Jantos/
+1 SEX F
+1 FAMS @F501@
+1 FAMC @F503@
+0 @I504@ INDI
+1 NAME Wincenty /Polak/
+1 SEX M
+1 FAMS @F502@
+0 @I505@ INDI
+1 NAME Agnieszka /Siwek/
+1 SEX F
+1 FAMS @F502@
+0 @I506@ INDI
+1 NAME Andrzej /Jantos/
+1 SEX M
+1 FAMS @F503@
+0 @I507@ INDI
+1 NAME Antonina /Prępyrzyńska/
+1 SEX F
+1 FAMS @F503@
+0 @I508@ INDI
+1 NAME Wincenty /Jantos/
+1 SEX M
+0 @I509@ INDI
+1 NAME Zofia /Piotrowicz/
+1 SEX F
+0 @F501@ FAM
+1 HUSB @I502@
+1 WIFE @I503@
+1 CHIL @I501@
+0 @F502@ FAM
+1 HUSB @I504@
+1 WIFE @I505@
+1 CHIL @I502@
+0 @F503@ FAM
+1 HUSB @I506@
+1 WIFE @I507@
+1 CHIL @I503@
+0 @I601@ INDI
+1 NAME Paweł /Wojciech/
+1 SEX M
+1 RELI Catholic
+1 BIRT
+2 DATE 28 AUG 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 30
+1 CHR
+2 DATE 31 AUG 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F601@
+1 ASSO @I608@
+2 RELA Godfather
+1 ASSO @I609@
+2 RELA Godmother
+1 ASSO @I_MID2@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE August 1903, Entry 12
+0 @I602@ INDI
+1 NAME Franciszek /Wojciech/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F601@
+1 FAMC @F602@
+1 NOTE Not to be confused with the parish priest of the same name
+0 @I603@ INDI
+1 NAME Agata /Dobiniak/
+1 SEX F
+1 FAMS @F601@
+1 FAMC @F603@
+0 @I604@ INDI
+1 NAME Józef /Wojciech/
+1 SEX M
+1 FAMS @F602@
+0 @I605@ INDI
+1 NAME Agata /Drab/
+1 SEX F
+1 FAMS @F602@
+0 @I606@ INDI
+1 NAME Paweł /Dobiniak/
+1 SEX M
+1 FAMS @F603@
+0 @I607@ INDI
+1 NAME Marianna /Polak/
+1 SEX F
+1 FAMS @F603@
+0 @I608@ INDI
+1 NAME Paweł /Szymczyk/
+1 SEX M
+0 @I609@ INDI
+1 NAME Agata /Pojatowska/
+1 SEX F
+0 @F601@ FAM
+1 HUSB @I602@
+1 WIFE @I603@
+1 CHIL @I601@
+0 @F602@ FAM
+1 HUSB @I604@
+1 WIFE @I605@
+1 CHIL @I602@
+0 @F603@ FAM
+1 HUSB @I606@
+1 WIFE @I607@
+1 CHIL @I603@
+0 @I701@ INDI
+1 NAME Antonina /Dąbrowska/
+1 SEX F
+1 RELI Catholic
+1 BIRT
+2 DATE 27 AUG 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 36
+1 CHR
+2 DATE 31 AUG 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F701@
+1 ASSO @I708@
+2 RELA Godfather
+1 ASSO @I709@
+2 RELA Godmother
+1 ASSO @I_MID1@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE August 1903
+0 @I702@ INDI
+1 NAME Wojciech /Dąbrowski/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F701@
+1 FAMC @F702@
+0 @I703@ INDI
+1 NAME Marianna /Hawula/
+1 SEX F
+1 FAMS @F701@
+1 FAMC @F703@
+0 @I704@ INDI
+1 NAME Jan /Dąbrowski/
+1 SEX M
+1 FAMS @F702@
+0 @I705@ INDI
+1 NAME Franciszka /Radek/
+1 SEX F
+1 FAMS @F702@
+0 @I706@ INDI
+1 NAME Jan /Hawula/
+1 SEX M
+1 FAMS @F703@
+0 @I707@ INDI
+1 NAME Franciszka /Ledwicz/
+1 SEX F
+1 FAMS @F703@
+0 @I708@ INDI
+1 NAME Jan /Motyka/
+1 SEX M
+0 @I709@ INDI
+1 NAME Antonina /Pichorz/
+1 SEX F
+0 @F701@ FAM
+1 HUSB @I702@
+1 WIFE @I703@
+1 CHIL @I701@
+0 @F702@ FAM
+1 HUSB @I704@
+1 WIFE @I705@
+1 CHIL @I702@
+0 @F703@ FAM
+1 HUSB @I706@
+1 WIFE @I707@
+1 CHIL @I703@
+0 @I801@ INDI
+1 NAME Jan /Woch/
+1 SEX M
+1 RELI Catholic
+1 BIRT
+2 DATE 8 OCT 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 46
+1 CHR
+2 DATE ABT 8 OCT 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F801@
+1 ASSO @I808@
+2 RELA Godfather
+1 ASSO @I809@
+2 RELA Godmother
+1 ASSO @I_MID1@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE October 1903
+0 @I802@ INDI
+1 NAME Jan /Woch/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F801@
+1 FAMC @F802@
+0 @I803@ INDI
+1 NAME Marianna /Piotryk/
+1 SEX F
+1 FAMS @F801@
+1 FAMC @F803@
+0 @I804@ INDI
+1 NAME Błażej /Woch/
+1 SEX M
+1 FAMS @F802@
+0 @I805@ INDI
+1 NAME Rozalia /Majtanek/
+1 SEX F
+1 FAMS @F802@
+0 @I806@ INDI
+1 NAME Walenty /Piotryk/
+1 SEX M
+1 FAMS @F803@
+0 @I807@ INDI
+1 NAME Rozalia /Trzcińska/
+1 SEX F
+1 FAMS @F803@
+0 @I808@ INDI
+1 NAME Jan /Piotryk/
+1 SEX M
+0 @I809@ INDI
+1 NAME Łucja /Piotrykowska/
+1 SEX F
+0 @F801@ FAM
+1 HUSB @I802@
+1 WIFE @I803@
+1 CHIL @I801@
+0 @F802@ FAM
+1 HUSB @I804@
+1 WIFE @I805@
+1 CHIL @I802@
+0 @F803@ FAM
+1 HUSB @I806@
+1 WIFE @I807@
+1 CHIL @I803@
+0 @I901@ INDI
+1 NAME Jan /Grzywacz/
+1 SEX M
+1 RELI Catholic
+1 BIRT
+2 DATE 9 OCT 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 50
+1 CHR
+2 DATE 12 OCT 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F901@
+1 ASSO @I908@
+2 RELA Godfather
+1 ASSO @I909@
+2 RELA Godmother
+1 ASSO @I_MID2@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE October 1903
+0 @I902@ INDI
+1 NAME Andrzej /Grzywacz/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F901@
+1 FAMC @F902@
+0 @I903@ INDI
+1 NAME Marianna /Sobasinski/
+1 SEX F
+1 FAMS @F901@
+1 FAMC @F903@
+0 @I904@ INDI
+1 NAME Józef /Grzywacz/
+1 SEX M
+1 FAMS @F902@
+0 @I905@ INDI
+1 NAME Marianna /Polak/
+1 SEX F
+1 FAMS @F902@
+0 @I906@ INDI
+1 NAME Stanisław /Sobasinski/
+1 SEX M
+1 FAMS @F903@
+0 @I907@ INDI
+1 NAME Marianna /Trzcińska/
+1 SEX F
+1 FAMS @F903@
+0 @I908@ INDI
+1 NAME Wojciech /Chmur/
+1 SEX M
+0 @I909@ INDI
+1 NAME Katarzyna /Lusina/
+1 SEX F
+0 @F901@ FAM
+1 HUSB @I902@
+1 WIFE @I903@
+1 CHIL @I901@
+0 @F902@ FAM
+1 HUSB @I904@
+1 WIFE @I905@
+1 CHIL @I902@
+0 @F903@ FAM
+1 HUSB @I906@
+1 WIFE @I907@
+1 CHIL @I903@
+0 @I1001@ INDI
+1 NAME Wojciech /Chodurek/
+1 SEX M
+1 RELI Catholic
+1 BIRT
+2 DATE 17 OCT 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 30
+1 CHR
+2 DATE 19 OCT 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F1001@
+1 ASSO @I1008@
+2 RELA Godfather
+1 ASSO @I1009@
+2 RELA Godmother
+1 ASSO @I_MID2@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE October 1903
+0 @I1002@ INDI
+1 NAME Franciszek /Chodurek/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F1001@
+1 FAMC @F1002@
+1 NOTE Distinct from Franciszek Chodurek in Baptism 3 (different parents)
+0 @I1003@ INDI
+1 NAME Anna /Polak/
+1 SEX F
+1 FAMS @F1001@
+1 FAMC @F1003@
+0 @I1004@ INDI
+1 NAME Jan /Chodurek/
+1 SEX M
+1 FAMS @F1002@
+0 @I1005@ INDI
+1 NAME Marianna /Ledwicz/
+1 SEX F
+1 FAMS @F1002@
+0 @I1006@ INDI
+1 NAME Jakub /Polak/
+1 SEX M
+1 FAMS @F1003@
+0 @I1007@ INDI
+1 NAME Józefa /Stachura/
+1 SEX F
+1 FAMS @F1003@
+0 @I1008@ INDI
+1 NAME Wojciech /Dąbrowski/
+1 SEX M
+0 @I1009@ INDI
+1 NAME Wiktoria /Kucharska/
+1 SEX F
+1 RESI
+2 PLAC Zielonki
+0 @F1001@ FAM
+1 HUSB @I1002@
+1 WIFE @I1003@
+1 CHIL @I1001@
+0 @F1002@ FAM
+1 HUSB @I1004@
+1 WIFE @I1005@
+1 CHIL @I1002@
+0 @F1003@ FAM
+1 HUSB @I1006@
+1 WIFE @I1007@
+1 CHIL @I1003@
+0 @I1101@ INDI
+1 NAME Jan /Sucker/
+1 SEX M
+1 RELI Catholic
+1 BIRT
+2 DATE 20 OCT 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 64
+1 CHR
+2 DATE 22 OCT 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F1101@
+1 ASSO @I1108@
+2 RELA Godfather
+1 ASSO @I1109@
+2 RELA Godmother
+1 ASSO @I_MID1@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE October 1903
+0 @I1102@ INDI
+1 NAME Józef /Sucker/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F1101@
+1 FAMC @F1102@
+0 @I1103@ INDI
+1 NAME Marianna /Dęty/
+1 SEX F
+1 FAMS @F1101@
+1 FAMC @F1103@
+0 @I1104@ INDI
+1 NAME Bartłomiej /Sucker/
+1 SEX M
+1 FAMS @F1102@
+1 NOTE Latin "Bara Tholomaei" interpreted as Bartholomaei (Bartłomiej)
+0 @I1105@ INDI
+1 NAME Łucja /Woch/
+1 SEX F
+1 FAMS @F1102@
+0 @I1106@ INDI
+1 NAME Wojciech /Dęty/
+1 SEX M
+1 FAMS @F1103@
+0 @I1107@ INDI
+1 NAME Katarzyna /Ledwicz/
+1 SEX F
+1 FAMS @F1103@
+0 @I1108@ INDI
+1 NAME Jan /Gola/
+1 SEX M
+0 @I1109@ INDI
+1 NAME Anna /Kucharska/
+1 SEX F
+0 @F1101@ FAM
+1 HUSB @I1102@
+1 WIFE @I1103@
+1 CHIL @I1101@
+0 @F1102@ FAM
+1 HUSB @I1104@
+1 WIFE @I1105@
+1 CHIL @I1102@
+0 @F1103@ FAM
+1 HUSB @I1106@
+1 WIFE @I1107@
+1 CHIL @I1103@
+0 @I1201@ INDI
+1 NAME Aniela /Motyka/
+1 SEX F
+1 RELI Catholic
+1 BIRT
+2 DATE 10 NOV 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 ADDR
+3 ADR1 House No. 42
+1 CHR
+2 DATE 16 NOV 1903
+2 PLAC Zielonki, Galicia, Austria-Hungary
+2 AGNC @I_PRIEST@
+1 FAMC @F1201@
+1 ASSO @I1208@
+2 RELA Godfather
+1 ASSO @I1209@
+2 RELA Godmother
+1 ASSO @I_MID1@
+2 RELA Midwife
+1 SOUR @S1@
+2 PAGE November 1903
+0 @I1202@ INDI
+1 NAME Alfred /Motyka/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F1201@
+1 FAMC @F1202@
+0 @I1203@ INDI
+1 NAME Katarzyna /Grzywacz/
+1 SEX F
+1 FAMS @F1201@
+1 FAMC @F1203@
+0 @I1204@ INDI
+1 NAME Jakub /Motyka/
+1 SEX M
+1 FAMS @F1202@
+0 @I1205@ INDI
+1 NAME Marianna /Nowak/
+1 SEX F
+1 FAMS @F1202@
+0 @I1206@ INDI
+1 NAME Jan /Grzywacz/
+1 SEX M
+1 FAMS @F1203@
+0 @I1207@ INDI
+1 NAME Marianna /Labig/
+1 SEX F
+1 FAMS @F1203@
+0 @I1208@ INDI
+1 NAME Piotr /Liotke/
+1 SEX M
+0 @I1209@ INDI
+1 NAME Aniela /Chmur/
+1 SEX F
+0 @F1201@ FAM
+1 HUSB @I1202@
+1 WIFE @I1203@
+1 CHIL @I1201@
+0 @F1202@ FAM
+1 HUSB @I1204@
+1 WIFE @I1205@
+1 CHIL @I1202@
+0 @F1203@ FAM
+1 HUSB @I1206@
+1 WIFE @I1207@
+1 CHIL @I1203@
+0 TRLR

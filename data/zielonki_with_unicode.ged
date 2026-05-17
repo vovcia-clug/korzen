@@ -1,0 +1,75 @@
+0 HEAD
+1 GEDC
+2 VERS 7.0
+1 SOUR ClaudeOpus
+2 NAME Anthropic Claude Opus
+2 VERS 2026.05
+1 DATE 14 MAY 2026
+1 LANG la
+1 SUBM @U1@
+1 NOTE Converted from OCR of "Liber Natorum et Baptisatorum", Parish of Zielonki, Galicia, year 1893, entries 1-12. Officiating priest: Rev. Franciscus Wojciech. Annotation: record amended 25 Sep 1909, copy issued AZ Nr 60/2009 USC Zielonki.
+
+0 @U1@ SUBM
+1 NAME Claude Opus
+1 LANG en
+
+0 @S1@ SOUR
+1 TITL Liber Natorum et Baptisatorum, Parochia Zielonki
+1 AUTH Parochia Zielonki
+1 PUBL Zielonki, 1893
+1 LANG la
+1 REPO @R1@
+2 CALN AZ Nr 60/2009 USC Zielonki
+3 MEDI BOOK
+
+0 @R1@ REPO
+1 NAME Urząd Stanu Cywilnego Zielonki
+1 ADDR
+2 CITY Zielonki
+2 CTRY Poland
+
+0 @I900@ INDI
+1 NAME Franciscus /Wojciech/
+1 SEX M
+1 OCCU Parochus
+2 NOTE Roman Catholic parish priest, Parochia Zielonki
+1 RESI
+2 PLAC Zielonki, Galicia
+
+0 @I901@ INDI
+1 NAME Marianna /Pichorz/
+1 SEX F
+1 OCCU Obstetrix
+2 NOTE Midwife serving Parochia Zielonki
+
+0 @I011@ INDI
+1 NAME Vincentius /Crapiuski/
+1 SEX M
+1 BIRT
+2 DATE 27 JUN 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 7
+2 SOUR @S1@
+1 BAPM
+2 DATE 29 JUN 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+1 FAMC @F01A@
+
+0 @I012@ INDI
+1 NAME Vincentius /Crapiuski/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F01A@
+
+0 @I013@ INDI
+1 NAME Antonina /Jantos/
+1 SEX F
+1 FAMS @F01A@
+
+0 @F01A@ FAM
+1 HUSB @I012@
+1 WIFE @I013@
+1 CHIL @I011@
+
+0 TRLR

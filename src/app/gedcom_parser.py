@@ -1,9 +1,17 @@
 """
 GEDCOM parser module using ged4py to extract genealogical data.
+
+This module has been refactored to improve maintainability:
+- Date parsing is delegated to DateParser utility class
+- Name parsing is delegated to NameParser utility class
+- Constants are centralized in gedcom_constants module
+- Parsing passes are extracted into separate methods
 """
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import logging
+import tempfile
+import os
 
 from ged4py import GedcomReader
 from ged4py.model import Individual, Record
@@ -23,6 +31,13 @@ from .services.phonetic_encoder import PhoneticEncoder
 from .services.feature_extractor import FeatureExtractor
 from .services.embedding_generator import EmbeddingGenerator
 from .services.duplicate_detector import DuplicateDetector
+from .utils.date_parser import DateParser
+from .utils.name_parser import NameParser
+from .gedcom_constants import (
+    UNICODE_REPLACEMENTS,
+    DEFAULT_ENCODING,
+    DUPLICATE_THRESHOLD
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +62,7 @@ class GedcomParser:
         self.phonetic_encoder = PhoneticEncoder()
         self.feature_extractor = FeatureExtractor()
         self.embedding_generator = EmbeddingGenerator()
-        self.duplicate_detector = DuplicateDetector(threshold=0.85)
+        self.duplicate_detector = DuplicateDetector(threshold=DUPLICATE_THRESHOLD)
     
     def _detect_encoding(self) -> str:
         """
@@ -93,11 +108,79 @@ class GedcomParser:
             logger.warning(f"Could not detect encoding: {e}")
         
         # Default to UTF-8
-        return 'utf-8'
+        return DEFAULT_ENCODING
+    
+    def _normalize_unicode_characters(self, filepath: str) -> str:
+        """
+        Normalize Unicode characters and remove blank lines from GEDCOM file.
         
+        This handles OCR artifacts like smart quotes and other Unicode characters
+        that are not compatible with strict GEDCOM parsers. Also removes blank lines
+        which violate the GEDCOM specification.
+        
+        Args:
+            filepath: Path to the GEDCOM file to normalize
+            
+        Returns:
+            Path to the temporary file with normalized content
+        """
+        logger.info("Normalizing GEDCOM file (Unicode characters and blank lines)...")
+        
+        try:
+            # Read the file content with UTF-8 encoding
+            with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            
+            # Check if any replacements are needed
+            needs_unicode_normalization = any(char in content for char in UNICODE_REPLACEMENTS.keys())
+            
+            # Check for blank lines (GEDCOM spec prohibits blank lines)
+            lines = content.splitlines(keepends=True)
+            blank_line_count = sum(1 for line in lines if not line.strip())
+            needs_blank_line_removal = blank_line_count > 0
+            
+            if needs_unicode_normalization or needs_blank_line_removal:
+                if needs_unicode_normalization:
+                    logger.info("Found Unicode characters that need normalization")
+                    
+                    # Apply all character replacements
+                    for unicode_char, ascii_char in UNICODE_REPLACEMENTS.items():
+                        if unicode_char in content:
+                            count = content.count(unicode_char)
+                            content = content.replace(unicode_char, ascii_char)
+                            logger.debug(f"Replaced {count} occurrence(s) of {repr(unicode_char)} with {repr(ascii_char)}")
+                
+                if needs_blank_line_removal:
+                    logger.info(f"Found {blank_line_count} blank line(s) that need to be removed")
+                    
+                    # Remove blank lines while preserving line endings
+                    lines = content.splitlines(keepends=True)
+                    non_blank_lines = [line for line in lines if line.strip()]
+                    content = ''.join(non_blank_lines)
+                    
+                    logger.debug(f"Removed {blank_line_count} blank line(s) from GEDCOM file")
+                
+                # Create a temporary file with the normalized content
+                temp_file = tempfile.NamedTemporaryFile(mode='w', encoding='utf-8',
+                                                        suffix='.ged', delete=False)
+                temp_file.write(content)
+                temp_file.close()
+                
+                logger.info(f"Created normalized temporary file: {temp_file.name}")
+                return temp_file.name
+            else:
+                logger.info("No normalization needed")
+                return filepath
+                
+        except Exception as e:
+            logger.warning(f"Error during normalization: {e}. Using original file.")
+            return filepath
+    
     def parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
         """
         Parse GEDCOM date string to datetime object.
+        
+        This method now delegates to the DateParser utility class.
         
         Args:
             date_str: GEDCOM date string (e.g., "1 JAN 1900") or DateValue object
@@ -105,199 +188,13 @@ class GedcomParser:
         Returns:
             datetime object or None if parsing fails
         """
-        if not date_str:
-            return None
-            
-        try:
-            # Convert to string if it's a DateValue object or other type
-            date_str = str(date_str) if not isinstance(date_str, str) else date_str
-            original_date_str = date_str
-            
-            # Remove parentheses (used for BC dates and BET dates)
-            date_str = date_str.strip().strip('()')
-            
-            # Handle BC dates and UNKNOWN - skip them
-            if 'BC' in date_str.upper():
-                logger.debug(f"Skipping BC date: {original_date_str}")
-                return None
-            
-            if date_str.upper() in ('UNKNOWN', 'UNK', ''):
-                logger.debug(f"Skipping unknown date: {original_date_str}")
-                return None
-            
-            # Handle year range with slash format: "1393/94"
-            if '/' in date_str and date_str.replace('/', '').isdigit():
-                parts = date_str.split('/')
-                if len(parts) == 2 and parts[0].isdigit():
-                    # Use the first year
-                    date_str = parts[0]
-            
-            # Handle year range with slash format: "1393/94"
-            if '/' in date_str and date_str.replace('/', '').isdigit():
-                parts = date_str.split('/')
-                if len(parts) == 2 and parts[0].isdigit():
-                    # Use the first year
-                    date_str = parts[0]
-            
-            # Handle BETWEEN dates - extract first date
-            # Examples: "BET 07 OCT AND 08 NOV 1260", "BET SEP AND NOV 1081", "BETWEEN 26 AND 27 NOV 1252"
-            if 'BETWEEN' in date_str.upper() or date_str.upper().startswith('BET '):
-                # Split by AND to get the two date parts
-                and_parts = date_str.upper().split(' AND ')
-                if len(and_parts) >= 2:
-                    # Get first date part (preserve original case)
-                    and_index = date_str.upper().index(' AND ')
-                    first_part = date_str[:and_index].strip()
-                    second_part = date_str[and_index + 5:].strip()
-                    
-                    # Remove BET/BETWEEN prefix from first part
-                    for prefix in ['BETWEEN', 'BET']:
-                        if first_part.upper().startswith(prefix):
-                            first_part = first_part[len(prefix):].strip()
-                            break
-                    
-                    # Parse the parts
-                    first_parts = first_part.split()
-                    second_parts = second_part.split()
-                    
-                    # Strategy: Try to use first part, but if it lacks a year, extract year from second part
-                    
-                    # Check if first part already has a year (last token is 3+ digit number)
-                    has_year = first_parts and first_parts[-1].isdigit() and len(first_parts[-1]) >= 3
-                    
-                    if not has_year:
-                        # First part lacks a year, find year in second part
-                        year = None
-                        for part in reversed(second_parts):
-                            if part.isdigit() and len(part) >= 3:
-                                year = part
-                                break
-                        
-                        if year:
-                            # Check if first part is "day month" format (e.g., "25 SEP")
-                            # and second part is "month year" or "day month year"
-                            if (len(first_parts) == 2 and
-                                first_parts[0].isdigit() and len(first_parts[0]) <= 2):
-                                # First part is "day month", append year
-                                date_str = first_part + ' ' + year
-                            else:
-                                # Append year to first part
-                                date_str = first_part + ' ' + year
-                        else:
-                            # No year found anywhere, just use first part
-                            date_str = first_part
-                    else:
-                        # First part already has a year, use it as-is
-                        date_str = first_part
-            
-            # Handle WEEN format (shortened BETWEEN)
-            elif date_str.upper().startswith('WEEN'):
-                and_parts = date_str.upper().split(' AND ')
-                if len(and_parts) >= 2:
-                    first_part = date_str[:date_str.upper().index(' AND ')].strip()
-                    second_part = date_str[date_str.upper().index(' AND ') + 5:].strip()
-                    
-                    first_part = first_part.replace('WEEN', '').replace('ween', '').strip()
-                    
-                    # Check if first part has a year
-                    first_parts = first_part.split()
-                    second_parts = second_part.split()
-                    
-                    if first_parts and not (first_parts[-1].isdigit() and len(first_parts[-1]) == 4):
-                        for part in reversed(second_parts):
-                            if part.isdigit() and len(part) == 4:
-                                first_part = first_part + ' ' + part
-                                break
-                    
-                    date_str = first_part
-            
-            # Remove date modifiers (English and other languages)
-            # Must check longer prefixes first to avoid partial matches
-            prefixes_to_remove = [
-                'ABOUT', 'BEFORE', 'AFTER', 'BETWEEN', 'ESTIMATED',
-                'ABT', 'BEF', 'AFT', 'BET', 'CAL', 'EST',
-                'ORE',  # Italian/Latin for "before"
-                'ER',   # Italian/Latin for "after"
-                'AND'
-            ]
-            
-            for prefix in prefixes_to_remove:
-                if date_str.upper().startswith(prefix + ' ') or date_str.upper() == prefix:
-                    date_str = date_str[len(prefix):].strip()
-                    break
-            
-            # Clean up any remaining text
-            date_str = date_str.strip()
-            
-            # Try different date formats
-            date_formats = [
-                '%d %b %Y',      # 1 JAN 1900
-                '%d %B %Y',      # 1 January 1900
-                '%b %Y',         # JAN 1900
-                '%B %Y',         # January 1900
-                '%Y',            # 1900
-            ]
-            
-            for fmt in date_formats:
-                try:
-                    return datetime.strptime(date_str, fmt)
-                except ValueError:
-                    continue
-            
-            # Try parsing just a year number (plain digits)
-            if date_str.isdigit():
-                year = int(date_str)
-                if 1 <= year <= 9999:  # Valid year range
-                    return datetime(year, 1, 1)
-            
-            # Try parsing full date with various separators (day month year)
-            parts = date_str.split()
-            if len(parts) == 3:
-                day_str, month_str, year_str = parts
-                if day_str.isdigit() and year_str.isdigit():
-                    day = int(day_str)
-                    year = int(year_str)
-                    if 1 <= year <= 9999 and 1 <= day <= 31:
-                        # Try to parse month
-                        for month_fmt in ['%b', '%B']:
-                            try:
-                                month_obj = datetime.strptime(month_str.upper(), month_fmt.upper())
-                                return datetime(year, month_obj.month, day)
-                            except ValueError:
-                                try:
-                                    month_obj = datetime.strptime(month_str, month_fmt)
-                                    return datetime(year, month_obj.month, day)
-                                except ValueError:
-                                    continue
-            
-            # Try parsing month name + year without day
-            if len(parts) == 2:
-                month_str, year_str = parts
-                if year_str.isdigit():
-                    year = int(year_str)
-                    if 1 <= year <= 9999:
-                        # Try to parse month (case-insensitive)
-                        for month_fmt in ['%b', '%B']:
-                            try:
-                                month_obj = datetime.strptime(month_str.upper(), month_fmt.upper())
-                                return datetime(year, month_obj.month, 1)
-                            except ValueError:
-                                try:
-                                    # Try with original case
-                                    month_obj = datetime.strptime(month_str, month_fmt)
-                                    return datetime(year, month_obj.month, 1)
-                                except ValueError:
-                                    continue
-                    
-            logger.warning(f"Could not parse date: {original_date_str}")
-            return None
-        except Exception as e:
-            logger.error(f"Error parsing date '{date_str}': {e}")
-            return None
+        return DateParser.parse(date_str)
     
     def extract_name_parts(self, name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
         """
         Extract first name and last name from GEDCOM name format.
+        
+        This method now delegates to the NameParser utility class.
         
         GEDCOM format: "FirstName /LastName/"
         
@@ -307,30 +204,7 @@ class GedcomParser:
         Returns:
             Tuple of (first_name, last_name)
         """
-        if not name:
-            return None, None
-        
-        # Handle tuple (sometimes ged4py returns tuples)
-        if isinstance(name, tuple):
-            name = name[0] if name else None
-            if not name:
-                return None, None
-        
-        # Convert to string if needed
-        name = str(name)
-            
-        # Remove slashes and split
-        parts = name.replace('/', '').strip().split(None, 1)
-        
-        if len(parts) == 0:
-            return None, None
-        elif len(parts) == 1:
-            return parts[0], None
-        else:
-            # Check if second part looks like a surname
-            if parts[1]:
-                return parts[0], parts[1]
-            return parts[0], None
+        return NameParser.extract_name_parts(name)
     
     def create_person_from_individual(self, individual: Individual) -> Person:
         """
@@ -820,9 +694,236 @@ class GedcomParser:
         
         return children_count
     
+    def _first_pass_create_persons(self, reader: GedcomReader, stats: Dict[str, int]) -> None:
+        """
+        First pass: Create all Person records from GEDCOM individuals.
+        
+        Args:
+            reader: GedcomReader instance
+            stats: Statistics dictionary to update
+        """
+        logger.info("Starting first pass: Creating person records...")
+        
+        for individual in reader.records0('INDI'):
+            try:
+                person = self.create_person_from_individual(individual)
+                db.session.add(person)
+                db.session.flush()
+                
+                # Check for potential duplicates
+                self._check_for_duplicates(person)
+                
+                # Map GEDCOM ID to Person UUID
+                self.person_map[individual.xref_id] = str(person.id)
+                stats['persons'] += 1
+                
+                # Create genealogical record for raw data
+                name_value = None
+                sex_value = None
+                birth_value = None
+                death_value = None
+                
+                for sub in individual.sub_records:
+                    if sub.tag == 'NAME' and sub.value:
+                        name_value = str(sub.value)
+                    elif sub.tag == 'SEX' and sub.value:
+                        sex_value = str(sub.value)
+                    elif sub.tag == 'BIRT':
+                        for subsub in sub.sub_records:
+                            if subsub.tag == 'DATE' and subsub.value:
+                                birth_value = str(subsub.value)
+                                break
+                    elif sub.tag == 'DEAT':
+                        for subsub in sub.sub_records:
+                            if subsub.tag == 'DATE' and subsub.value:
+                                death_value = str(subsub.value)
+                                break
+                
+                raw_data = {
+                    'gedcom_id': individual.xref_id,
+                    'name': name_value,
+                    'sex': sex_value,
+                    'birth': birth_value,
+                    'death': death_value,
+                }
+                
+                gen_record = GenealogicalRecord(
+                    batch_id=self.batch.id,
+                    record_type='INDIVIDUAL',
+                    raw_payload=raw_data,
+                    external_id=individual.xref_id
+                )
+                db.session.add(gen_record)
+                
+            except Exception as e:
+                # Rollback this individual and continue
+                db.session.rollback()
+                error_msg = f"Error processing individual {individual.xref_id}: {str(e)}"
+                logger.error(error_msg)
+                stats['errors'].append(error_msg)
+                # Recreate batch after rollback
+                try:
+                    db.session.merge(self.batch)
+                except:
+                    db.session.add(self.batch)
+        
+        db.session.commit()
+        logger.info(f"Completed first pass: Created {stats['persons']} person records")
+    
+    def _second_pass_create_events(self, filepath: str, encoding: str, stats: Dict[str, int]) -> None:
+        """
+        Second pass: Create baptism and death records from GEDCOM individuals.
+        
+        Args:
+            filepath: Path to the GEDCOM file
+            encoding: File encoding
+            stats: Statistics dictionary to update
+        """
+        logger.info("Starting second pass: Creating event records...")
+        
+        with GedcomReader(filepath, encoding=encoding) as reader:
+            for individual in reader.records0('INDI'):
+                try:
+                    if individual.xref_id not in self.person_map:
+                        continue
+                    
+                    person_id = self.person_map[individual.xref_id]
+                    person = db.session.get(Person, person_id)
+                    
+                    if not person:
+                        continue
+                    
+                    # Create baptism record
+                    baptism = self.create_baptism_record(individual, person)
+                    if baptism:
+                        if baptism not in db.session:
+                            db.session.add(baptism)
+                            stats['baptisms'] += 1
+                    
+                    # Create death record
+                    death = self.create_death_record(individual, person)
+                    if death:
+                        if death not in db.session:
+                            db.session.add(death)
+                            stats['deaths'] += 1
+                        
+                except Exception as e:
+                    error_msg = f"Error processing events for {individual.xref_id}: {str(e)}"
+                    logger.error(error_msg)
+                    stats['errors'].append(error_msg)
+        
+        db.session.commit()
+        logger.info(f"Completed second pass: Created {stats['baptisms']} baptism records and {stats['deaths']} death records")
+    
+    def _third_pass_create_marriages(self, filepath: str, encoding: str, stats: Dict[str, int]) -> None:
+        """
+        Third pass: Create marriage records from GEDCOM family records.
+        
+        Args:
+            filepath: Path to the GEDCOM file
+            encoding: File encoding
+            stats: Statistics dictionary to update
+        """
+        logger.info("Starting third pass: Creating marriage records...")
+        
+        with GedcomReader(filepath, encoding=encoding) as reader:
+            for family in reader.records0('FAM'):
+                try:
+                    marriage = self.create_marriage_record(family)
+                    if marriage:
+                        if marriage not in db.session:
+                            db.session.add(marriage)
+                            stats['marriages'] += 1
+                        
+                        # Extract data from sub_records for raw data
+                        husband_xref = None
+                        wife_xref = None
+                        marriage_date_value = None
+                        
+                        for sub in family.sub_records:
+                            if sub.tag == 'HUSB' and sub.value:
+                                husband_xref = sub.value
+                            elif sub.tag == 'WIFE' and sub.value:
+                                wife_xref = sub.value
+                            elif sub.tag == 'MARR':
+                                for subsub in sub.sub_records:
+                                    if subsub.tag == 'DATE' and subsub.value:
+                                        marriage_date_value = str(subsub.value)
+                                        break
+                        
+                        # Create genealogical record for raw data
+                        raw_data = {
+                            'gedcom_id': family.xref_id,
+                            'husband': husband_xref,
+                            'wife': wife_xref,
+                            'marriage_date': marriage_date_value,
+                        }
+                        
+                        gen_record = GenealogicalRecord(
+                            batch_id=self.batch.id,
+                            record_type='FAMILY',
+                            raw_payload=raw_data,
+                            external_id=family.xref_id
+                        )
+                        db.session.add(gen_record)
+                        
+                except Exception as e:
+                    error_msg = f"Error processing family {family.xref_id}: {str(e)}"
+                    logger.error(error_msg)
+                    stats['errors'].append(error_msg)
+        
+        db.session.commit()
+        logger.info(f"Completed third pass: Created {stats['marriages']} marriage records")
+    
+    def _fourth_pass_process_relationships(self, filepath: str, encoding: str, stats: Dict[str, int]) -> None:
+        """
+        Fourth pass: Process parent-child relationships from GEDCOM family records.
+        
+        Args:
+            filepath: Path to the GEDCOM file
+            encoding: File encoding
+            stats: Statistics dictionary to update
+        """
+        print("\n" + "="*80)
+        print("STARTING PARENT-CHILD RELATIONSHIP PROCESSING")
+        print("="*80)
+        logger.info("Processing parent-child relationships...")
+        children_processed = 0
+        
+        with GedcomReader(filepath, encoding=encoding) as reader:
+            families = list(reader.records0('FAM'))
+            print(f"Found {len(families)} families to process")
+            
+            for family in families:
+                try:
+                    print(f"\nProcessing family {family.xref_id}")
+                    count = self.process_family_children(family)
+                    children_processed += count
+                    print(f"  -> Processed {count} children")
+                except Exception as e:
+                    error_msg = f"Error processing family children {family.xref_id}: {str(e)}"
+                    print(f"  -> ERROR: {error_msg}")
+                    logger.error(error_msg)
+                    stats['errors'].append(error_msg)
+                    import traceback
+                    traceback.print_exc()
+        
+        print(f"\nCommitting changes to database...")
+        db.session.commit()
+        print(f"TOTAL: Processed {children_processed} parent-child relationships")
+        print("="*80 + "\n")
+        logger.info(f"Processed {children_processed} parent-child relationships")
+        stats['parent_child_relationships'] = children_processed
+    
     def parse_and_import(self) -> Dict[str, int]:
         """
         Parse the GEDCOM file and import data into the database.
+        
+        This method coordinates the four-pass import process:
+        1. Create person records
+        2. Create event records (baptisms, deaths)
+        3. Create marriage records
+        4. Process parent-child relationships
         
         Returns:
             Dictionary with import statistics
@@ -835,6 +936,10 @@ class GedcomParser:
             'parent_child_relationships': 0,
             'errors': []
         }
+        
+        # Track temporary file for cleanup
+        normalized_filepath = None
+        temp_file_created = False
         
         try:
             # Ensure session is in a clean state before starting
@@ -864,200 +969,24 @@ class GedcomParser:
             # Parse GEDCOM file
             logger.info(f"Parsing GEDCOM file: {self.filepath}")
             
+            # Normalize Unicode characters that may cause parsing issues
+            normalized_filepath = self._normalize_unicode_characters(self.filepath)
+            temp_file_created = (normalized_filepath != self.filepath)
+            
+            if temp_file_created:
+                logger.info("Using normalized GEDCOM file for parsing")
+            
             # Try different encodings
             encoding = self._detect_encoding()
             logger.info(f"Using encoding: {encoding}")
             
-            with GedcomReader(self.filepath, encoding=encoding) as reader:
-                # First pass: Create all Person records
-                for individual in reader.records0('INDI'):
-                    try:
-                        person = self.create_person_from_individual(individual)
-                        db.session.add(person)
-                        db.session.flush()
-                        
-                        # Check for potential duplicates
-                        self._check_for_duplicates(person)
-                        
-                        # Map GEDCOM ID to Person UUID
-                        self.person_map[individual.xref_id] = str(person.id)
-                        stats['persons'] += 1
-                        
-                        # Create genealogical record for raw data
-                        # Extract name from sub_records
-                        name_value = None
-                        sex_value = None
-                        birth_value = None
-                        death_value = None
-                        
-                        for sub in individual.sub_records:
-                            if sub.tag == 'NAME' and sub.value:
-                                name_value = str(sub.value)
-                            elif sub.tag == 'SEX' and sub.value:
-                                sex_value = str(sub.value)
-                            elif sub.tag == 'BIRT':
-                                for subsub in sub.sub_records:
-                                    if subsub.tag == 'DATE' and subsub.value:
-                                        birth_value = str(subsub.value)
-                                        break
-                            elif sub.tag == 'DEAT':
-                                for subsub in sub.sub_records:
-                                    if subsub.tag == 'DATE' and subsub.value:
-                                        death_value = str(subsub.value)
-                                        break
-                        
-                        raw_data = {
-                            'gedcom_id': individual.xref_id,
-                            'name': name_value,
-                            'sex': sex_value,
-                            'birth': birth_value,
-                            'death': death_value,
-                        }
-                        
-                        gen_record = GenealogicalRecord(
-                            batch_id=self.batch.id,
-                            record_type='INDIVIDUAL',
-                            raw_payload=raw_data,
-                            external_id=individual.xref_id
-                        )
-                        db.session.add(gen_record)
-                        
-                    except Exception as e:
-                        # Rollback this individual and continue
-                        db.session.rollback()
-                        error_msg = f"Error processing individual {individual.xref_id}: {str(e)}"
-                        logger.error(error_msg)
-                        stats['errors'].append(error_msg)
-                        # Recreate batch after rollback - need to re-add to session
-                        try:
-                            # Check if batch exists in session
-                            db.session.merge(self.batch)
-                        except:
-                            # If merge fails, create new batch reference
-                            db.session.add(self.batch)
-                
-                db.session.commit()
-                logger.info(f"Created {stats['persons']} person records")
-                
-                # Second pass: Create baptism and death records
-                with GedcomReader(self.filepath, encoding=encoding) as reader2:
-                    for individual in reader2.records0('INDI'):
-                        try:
-                            if individual.xref_id not in self.person_map:
-                                continue
-                            
-                            person_id = self.person_map[individual.xref_id]
-                            person = db.session.get(Person, person_id)
-                            
-                            if not person:
-                                continue
-                            
-                            # Create baptism record
-                            baptism = self.create_baptism_record(individual, person)
-                            if baptism:
-                                # Only add if it's a new record (not already in session)
-                                if baptism not in db.session:
-                                    db.session.add(baptism)
-                                    stats['baptisms'] += 1
-                            
-                            # Create death record
-                            death = self.create_death_record(individual, person)
-                            if death:
-                                # Only add if it's a new record (not already in session)
-                                if death not in db.session:
-                                    db.session.add(death)
-                                    stats['deaths'] += 1
-                                
-                        except Exception as e:
-                            error_msg = f"Error processing events for {individual.xref_id}: {str(e)}"
-                            logger.error(error_msg)
-                            stats['errors'].append(error_msg)
-                
-                db.session.commit()
-                logger.info(f"Created {stats['baptisms']} baptism records and {stats['deaths']} death records")
-                
-                # Third pass: Create marriage records from families
-                with GedcomReader(self.filepath, encoding=encoding) as reader3:
-                    for family in reader3.records0('FAM'):
-                        try:
-                            marriage = self.create_marriage_record(family)
-                            if marriage:
-                                # Only add if it's a new record (not already in session)
-                                if marriage not in db.session:
-                                    db.session.add(marriage)
-                                    stats['marriages'] += 1
-                                
-                                # Extract data from sub_records for raw data
-                                husband_xref = None
-                                wife_xref = None
-                                marriage_date_value = None
-                                
-                                for sub in family.sub_records:
-                                    if sub.tag == 'HUSB' and sub.value:
-                                        husband_xref = sub.value  # Keep @ symbols for consistency
-                                    elif sub.tag == 'WIFE' and sub.value:
-                                        wife_xref = sub.value  # Keep @ symbols for consistency
-                                    elif sub.tag == 'MARR':
-                                        for subsub in sub.sub_records:
-                                            if subsub.tag == 'DATE' and subsub.value:
-                                                marriage_date_value = str(subsub.value)
-                                                break
-                                
-                                # Create genealogical record for raw data
-                                raw_data = {
-                                    'gedcom_id': family.xref_id,
-                                    'husband': husband_xref,
-                                    'wife': wife_xref,
-                                    'marriage_date': marriage_date_value,
-                                }
-                                
-                                gen_record = GenealogicalRecord(
-                                    batch_id=self.batch.id,
-                                    record_type='FAMILY',
-                                    raw_payload=raw_data,
-                                    external_id=family.xref_id
-                                )
-                                db.session.add(gen_record)
-                                
-                        except Exception as e:
-                            error_msg = f"Error processing family {family.xref_id}: {str(e)}"
-                            logger.error(error_msg)
-                            stats['errors'].append(error_msg)
-                
-                db.session.commit()
-                logger.info(f"Created {stats['marriages']} marriage records")
+            # Execute the four parsing passes
+            with GedcomReader(normalized_filepath, encoding=encoding) as reader:
+                self._first_pass_create_persons(reader, stats)
             
-            # Fourth pass: Process parent-child relationships from families
-            print("\n" + "="*80)
-            print("STARTING PARENT-CHILD RELATIONSHIP PROCESSING")
-            print("="*80)
-            logger.info("Processing parent-child relationships...")
-            children_processed = 0
-            
-            with GedcomReader(self.filepath, encoding=encoding) as reader4:
-                families = list(reader4.records0('FAM'))
-                print(f"Found {len(families)} families to process")
-                
-                for family in families:
-                    try:
-                        print(f"\nProcessing family {family.xref_id}")
-                        count = self.process_family_children(family)
-                        children_processed += count
-                        print(f"  -> Processed {count} children")
-                    except Exception as e:
-                        error_msg = f"Error processing family children {family.xref_id}: {str(e)}"
-                        print(f"  -> ERROR: {error_msg}")
-                        logger.error(error_msg)
-                        stats['errors'].append(error_msg)
-                        import traceback
-                        traceback.print_exc()
-            
-            print(f"\nCommitting changes to database...")
-            db.session.commit()
-            print(f"TOTAL: Processed {children_processed} parent-child relationships")
-            print("="*80 + "\n")
-            logger.info(f"Processed {children_processed} parent-child relationships")
-            stats['parent_child_relationships'] = children_processed
+            self._second_pass_create_events(self.filepath, encoding, stats)
+            self._third_pass_create_marriages(self.filepath, encoding, stats)
+            self._fourth_pass_process_relationships(self.filepath, encoding, stats)
             
             # Import data into AGE graph
             try:
@@ -1098,6 +1027,16 @@ class GedcomParser:
                 db.session.commit()
             
             raise
+        
+        finally:
+            # Clean up temporary normalized file if it was created
+            if temp_file_created and normalized_filepath:
+                try:
+                    if os.path.exists(normalized_filepath):
+                        os.unlink(normalized_filepath)
+                        logger.info(f"Cleaned up temporary normalized file: {normalized_filepath}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temporary file {normalized_filepath}: {e}")
     
     def _import_to_age_graph(self, stats: Dict[str, int]):
         """
