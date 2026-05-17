@@ -21,74 +21,78 @@ def upgrade():
     # Enable pgvector extension
     op.execute('CREATE EXTENSION IF NOT EXISTS vector')
     
+    # Use raw SQL with IF NOT EXISTS to make migration idempotent
+    conn = op.get_bind()
+    
     # Add vector embedding and phonetic columns to persons table
-    op.add_column('persons', sa.Column('embedding', Vector(128), nullable=True))
-    op.add_column('persons', sa.Column('first_name_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
-    op.add_column('persons', sa.Column('last_name_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
-    op.add_column('persons', sa.Column('maiden_name_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
+    conn.execute(sa.text('ALTER TABLE persons ADD COLUMN IF NOT EXISTS embedding VECTOR(128)'))
+    conn.execute(sa.text('ALTER TABLE persons ADD COLUMN IF NOT EXISTS first_name_phonetic JSONB'))
+    conn.execute(sa.text('ALTER TABLE persons ADD COLUMN IF NOT EXISTS last_name_phonetic JSONB'))
+    conn.execute(sa.text('ALTER TABLE persons ADD COLUMN IF NOT EXISTS maiden_name_phonetic JSONB'))
     
     # Add vector embedding and phonetic columns to baptism_records table
-    op.add_column('baptism_records', sa.Column('embedding', Vector(128), nullable=True))
-    op.add_column('baptism_records', sa.Column('child_name_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
-    op.add_column('baptism_records', sa.Column('father_surname_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
-    op.add_column('baptism_records', sa.Column('mother_maiden_name_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
+    conn.execute(sa.text('ALTER TABLE baptism_records ADD COLUMN IF NOT EXISTS embedding VECTOR(128)'))
+    conn.execute(sa.text('ALTER TABLE baptism_records ADD COLUMN IF NOT EXISTS child_name_phonetic JSONB'))
+    conn.execute(sa.text('ALTER TABLE baptism_records ADD COLUMN IF NOT EXISTS father_surname_phonetic JSONB'))
+    conn.execute(sa.text('ALTER TABLE baptism_records ADD COLUMN IF NOT EXISTS mother_maiden_name_phonetic JSONB'))
     
     # Add vector embedding and phonetic columns to marriage_records table
-    op.add_column('marriage_records', sa.Column('embedding', Vector(128), nullable=True))
-    op.add_column('marriage_records', sa.Column('spouse1_surname_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
-    op.add_column('marriage_records', sa.Column('spouse2_surname_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
+    conn.execute(sa.text('ALTER TABLE marriage_records ADD COLUMN IF NOT EXISTS embedding VECTOR(128)'))
+    conn.execute(sa.text('ALTER TABLE marriage_records ADD COLUMN IF NOT EXISTS spouse1_surname_phonetic JSONB'))
+    conn.execute(sa.text('ALTER TABLE marriage_records ADD COLUMN IF NOT EXISTS spouse2_surname_phonetic JSONB'))
     
     # Add vector embedding and phonetic columns to death_records table
-    op.add_column('death_records', sa.Column('embedding', Vector(128), nullable=True))
-    op.add_column('death_records', sa.Column('deceased_surname_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
-    op.add_column('death_records', sa.Column('deceased_maiden_name_phonetic', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
+    conn.execute(sa.text('ALTER TABLE death_records ADD COLUMN IF NOT EXISTS embedding VECTOR(128)'))
+    conn.execute(sa.text('ALTER TABLE death_records ADD COLUMN IF NOT EXISTS deceased_surname_phonetic JSONB'))
+    conn.execute(sa.text('ALTER TABLE death_records ADD COLUMN IF NOT EXISTS deceased_maiden_name_phonetic JSONB'))
     
-    # Create duplicate_candidates table
-    op.create_table('duplicate_candidates',
-        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('record_type', sa.String(length=50), nullable=False),
-        sa.Column('record1_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('record2_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('vector_similarity', sa.Float(), nullable=False),
-        sa.Column('phonetic_similarity', sa.Float(), nullable=True),
-        sa.Column('date_similarity', sa.Float(), nullable=True),
-        sa.Column('location_similarity', sa.Float(), nullable=True),
-        sa.Column('composite_score', sa.Float(), nullable=False),
-        sa.Column('status', sa.String(length=20), nullable=False),
-        sa.Column('reviewed_by', sa.String(length=100), nullable=True),
-        sa.Column('reviewed_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('review_notes', sa.Text(), nullable=True),
-        sa.Column('detected_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('detection_method', sa.String(length=50), nullable=True),
-        sa.PrimaryKeyConstraint('id')
-    )
+    # Create duplicate_candidates table (if not exists)
+    conn.execute(sa.text("""
+        CREATE TABLE IF NOT EXISTS duplicate_candidates (
+            id UUID NOT NULL PRIMARY KEY,
+            record_type VARCHAR(50) NOT NULL,
+            record1_id UUID NOT NULL,
+            record2_id UUID NOT NULL,
+            vector_similarity FLOAT NOT NULL,
+            phonetic_similarity FLOAT,
+            date_similarity FLOAT,
+            location_similarity FLOAT,
+            composite_score FLOAT NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            reviewed_by VARCHAR(100),
+            reviewed_at TIMESTAMP WITH TIME ZONE,
+            review_notes TEXT,
+            detected_at TIMESTAMP WITH TIME ZONE,
+            detection_method VARCHAR(50)
+        )
+    """))
     
-    # Create duplicate_resolutions table
-    op.create_table('duplicate_resolutions',
-        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('candidate_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('action', sa.String(length=20), nullable=False),
-        sa.Column('kept_record_id', postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column('merged_record_id', postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column('resolved_by', sa.String(length=100), nullable=False),
-        sa.Column('resolved_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('resolution_notes', sa.Text(), nullable=True),
-        sa.Column('merged_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.ForeignKeyConstraint(['candidate_id'], ['duplicate_candidates.id'], ),
-        sa.PrimaryKeyConstraint('id')
-    )
+    # Create duplicate_resolutions table (if not exists)
+    conn.execute(sa.text("""
+        CREATE TABLE IF NOT EXISTS duplicate_resolutions (
+            id UUID NOT NULL PRIMARY KEY,
+            candidate_id UUID NOT NULL REFERENCES duplicate_candidates(id),
+            action VARCHAR(20) NOT NULL,
+            kept_record_id UUID,
+            merged_record_id UUID,
+            resolved_by VARCHAR(100) NOT NULL,
+            resolved_at TIMESTAMP WITH TIME ZONE,
+            resolution_notes TEXT,
+            merged_data JSONB
+        )
+    """))
     
-    # Create indexes on duplicate_candidates
-    op.create_index('ix_duplicate_candidates_record1', 'duplicate_candidates', ['record_type', 'record1_id'], unique=False)
-    op.create_index('ix_duplicate_candidates_record2', 'duplicate_candidates', ['record_type', 'record2_id'], unique=False)
-    op.create_index('ix_duplicate_candidates_status', 'duplicate_candidates', ['status'], unique=False)
-    op.create_index('ix_duplicate_candidates_score', 'duplicate_candidates', ['composite_score'], unique=False)
+    # Create indexes on duplicate_candidates (if not exists)
+    conn.execute(sa.text('CREATE INDEX IF NOT EXISTS ix_duplicate_candidates_record1 ON duplicate_candidates (record_type, record1_id)'))
+    conn.execute(sa.text('CREATE INDEX IF NOT EXISTS ix_duplicate_candidates_record2 ON duplicate_candidates (record_type, record2_id)'))
+    conn.execute(sa.text('CREATE INDEX IF NOT EXISTS ix_duplicate_candidates_status ON duplicate_candidates (status)'))
+    conn.execute(sa.text('CREATE INDEX IF NOT EXISTS ix_duplicate_candidates_score ON duplicate_candidates (composite_score)'))
     
-    # Create HNSW indexes for vector similarity search
-    op.execute('CREATE INDEX ix_persons_embedding_hnsw ON persons USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)')
-    op.execute('CREATE INDEX ix_baptism_records_embedding_hnsw ON baptism_records USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)')
-    op.execute('CREATE INDEX ix_marriage_records_embedding_hnsw ON marriage_records USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)')
-    op.execute('CREATE INDEX ix_death_records_embedding_hnsw ON death_records USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)')
+    # Create HNSW indexes for vector similarity search (with IF NOT EXISTS)
+    op.execute('CREATE INDEX IF NOT EXISTS ix_persons_embedding_hnsw ON persons USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_baptism_records_embedding_hnsw ON baptism_records USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_marriage_records_embedding_hnsw ON marriage_records USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)')
+    op.execute('CREATE INDEX IF NOT EXISTS ix_death_records_embedding_hnsw ON death_records USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)')
 
 
 def downgrade():
