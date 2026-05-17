@@ -19,6 +19,47 @@ from .routes import health, main
 from .services.age_initializer import initialize_age_database
 
 
+def initialize_pgvector_extension(app):
+    """Initialize pgvector extension in the database."""
+    try:
+        with db.engine.connect() as conn:
+            # Check if pgvector extension exists
+            result = conn.execute(db.text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_extension WHERE extname = 'vector'
+                );
+            """))
+            exists = result.scalar()
+            
+            if not exists:
+                app.logger.info("Creating pgvector extension...")
+                conn.execute(db.text("CREATE EXTENSION IF NOT EXISTS vector;"))
+                conn.commit()
+                app.logger.info("✓ pgvector extension created successfully")
+            else:
+                app.logger.info("✓ pgvector extension already exists")
+                
+            # Verify vector type is available
+            result = conn.execute(db.text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_type WHERE typname = 'vector'
+                );
+            """))
+            vector_exists = result.scalar()
+            
+            if vector_exists:
+                app.logger.info("✓ Vector type is available")
+                return True
+            else:
+                app.logger.error("✗ Vector type is not available after extension creation")
+                return False
+                
+    except Exception as e:
+        app.logger.error(f"Error initializing pgvector extension: {e}")
+        app.logger.warning("pgvector features will not be available")
+        return False
+
+
 def create_app() -> Flask:
     import os
     
@@ -36,6 +77,13 @@ def create_app() -> Flask:
 
     # Run database initialization automatically on startup
     with app.app_context():
+        try:
+            # Step 0: Initialize pgvector extension (must be done before creating tables)
+            initialize_pgvector_extension(app)
+        except Exception as e:
+            app.logger.error(f"Error initializing pgvector extension: {e}")
+            # Continue anyway - app can work without vector features
+        
         try:
             # Step 1: Create all tables if they don't exist (for initial setup)
             db.create_all()
