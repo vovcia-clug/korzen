@@ -1,8 +1,10 @@
-# GEDCOM Duplicate Detection Implementation
+# GEDCOM ID Tracking and Re-Import Prevention
 
 ## Overview
 
-This document describes the implementation of GEDCOM ID tracking across all record types (Person, BaptismRecord, MarriageRecord, DeathRecord) to prevent duplicate records during re-import of GEDCOM files.
+This document describes the implementation of GEDCOM ID tracking across all record types (Person, BaptismRecord, MarriageRecord, DeathRecord) to prevent duplicate records during re-import of **the same GEDCOM file**.
+
+**IMPORTANT:** GEDCOM ID tracking is NOT used for duplicate detection across different GEDCOM files. It only prevents re-importing the same file multiple times.
 
 ## Problem Statement
 
@@ -10,6 +12,20 @@ Previously, no record types stored original GEDCOM IDs, which caused:
 - **Duplicate records**: Re-importing the same GEDCOM file created duplicate entries for persons, baptisms, marriages, and deaths
 - **No traceability**: Unable to link records back to their original GEDCOM source
 - **Data integrity issues**: Multiple imports resulted in data inconsistency across all record types
+
+## Important Distinction
+
+### GEDCOM ID Re-Import Prevention (This Document)
+- **Purpose**: Prevent re-importing the same GEDCOM file multiple times
+- **Scope**: Only checks GEDCOM ID + source_batch_id combination
+- **Location**: [`src/app/gedcom_parser.py`](src/app/gedcom_parser.py)
+- **Behavior**: If a record with the same GEDCOM ID exists in the same batch, reuse it
+
+### Duplicate Detection (Different System)
+- **Purpose**: Find duplicate persons/records across ALL sources (including different GEDCOM files)
+- **Scope**: Uses vector similarity, phonetic matching, date/location comparison
+- **Location**: [`src/app/services/duplicate_detector.py`](src/app/services/duplicate_detector.py)
+- **Behavior**: Identifies potential duplicates using AI/ML techniques, NOT GEDCOM IDs
 
 ## Solution
 
@@ -41,14 +57,21 @@ source_batch = relationship("RecordBatch")
 
 Modified `GedcomParser.create_person_from_individual()` to:
 
-1. **Check for existing persons** before creating new ones:
+1. **Check for existing persons within the same batch** before creating new ones:
 ```python
-existing_person = Person.query.filter_by(gedcom_id=individual.xref_id).first()
+# Check if person already exists by GEDCOM ID within the same batch
+# Note: Different GEDCOM files can have the same IDs, so we check batch too
+existing_person = Person.query.filter_by(
+    gedcom_id=individual.xref_id,
+    source_batch_id=self.batch.id
+).first()
 
 if existing_person:
-    logger.info(f"Found existing person with GEDCOM ID {individual.xref_id}")
+    logger.info(f"Found existing person with GEDCOM ID {individual.xref_id} in batch {self.batch.id}")
     return existing_person
 ```
+
+**Key Change (2026-05-17):** Added `source_batch_id` to the query to prevent false positives when importing different GEDCOM files that happen to use the same GEDCOM IDs (e.g., both files use `@I1@`, `@I2@`, etc.).
 
 2. **Store GEDCOM ID and batch** when creating new persons:
 ```python
@@ -58,6 +81,8 @@ person = Person(
     # ... other fields
 )
 ```
+
+The same logic applies to BaptismRecord, MarriageRecord, and DeathRecord creation.
 
 ### 3. Database Migrations
 
@@ -164,8 +189,9 @@ Expected output:
 
 1. **Existing data**: Current persons without `gedcom_id` continue to work
 2. **Manual entries**: Persons created manually have `gedcom_id=None`
-3. **Multiple sources**: Different GEDCOM files can have same IDs (tracked by batch)
+3. **Multiple sources**: Different GEDCOM files can have same IDs (tracked by batch) - **FIXED 2026-05-17**
 4. **Partial imports**: Failed imports don't leave orphaned data
+5. **Cross-file duplicates**: Handled by the separate duplicate detection system (vector similarity, phonetic matching, etc.)
 
 ## Future Enhancements
 

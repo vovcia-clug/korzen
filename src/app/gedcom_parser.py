@@ -222,11 +222,15 @@ class GedcomParser:
         Returns:
             Person database object (existing or newly created)
         """
-        # Check if person already exists by GEDCOM ID
-        existing_person = Person.query.filter_by(gedcom_id=individual.xref_id).first()
+        # Check if person already exists by GEDCOM ID within the same batch
+        # Note: Different GEDCOM files can have the same IDs, so we check batch too
+        existing_person = Person.query.filter_by(
+            gedcom_id=individual.xref_id,
+            source_batch_id=self.batch.id
+        ).first()
         
         if existing_person:
-            logger.info(f"Found existing person with GEDCOM ID {individual.xref_id}: {existing_person.first_name} {existing_person.last_name}")
+            logger.info(f"Found existing person with GEDCOM ID {individual.xref_id} in batch {self.batch.id}: {existing_person.first_name} {existing_person.last_name}")
             return existing_person
         
         # Extract name from sub_records
@@ -777,10 +781,14 @@ class GedcomParser:
         # Generate GEDCOM ID for baptism event (use individual's ID + event type)
         baptism_gedcom_id = f"{individual.xref_id}_BAPM"
         
-        # Check if baptism record already exists
-        existing_baptism = BaptismRecord.query.filter_by(gedcom_id=baptism_gedcom_id).first()
+        # Check if baptism record already exists within the same batch
+        # Note: Different GEDCOM files can have the same IDs, so we check batch too
+        existing_baptism = BaptismRecord.query.filter_by(
+            gedcom_id=baptism_gedcom_id,
+            source_batch_id=self.batch.id
+        ).first()
         if existing_baptism:
-            logger.info(f"Found existing baptism record with GEDCOM ID {baptism_gedcom_id}")
+            logger.info(f"Found existing baptism record with GEDCOM ID {baptism_gedcom_id} in batch {self.batch.id}")
             return existing_baptism
         
         # Extract baptism date and place
@@ -824,11 +832,15 @@ class GedcomParser:
         Returns:
             MarriageRecord or None if no marriage event found
         """
-        # Check if marriage record already exists by family GEDCOM ID
+        # Check if marriage record already exists by family GEDCOM ID within the same batch
+        # Note: Different GEDCOM files can have the same IDs, so we check batch too
         marriage_gedcom_id = f"{family.xref_id}_MARR"
-        existing_marriage = MarriageRecord.query.filter_by(gedcom_id=marriage_gedcom_id).first()
+        existing_marriage = MarriageRecord.query.filter_by(
+            gedcom_id=marriage_gedcom_id,
+            source_batch_id=self.batch.id
+        ).first()
         if existing_marriage:
-            logger.info(f"Found existing marriage record with GEDCOM ID {marriage_gedcom_id}")
+            logger.info(f"Found existing marriage record with GEDCOM ID {marriage_gedcom_id} in batch {self.batch.id}")
             return existing_marriage
         
         # Find MARR sub-record
@@ -942,10 +954,14 @@ class GedcomParser:
         # Generate GEDCOM ID for death event
         death_gedcom_id = f"{individual.xref_id}_DEAT"
         
-        # Check if death record already exists
-        existing_death = DeathRecord.query.filter_by(gedcom_id=death_gedcom_id).first()
+        # Check if death record already exists within the same batch
+        # Note: Different GEDCOM files can have the same IDs, so we check batch too
+        existing_death = DeathRecord.query.filter_by(
+            gedcom_id=death_gedcom_id,
+            source_batch_id=self.batch.id
+        ).first()
         if existing_death:
-            logger.info(f"Found existing death record with GEDCOM ID {death_gedcom_id}")
+            logger.info(f"Found existing death record with GEDCOM ID {death_gedcom_id} in batch {self.batch.id}")
             return existing_death
         
         # Find DEAT sub-record
@@ -1081,8 +1097,14 @@ class GedcomParser:
                             self._auto_merge_duplicate(candidate, person, score, breakdown)
                             
                             # Remove the newly added person (it's a duplicate)
-                            db.session.delete(person)
-                            db.session.flush()
+                            try:
+                                db.session.delete(person)
+                                db.session.flush()
+                                logger.info(f"Successfully deleted duplicate person {person.id}")
+                            except Exception as e:
+                                logger.error(f"Failed to delete person {person.id}: {e}")
+                                db.session.rollback()
+                                raise
                             
                             # Map GEDCOM ID to the existing person's UUID
                             self.person_map[individual.xref_id] = str(candidate.id)
@@ -1424,8 +1446,14 @@ class GedcomParser:
                             self._auto_merge_duplicate(candidate, person, score, breakdown)
                             
                             # Remove the merged person from database
-                            db.session.delete(person)
-                            db.session.flush()
+                            try:
+                                db.session.delete(person)
+                                db.session.flush()
+                                logger.info(f"Successfully deleted merged person {person.id}")
+                            except Exception as e:
+                                logger.error(f"Failed to delete merged person {person.id}: {e}")
+                                db.session.rollback()
+                                raise
                             
                             # Update GEDCOM ID mapping to point to kept record
                             if person.gedcom_id in self.person_map:

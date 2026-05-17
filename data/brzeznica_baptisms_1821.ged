@@ -1,0 +1,46 @@
+0 HEAD
+1 SOUR Hand_Transcription
+1 DATE 17 May 2026
+1 GEDC
+2 VERS 5.5
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Joannes /Nepomucenus/
+1 SEX M
+1 BAPM
+2 DATE 15 MAY 1821
+2 PLAC Brzeźnica
+1 FAMC @F1@
+0 @I2@ INDI
+1 NAME Antonius /Sopa/
+1 SEX M
+1 FAMS @F1@
+0 @I3@ INDI
+1 NAME Theresia /Lubinska/
+1 SEX F
+1 FAMS @F1@
+0 @I4@ INDI
+1 NAME Joannes /Nepomucenus/
+1 SEX M
+1 BAPM
+2 DATE 20 MAY 1821
+2 PLAC Brzeźnica
+1 FAMC @F2@
+0 @I5@ INDI
+1 NAME Mathias /Ciapka/
+1 SEX M
+1 FAMS @F2@
+0 @I6@ INDI
+1 NAME Justina /Wielk.../
+1 SEX F
+1 FAMS @F2@
+0 @F1@ FAM
+1 HUSB @I2@
+1 WIFE @I3@
+1 CHIL @I1@
+0 @F2@ FAM
+1 HUSB @I5@
+1 WIFE @I6@
+1 CHIL @I4@
+0 TRLR

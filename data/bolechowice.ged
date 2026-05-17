@@ -1,0 +1,2135 @@
+0 HEAD
+1 SOUR ANTHROPIC_CLAUDE
+2 NAME Latin Parish Record Transcription
+2 VERS 1.0
+1 DEST ANY
+1 DATE 17 MAY 2026
+1 SUBM @SUB1@
+1 FILE bolechowice_1890.ged
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+1 LANG Polish
+0 @SUB1@ SUBM
+1 NAME Genealogy Compiler
+0 @S1@ SOUR
+1 TITL Liber Natorum et Baptisatorum, Parochia Bolechowice
+1 AUTH Parochus Loci
+1 PUBL Archiwum Kurii Metropolitalnej w Krakowie
+1 DATA
+2 EVEN BIRT, CHR
+3 DATE FROM 1 JAN 1890 TO 2 JAN 1891
+3 PLAC Parochia Bolechowice, Galicia
+1 REPO @R1@
+0 @R1@ REPO
+1 NAME Archiwum Kurii Metropolitalnej, Krakow
+0 @I0001@ INDI
+1 NAME Paulus /Wiedra/
+2 GIVN Paulus
+2 SURN Wiedra
+1 SEX M
+1 BIRT
+2 DATE 8 JAN 1890
+2 PLAC Bolechowice, dom 14
+1 CHR
+2 DATE 8 JAN 1890
+2 PLAC Bolechowice
+2 NOTE Baptismus in periculo mortis (Convers.)
+1 DEAT
+2 DATE 8 JAN 1890
+2 PLAC Bolechowice
+1 FAMC @F0001@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 1
+0 @I0002@ INDI
+1 NAME Joannes /Wiedra/
+2 GIVN Joannes
+2 SURN Wiedra
+1 SEX M
+1 OCCU agricola
+1 RESI
+2 PLAC Bolechowice
+1 FAMS @F0001@
+1 FAMC @F0001A@
+0 @I0003@ INDI
+1 NAME Marianna /Rumian/
+2 GIVN Marianna
+2 SURN Rumian
+1 SEX F
+1 FAMS @F0001@
+1 FAMC @F0001B@
+0 @I0004@ INDI
+1 NAME Franciscus /Wiedra/
+1 SEX M
+1 FAMS @F0001A@
+0 @I0005@ INDI
+1 NAME Catharina /Niepurs/
+1 SEX F
+1 FAMS @F0001A@
+0 @I0006@ INDI
+1 NAME Adalbertus /Rumian/
+1 SEX M
+1 FAMS @F0001B@
+0 @I0007@ INDI
+1 NAME Catharina /Konik/
+1 SEX F
+1 FAMS @F0001B@
+0 @F0001@ FAM
+1 HUSB @I0002@
+1 WIFE @I0003@
+1 CHIL @I0001@
+1 MARR
+2 TYPE Religious
+2 PLAC Bolechowice
+2 NOTE Coniuges legitimi (conj. leg.)
+0 @F0001A@ FAM
+1 HUSB @I0004@
+1 WIFE @I0005@
+1 CHIL @I0002@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @F0001B@ FAM
+1 HUSB @I0006@
+1 WIFE @I0007@
+1 CHIL @I0003@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0008@ INDI
+1 NAME Stanislaus /Rumian/
+1 SEX M
+1 OCCU agricola
+1 ASSO @I0001@
+2 RELA Godfather
+0 @I0009@ INDI
+1 NAME Catharina /Kora/
+1 SEX F
+1 ASSO @I0001@
+2 RELA Godmother
+0 @I0010@ INDI
+1 NAME Agnes /Sendor/
+1 SEX F
+1 BIRT
+2 DATE 12 JAN 1890
+2 PLAC Bolechowice, dom 45
+1 CHR
+2 DATE 15 JAN 1890
+2 PLAC Bolechowice
+1 FAMC @F0002@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 2
+0 @I0011@ INDI
+1 NAME Hyacinthus /Sendor/
+1 SEX M
+1 OCCU agricola
+1 FAMS @F0002@
+0 @I0012@ INDI
+1 NAME Anna /Konik/
+1 SEX F
+1 FAMS @F0002@
+1 NOTE Filia Adalberti Konik et Catharinae Konik
+0 @F0002@ FAM
+1 HUSB @I0011@
+1 WIFE @I0012@
+1 CHIL @I0010@
+1 MARR
+2 TYPE Religious
+2 PLAC Bolechowice
+2 NOTE Coniuges legitimi
+0 @I0013@ INDI
+1 NAME Emmanuela /Wierzbicki/
+1 SEX F
+1 BIRT
+2 DATE 18 JAN 1890
+2 PLAC Bolechowice, dom 63
+2 NOTE in alvum partus - baptized in utero / emergency
+1 CHR
+2 DATE 18 JAN 1890
+2 PLAC Bolechowice
+1 FAMC @F0003@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 3
+0 @I0014@ INDI
+1 NAME Joannes /Wierzbicki/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Bartholomaei Wierzbicki et Catharinae natae Woch
+1 FAMS @F0003@
+0 @I0015@ INDI
+1 NAME Marianna /Styrental/
+1 SEX F
+1 NOTE Filia Joannis Styrental et Margarithae natae Wierzbicki, residens in Zelkow
+1 FAMS @F0003@
+0 @F0003@ FAM
+1 HUSB @I0014@
+1 WIFE @I0015@
+1 CHIL @I0013@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0016@ INDI
+1 NAME Agnes /Szczuka/
+1 SEX F
+1 BIRT
+2 DATE 19 JAN 1890
+2 PLAC Bolechowice, dom 85
+1 CHR
+2 DATE 20 JAN 1890
+2 PLAC Bolechowice
+1 FAMC @F0004@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 4
+0 @I0017@ INDI
+1 NAME Andreas /Szczuka/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Josephi Szczuka et Theresiae natae Mikuni
+1 FAMS @F0004@
+0 @I0018@ INDI
+1 NAME Carolina /Szczercza/
+1 SEX F
+1 NOTE Filia Joannis Szczercza et Victoriae natae Soman, operariorum in Wisniowice
+1 FAMS @F0004@
+0 @F0004@ FAM
+1 HUSB @I0017@
+1 WIFE @I0018@
+1 CHIL @I0016@
+1 MARR
+2 TYPE Religious
+2 PLAC Bolechowice
+2 NOTE Coniuges legitimi
+0 @I0019@ INDI
+1 NAME Mathias /Kowalik/
+1 SEX M
+1 BIRT
+2 DATE 12 FEB 1890
+2 PLAC Bolechowice, dom 20
+1 CHR
+2 DATE 15 FEB 1890
+2 PLAC Bolechowice
+1 FAMC @F0005@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 5
+0 @I0020@ INDI
+1 NAME Franciscus /Kowalik/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Andreae Kowalik et Mariannae natae Wegiel
+1 FAMS @F0005@
+0 @I0021@ INDI
+1 NAME Catharina /Sendor/
+1 SEX F
+1 NOTE Filia Hyacinthi Sendor et Catharinae natae Czuber
+1 FAMS @F0005@
+0 @F0005@ FAM
+1 HUSB @I0020@
+1 WIFE @I0021@
+1 CHIL @I0019@
+1 MARR
+2 TYPE Religious
+2 PLAC Bolechowice
+2 NOTE Coniuges legitimi
+0 @I0022@ INDI
+1 NAME Petrus /Czajka/
+1 SEX M
+1 BIRT
+2 DATE 18 FEB 1890
+2 PLAC Bolechowice, dom 11
+1 CHR
+2 DATE 19 FEB 1890
+2 PLAC Bolechowice
+1 DEAT
+2 DATE 29 DEC 1890
+2 PLAC Bolechowice
+1 FAMC @F0006@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 6
+0 @I0023@ INDI
+1 NAME Martinus /Czajka/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Stanislai Czajka et Reginae natae Bielak
+1 FAMS @F0006@
+0 @I0024@ INDI
+1 NAME Magdalena /Stryjak/
+1 SEX F
+1 NOTE Filia Francisci Stryjak et Bronislavae natae Krocniak, ex Wisniowice
+1 FAMS @F0006@
+0 @F0006@ FAM
+1 HUSB @I0023@
+1 WIFE @I0024@
+1 CHIL @I0022@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0025@ INDI
+1 NAME Casimirus /Korbel/
+1 SEX M
+1 BIRT
+2 DATE 22 FEB 1890
+2 PLAC Bolechowice, dom 101
+1 CHR
+2 DATE 23 FEB 1890
+2 PLAC Bolechowice
+1 FAMC @F0007@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 7
+0 @I0026@ INDI
+1 NAME Joannes /Korbel/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Joannis Korbel et Juliannae natae Strugala
+1 FAMS @F0007@
+0 @I0027@ INDI
+1 NAME Francisca /Wazik/
+1 SEX F
+1 NOTE Filia Stephani Wazik et Rosaliae natae Mikuni
+1 FAMS @F0007@
+0 @F0007@ FAM
+1 HUSB @I0026@
+1 WIFE @I0027@
+1 CHIL @I0025@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0028@ INDI
+1 NAME Josepha /Wojcik/
+1 SEX F
+1 BIRT
+2 DATE 1 MAR 1890
+2 PLAC Bolechowice, dom 12
+1 CHR
+2 DATE 2 MAR 1890
+2 PLAC Bolechowice
+1 FAMC @F0008@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 8
+0 @I0029@ INDI
+1 NAME Hyacinthus /Wojcik/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Francisci Wojcik et Mariannae natae Sekurna
+1 FAMS @F0008@
+0 @I0030@ INDI
+1 NAME Bronislawa /Strugala/
+1 SEX F
+1 NOTE Filia Stephani Strugala et Sophiae natae Czajka. Annotatio 1979 USC Zabierzow Decyzja 62345/5/79 in actu nr 1/45 rubryka matka emendatum Jozefa rectius Bronislawa
+1 FAMS @F0008@
+0 @F0008@ FAM
+1 HUSB @I0029@
+1 WIFE @I0030@
+1 CHIL @I0028@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0031@ INDI
+1 NAME Clemens /Wozera/
+1 SEX M
+1 BIRT
+2 DATE 10 MAR 1890
+2 PLAC Bolechowice, dom 55
+1 CHR
+2 DATE 13 MAR 1890
+2 PLAC Bolechowice
+2 NOTE Gemelli
+1 DEAT
+2 DATE 22 NOV 1890
+2 PLAC Bolechowice
+1 FAMC @F0009@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 9
+0 @I0032@ INDI
+1 NAME Josepha /Wozera/
+1 SEX F
+1 BIRT
+2 DATE 10 MAR 1890
+2 PLAC Bolechowice, dom 55
+1 CHR
+2 DATE 13 MAR 1890
+2 PLAC Bolechowice
+2 NOTE Gemelli
+1 FAMC @F0009@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 10
+0 @I0033@ INDI
+1 NAME Joannes /Wozera/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Adalberti Wozera et Mariannae natae Smoczyk
+1 FAMS @F0009@
+0 @I0034@ INDI
+1 NAME Marianna /Rumian/
+1 SEX F
+1 NOTE Filia Josephi Rumian et Reginae natae Sekera
+1 FAMS @F0009@
+0 @F0009@ FAM
+1 HUSB @I0033@
+1 WIFE @I0034@
+1 CHIL @I0031@
+1 CHIL @I0032@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0035@ INDI
+1 NAME Francisca /Rumiński/
+1 SEX F
+1 BIRT
+2 DATE 27 MAR 1890
+2 PLAC Bolechowice, dom 16
+1 CHR
+2 DATE 29 MAR 1890
+2 PLAC Bolechowice
+1 FAMC @F0010@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 11
+0 @I0036@ INDI
+1 NAME Stanislaus /Rumiński/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Andreae Rumian et Catharinae natae Rozien
+1 FAMS @F0010@
+0 @I0037@ INDI
+1 NAME Marianna /Strugalski/
+1 SEX F
+1 NOTE Filia Mariani Strugalski et Catharinae natae Piechota
+1 FAMS @F0010@
+0 @F0010@ FAM
+1 HUSB @I0036@
+1 WIFE @I0037@
+1 CHIL @I0035@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0038@ INDI
+1 NAME Helena /Wruck/
+1 SEX F
+1 BIRT
+2 DATE 4 APR 1890
+2 PLAC Bolechowice, dom 90
+2 NOTE Mensis incertus, verisimiliter Aprilis
+1 CHR
+2 DATE 5 APR 1890
+2 PLAC Bolechowice
+1 FAMC @F0011@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 12
+0 @I0039@ INDI
+1 NAME Jacobus /Wruck/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Jacobi Wruck et Magdalenae natae Sendor
+1 FAMS @F0011@
+0 @I0040@ INDI
+1 NAME Marianna /Pączyński/
+1 SEX F
+1 NOTE Filia Joannis Paczynski et Mariannae natae Godek
+1 FAMS @F0011@
+0 @F0011@ FAM
+1 HUSB @I0039@
+1 WIFE @I0040@
+1 CHIL @I0038@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0041@ INDI
+1 NAME Helena /Rozień/
+1 SEX F
+1 BIRT
+2 DATE 28 APR 1890
+2 PLAC Bolechowice, dom 104
+1 CHR
+2 DATE 30 APR 1890
+2 PLAC Bolechowice
+1 FAMC @F0012@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 13
+0 @I0042@ INDI
+1 NAME Adalbertus /Rozień/
+1 SEX M
+1 OCCU agricola
+1 RESI
+2 PLAC Kobylany
+1 NOTE Filius Joannis Rozien et Mariae natae Chochotek
+1 FAMS @F0012@
+0 @I0043@ INDI
+1 NAME Francisca /Rumiński/
+1 SEX F
+1 NOTE Filia Josephi Ruminski et Reginae natae Sidor
+1 FAMS @F0012@
+0 @F0012@ FAM
+1 HUSB @I0042@
+1 WIFE @I0043@
+1 CHIL @I0041@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0044@ INDI
+1 NAME Petrus /Szaruka/
+1 SEX M
+1 BIRT
+2 DATE 26 MAY 1890
+2 PLAC Bolechowice, dom 109
+1 CHR
+2 DATE 28 MAY 1890
+2 PLAC Bolechowice
+2 NOTE a Sp. - baptismus in periculo sub conditione, incertum
+1 FAMC @F0013@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 14
+0 @I0045@ INDI
+1 NAME Paulus /Szaruka/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Josephi Szaruka et Magdalenae natae Mikula
+1 FAMS @F0013@
+0 @I0046@ INDI
+1 NAME Marianna /Bień/
+1 SEX F
+1 NOTE Filia Stanislai Bien et Mariannae natae Nedelka
+1 FAMS @F0013@
+0 @F0013@ FAM
+1 HUSB @I0045@
+1 WIFE @I0046@
+1 CHIL @I0044@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0047@ INDI
+1 NAME Franciscus /Szwarek/
+1 SEX M
+1 BIRT
+2 DATE 1 JUN 1890
+2 PLAC Bolechowice, dom 92
+1 CHR
+2 DATE 2 JUN 1890
+2 PLAC Bolechowice
+1 FAMC @F0014@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 15
+0 @I0048@ INDI
+1 NAME Valentinus /Szwarek/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Adalberti Szwarek et Mariannae natae Kowalik
+1 FAMS @F0014@
+0 @I0049@ INDI
+1 NAME Marianna /Wegiel/
+1 SEX F
+1 NOTE Filia Joannis Wegiel et Mariannae natae Bigaj, ex Wieckowice
+1 FAMS @F0014@
+0 @F0014@ FAM
+1 HUSB @I0048@
+1 WIFE @I0049@
+1 CHIL @I0047@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0050@ INDI
+1 NAME Ladislaus /Lurek/
+1 SEX M
+1 BIRT
+2 DATE 3 JUN 1890
+2 PLAC Bolechowice, dom 112
+1 CHR
+2 DATE 4 JUN 1890
+2 PLAC Bolechowice
+1 FAMC @F0015@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 16
+0 @I0051@ INDI
+1 NAME Michael /Lurek/
+1 SEX M
+1 OCCU operarius
+1 RESI
+2 PLAC Zelkow
+1 NOTE Filius Petri Lurek et Mariannae natae Dreler
+1 FAMS @F0015@
+0 @I0052@ INDI
+1 NAME Marianna /Sendor/
+1 SEX F
+1 NOTE Filia Joannis Sendor et Reginae natae Grzotek
+1 FAMS @F0015@
+0 @F0015@ FAM
+1 HUSB @I0051@
+1 WIFE @I0052@
+1 CHIL @I0050@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0053@ INDI
+1 NAME Florentina Ludovica /Szelenik/
+1 SEX F
+1 BIRT
+2 DATE 11 JUL 1890
+2 PLAC Bolechowice, dom 39
+1 CHR
+2 DATE 12 JUL 1890
+2 PLAC Bolechowice
+1 FAMC @F0016@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 17
+0 @I0054@ INDI
+1 NAME Franciscus /Szelenik/
+1 SEX M
+1 OCCU sutor
+1 NOTE Filius Francisci Szelenik et Mariannae natae Strugala
+1 FAMS @F0016@
+0 @I0055@ INDI
+1 NAME Francisca /Wojtanek/
+1 SEX F
+1 RESI
+2 PLAC Brzezie
+1 NOTE Filia Adalberti Wojtanek et Magdalenae natae Wegiel
+1 FAMS @F0016@
+0 @F0016@ FAM
+1 HUSB @I0054@
+1 WIFE @I0055@
+1 CHIL @I0053@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0056@ INDI
+1 NAME Ludovicus /Kowalik/
+1 SEX M
+1 BIRT
+2 DATE 16 JUL 1890
+2 PLAC Bolechowice, dom 97
+1 CHR
+2 DATE 18 JUL 1890
+2 PLAC Bolechowice
+1 FAMC @F0017@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 18
+0 @I0057@ INDI
+1 NAME Petrus /Kowalik/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Francisci Kowalik et Mariannae natae Chubata
+1 FAMS @F0017@
+0 @I0058@ INDI
+1 NAME Francisca /Kowaliński/
+1 SEX F
+1 NOTE Filia Joannis Kowalinski et Mariannae natae Godak
+1 FAMS @F0017@
+0 @F0017@ FAM
+1 HUSB @I0057@
+1 WIFE @I0058@
+1 CHIL @I0056@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0059@ INDI
+1 NAME Cyprianus /Kubata/
+1 SEX M
+1 BIRT
+2 DATE 15 AUG 1890
+2 PLAC Bolechowice, dom 50
+1 CHR
+2 DATE 16 AUG 1890
+2 PLAC Bolechowice
+1 FAMC @F0018@
+1 NOTE Annotatio sec XX Bolechowice 47/62 actus matrimonii civilis 1962
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 19
+0 @I0060@ INDI
+1 NAME Blasius /Kubata/
+1 SEX M
+1 OCCU agricola
+1 DEAT Y
+2 NOTE Defunctus ante baptismum filii
+1 FAMS @F0018@
+0 @I0061@ INDI
+1 NAME Magdalena /Ambata/
+1 SEX F
+1 NOTE Vidua post Blasium Kubata, filia Andreae Kowalik et Mariannae natae Wegiel
+1 FAMS @F0018@
+0 @F0018@ FAM
+1 HUSB @I0060@
+1 WIFE @I0061@
+1 CHIL @I0059@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi, vir defunctus ante baptismum filii
+0 @I0062@ INDI
+1 NAME Franciscus /Struka/
+1 SEX M
+1 BIRT
+2 DATE 23 AUG 1890
+2 PLAC Bolechowice, dom 99
+1 CHR
+2 DATE 23 AUG 1890
+2 PLAC Bolechowice
+1 FAMC @F0019@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 20
+0 @I0063@ INDI
+1 NAME Jacobus /Struka/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Blasii Struka et Franciscae natae Saczka
+1 FAMS @F0019@
+0 @I0064@ INDI
+1 NAME Francisca /Glaracki/
+1 SEX F
+1 NOTE Filia Andreae Glaracki et Margarithae natae Strugalski
+1 FAMS @F0019@
+0 @F0019@ FAM
+1 HUSB @I0063@
+1 WIFE @I0064@
+1 CHIL @I0062@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0065@ INDI
+1 NAME Michael /Kowalik/
+1 SEX M
+1 BIRT
+2 DATE 28 AUG 1890
+2 PLAC Bolechowice, dom 27
+1 CHR
+2 DATE 29 AUG 1890
+2 PLAC Bolechowice
+1 FAMC @F0020@
+1 NOTE Annotatio marginalis in 26/11 89 lectio incerta
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 21
+0 @I0066@ INDI
+1 NAME Martinus /Kowalik/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Andreae Kowalik et Mariannae natae Wegiel
+1 FAMS @F0020@
+0 @I0067@ INDI
+1 NAME Julianna /Stryjak/
+1 SEX F
+1 RESI
+2 PLAC Wieckowice
+1 NOTE Filia Adalberti Stryjak et Catharinae natae Brumala
+1 FAMS @F0020@
+0 @F0020@ FAM
+1 HUSB @I0066@
+1 WIFE @I0067@
+1 CHIL @I0065@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0068@ INDI
+1 NAME Michael /Mazur/
+1 SEX M
+1 BIRT
+2 DATE 29 SEP 1890
+2 PLAC Bolechowice, dom 53
+1 CHR
+2 DATE 29 SEP 1890
+2 PLAC Bolechowice
+1 FAMC @F0021@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 22
+0 @I0069@ INDI
+1 NAME Joannes /Mazur/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Clementis Mazur et Helenae natae Prusia
+1 FAMS @F0021@
+0 @I0070@ INDI
+1 NAME Regina /Rumian/
+1 SEX F
+1 NOTE Filia Josephi Rumian et Reginae natae Szkarowicz
+1 FAMS @F0021@
+0 @F0021@ FAM
+1 HUSB @I0069@
+1 WIFE @I0070@
+1 CHIL @I0068@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0071@ INDI
+1 NAME Stephania /Wojciech/
+1 SEX F
+1 BIRT
+2 DATE 5 OCT 1890
+2 PLAC Bolechowice, dom 7
+1 CHR
+2 DATE 7 OCT 1890
+2 PLAC Bolechowice
+1 FAMC @F0022@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 23
+0 @I0072@ INDI
+1 NAME Josephus /Wojciech/
+1 SEX M
+1 OCCU scriptor villanus
+1 NOTE Filius Adalberti Wojciech et Magdalenae natae Wojciech, ex Brzezie
+1 FAMS @F0022@
+0 @I0073@ INDI
+1 NAME Sophia /Woriniak/
+1 SEX F
+1 NOTE Filia Joannis Woriniak et Carolinae natae Jochu
+1 FAMS @F0022@
+0 @F0022@ FAM
+1 HUSB @I0072@
+1 WIFE @I0073@
+1 CHIL @I0071@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0074@ INDI
+1 NAME Carolus /Kowalik/
+1 SEX M
+1 BIRT
+2 DATE 20 OCT 1890
+2 PLAC Bolechowice, dom 23
+1 CHR
+2 DATE 22 OCT 1890
+2 PLAC Bolechowice
+1 FAMC @F0023@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 24
+0 @I0075@ INDI
+1 NAME Joannes /Kowalik/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Francisci Kowalik et Mariannae natae Hubata
+1 FAMS @F0023@
+0 @I0076@ INDI
+1 NAME Sophia /Kruk/
+1 SEX F
+1 NOTE Filia Jacobi Kruk et Magdalenae natae Sendor
+1 FAMS @F0023@
+0 @F0023@ FAM
+1 HUSB @I0075@
+1 WIFE @I0076@
+1 CHIL @I0074@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0077@ INDI
+1 NAME Catharina /Kowalik/
+1 SEX F
+1 BIRT
+2 DATE 20 OCT 1890
+2 PLAC Bolechowice, dom 11
+1 CHR
+2 DATE 25 OCT 1890
+2 PLAC Bolechowice
+1 DEAT
+2 DATE 29 OCT 1890
+2 PLAC Bolechowice
+1 FAMC @F0024@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 25
+0 @I0078@ INDI
+1 NAME Joannes /Kowalik/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Hyacinthi Kowalik et Reginae natae Bielak
+1 FAMS @F0024@
+0 @I0079@ INDI
+1 NAME Sophia /Sendor/
+1 SEX F
+1 NOTE Filia Joannis Sendor et Agnetis natae Mikus
+1 FAMS @F0024@
+0 @F0024@ FAM
+1 HUSB @I0078@
+1 WIFE @I0079@
+1 CHIL @I0077@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0080@ INDI
+1 NAME Martinus /Prusia/
+1 SEX M
+1 BIRT
+2 DATE 30 OCT 1890
+2 PLAC Bolechowice, dom 66
+1 CHR
+2 DATE 31 OCT 1890
+2 PLAC Bolechowice
+1 FAMC @F0025@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 26
+0 @I0081@ INDI
+1 NAME Adalbertus /Prusia/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Hyacinthi Prusia et Mariannae natae Wawarska
+1 FAMS @F0025@
+0 @I0082@ INDI
+1 NAME Marianna /Sendor/
+1 SEX F
+1 NOTE Filia Joannis Sendor et Annae natae Drimba
+1 FAMS @F0025@
+0 @F0025@ FAM
+1 HUSB @I0081@
+1 WIFE @I0082@
+1 CHIL @I0080@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0083@ INDI
+1 NAME Andreas /Kowalik/
+1 SEX M
+1 BIRT
+2 DATE 18 NOV 1890
+2 PLAC Bolechowice, dom 27
+1 CHR
+2 DATE 19 NOV 1890
+2 PLAC Bolechowice
+1 FAMC @F0026@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 27
+0 @I0084@ INDI
+1 NAME Casimirus /Kowalik/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Andreae Kowalik et Catharinae natae Wawarska
+1 FAMS @F0026@
+0 @I0085@ INDI
+1 NAME Catharina /Kowalik/
+1 SEX F
+1 NOTE Filia Andreae Kowalik et Catharinae natae Pyska
+1 FAMS @F0026@
+0 @F0026@ FAM
+1 HUSB @I0084@
+1 WIFE @I0085@
+1 CHIL @I0083@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0086@ INDI
+1 NAME Victoria /Berniak/
+1 SEX F
+1 BIRT
+2 DATE 25 NOV 1890
+2 PLAC Bolechowice, dom 3
+1 CHR
+2 DATE 26 NOV 1890
+2 PLAC Bolechowice
+1 NOTE Illegitima, pater non designatus
+1 FAMC @F0027@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 28
+0 @I0087@ INDI
+1 NAME Marianna /Berniak/
+1 SEX F
+1 OCCU serva
+1 NOTE Filia Joannis Berniak et Franciscae natae Lominska
+1 FAMS @F0027@
+0 @F0027@ FAM
+1 WIFE @I0087@
+1 CHIL @I0086@
+1 NOTE Partus illegitimus, sine matrimonio
+0 @I0088@ INDI
+1 NAME Stephanus /Wazik/
+1 SEX M
+1 BIRT
+2 DATE 5 DEC 1890
+2 PLAC Bolechowice, dom 65
+1 CHR
+2 DATE 5 DEC 1890
+2 PLAC Bolechowice
+1 MARR
+2 DATE 19 JAN 1963
+2 PLAC USC Krakow, akt nr 17/63
+2 NOTE Annotatio civilis posterior
+1 FAMC @F0028@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 29
+0 @I0089@ INDI
+1 NAME Franciscus /Wazik/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Josephi Wazik et Rosaliae natae Mikus
+1 FAMS @F0028@
+0 @I0090@ INDI
+1 NAME Francisca /Rumian/
+1 SEX F
+1 NOTE Filia Casimiri Rumian et Catharinae natae Scelemin
+1 FAMS @F0028@
+0 @F0028@ FAM
+1 HUSB @I0089@
+1 WIFE @I0090@
+1 CHIL @I0088@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0091@ INDI
+1 NAME Nicolaus /Sendor/
+1 SEX M
+1 BIRT
+2 DATE 5 DEC 1890
+2 PLAC Bolechowice, dom 17
+1 CHR
+2 DATE 6 DEC 1890
+2 PLAC Bolechowice
+1 MARR
+2 DATE 25 JUL 1963
+2 PLAC USC Zabierzow, akt nr 47/63
+2 NOTE Annotatio civilis posterior
+1 FAMC @F0029@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 30
+0 @I0092@ INDI
+1 NAME Joannes /Sendor/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Joannis Sendor et Reginae natae Wotek
+1 FAMS @F0029@
+0 @I0093@ INDI
+1 NAME Regina /Lipka/
+1 SEX F
+1 RESI
+2 PLAC Wieckowice
+1 NOTE Filia Petri Lipka et Mariannae natae Scelemin
+1 FAMS @F0029@
+0 @F0029@ FAM
+1 HUSB @I0092@
+1 WIFE @I0093@
+1 CHIL @I0091@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0094@ INDI
+1 NAME Puer /Baran/
+1 SEX M
+1 BIRT
+2 DATE 27 DEC 1890
+2 PLAC Bolechowice, dom 42
+2 NOTE Inanimiter natus puer, natus mortuus
+1 DEAT
+2 DATE 27 DEC 1890
+2 PLAC Bolechowice
+1 FAMC @F0030@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 31
+0 @I0095@ INDI
+1 NAME Joannes /Baran/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Joannis Baran et Catharinae natae Sedrowska
+1 FAMS @F0030@
+0 @I0096@ INDI
+1 NAME Catharina /Sędrowski/
+1 SEX F
+1 NOTE Filia Andreae Sedrowski et Magdalenae natae Wotek
+1 FAMS @F0030@
+0 @F0030@ FAM
+1 HUSB @I0095@
+1 WIFE @I0096@
+1 CHIL @I0094@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0097@ INDI
+1 NAME Gasparus /Rozera/
+1 SEX M
+1 BIRT
+2 DATE 30 DEC 1890
+2 PLAC Bolechowice, dom 36
+1 CHR
+2 DATE 31 DEC 1890
+2 PLAC Bolechowice
+1 FAMC @F0031@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 32
+0 @I0098@ INDI
+1 NAME Adalbertus /Rozera/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Antonii Rozera et Mariannae natae Brz lectio incerta
+1 FAMS @F0031@
+0 @I0099@ INDI
+1 NAME Catharina /Rumian/
+1 SEX F
+1 NOTE Filia Casimiri Rumian et Catharinae natae Scelemin
+1 FAMS @F0031@
+0 @F0031@ FAM
+1 HUSB @I0098@
+1 WIFE @I0099@
+1 CHIL @I0097@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0100@ INDI
+1 NAME Agnes /Sędrowski/
+1 SEX F
+1 BIRT
+2 DATE 31 DEC 1890
+2 PLAC Bolechowice, dom 41
+1 CHR
+2 DATE 2 JAN 1891
+2 PLAC Bolechowice
+1 FAMC @F0032@
+1 SOUR @S1@
+2 PAGE Villa Bolechowice 1890, nr. 33
+0 @I0101@ INDI
+1 NAME Adalbertus /Sędrowski/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Josephi Sedrowski et Annae natae Kowalik
+1 FAMS @F0032@
+0 @I0102@ INDI
+1 NAME Catharina /Puchała/
+1 SEX F
+1 NOTE Filia Thomae Puchala et Mariannae natae Slodolak
+1 FAMS @F0032@
+0 @F0032@ FAM
+1 HUSB @I0101@
+1 WIFE @I0102@
+1 CHIL @I0100@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0200@ INDI
+1 NAME Julianus /Wojciech/
+1 SEX M
+1 BIRT
+2 DATE 2 FEB 1890
+2 PLAC Brzezie, dom 12
+1 CHR
+2 DATE 5 FEB 1890
+2 PLAC Brzezie
+1 FAMC @F0100@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 1
+0 @I0201@ INDI
+1 NAME Vincentius /Wojciech/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Joannis Wojciech et Mariannae natae Dmoch
+1 FAMS @F0100@
+0 @I0202@ INDI
+1 NAME Stephania /Brunk/
+1 SEX F
+1 NOTE Filia Pauli et Mariannae natae Brunk
+1 FAMS @F0100@
+0 @F0100@ FAM
+1 HUSB @I0201@
+1 WIFE @I0202@
+1 CHIL @I0200@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0203@ INDI
+1 NAME Julianus /Wojciech/
+1 SEX M
+1 BIRT
+2 DATE 11 FEB 1890
+2 PLAC Brzezie, dom 7
+1 CHR
+2 DATE 13 FEB 1890
+2 PLAC Brzezie
+1 DEAT
+2 DATE 18 JUN 1890
+2 PLAC Brzezie
+1 NOTE Illegitimus
+1 FAMC @F0101@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 2
+0 @I0204@ INDI
+1 NAME Brzewska /Wojciech/
+1 SEX F
+1 NOTE Filia Joannis Wojciech et Mariannae natae Sabuda, lectio nominis incerta
+1 FAMS @F0101@
+0 @F0101@ FAM
+1 WIFE @I0204@
+1 CHIL @I0203@
+1 NOTE Partus illegitimus, sine matrimonio
+0 @I0205@ INDI
+1 NAME Josephus /Sobicki/
+1 SEX M
+1 BIRT
+2 DATE 15 MAR 1890
+2 PLAC Brzezie, dom 21
+1 CHR
+2 DATE 17 MAR 1890
+2 PLAC Brzezie
+1 FAMC @F0102@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 3
+0 @I0206@ INDI
+1 NAME Joannes /Sobicki/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Joannis Sobicki et Mariannae natae Kamienski
+1 FAMS @F0102@
+0 @I0207@ INDI
+1 NAME Agnes /Wojciech/
+1 SEX F
+1 NOTE Filia Joannis Wojciech et Mariannae natae Dmoch
+1 FAMS @F0102@
+0 @F0102@ FAM
+1 HUSB @I0206@
+1 WIFE @I0207@
+1 CHIL @I0205@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0208@ INDI
+1 NAME Vincentius /Witka/
+1 SEX M
+1 BIRT
+2 DATE 21 MAR 1890
+2 PLAC Brzezie, dom 10
+1 CHR
+2 DATE 22 MAR 1890
+2 PLAC Brzezie
+1 FAMC @F0103@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 4
+0 @I0209@ INDI
+1 NAME Josephus /Witka/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Joannis Witka et Mariannae natae Wojciech
+1 FAMS @F0103@
+0 @I0210@ INDI
+1 NAME Salomea /Brzewski/
+1 SEX F
+1 NOTE Filia Joannis Brzewski et Mariannae natae Dmoch
+1 FAMS @F0103@
+0 @F0103@ FAM
+1 HUSB @I0209@
+1 WIFE @I0210@
+1 CHIL @I0208@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0211@ INDI
+1 NAME Antonius /Dmoch/
+1 SEX M
+1 BIRT
+2 DATE 4 JUN 1890
+2 PLAC Brzezie, dom 43
+1 CHR
+2 DATE 5 JUN 1890
+2 PLAC Brzezie
+1 NOTE Annotationes posteriores Lucas dictus 6.10.1971 usque 2.10.1972, Brzezie 11.1953, Brzezie 12.11.1953
+1 FAMC @F0104@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 5
+0 @I0212@ INDI
+1 NAME Franciscus /Dmoch/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Adalberti Dmoch et Catharinae natae Krapka
+1 FAMS @F0104@
+0 @I0213@ INDI
+1 NAME Magdalena /Wojcik/
+1 SEX F
+1 NOTE Filia Adalberti Wojcik et Mariannae natae Brzewska
+1 FAMS @F0104@
+0 @F0104@ FAM
+1 HUSB @I0212@
+1 WIFE @I0213@
+1 CHIL @I0211@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0214@ INDI
+1 NAME Anna /Wojciech/
+1 SEX F
+1 BIRT
+2 DATE 7 JUN 1890
+2 PLAC Brzezie, dom 7
+1 CHR
+2 DATE 7 JUN 1890
+2 PLAC Brzezie
+1 DEAT
+2 DATE 27 JUN 1890
+2 PLAC Brzezie
+1 FAMC @F0105@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 6
+0 @I0215@ INDI
+1 NAME Andreas /Wojciech/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Adalberti Wojciech et Mariannae natae Wojcik
+1 FAMS @F0105@
+0 @I0216@ INDI
+1 NAME Magdalena /Wojciech/
+1 SEX F
+1 NOTE Filia Vincentii Wojciech et Salomeae natae Stefanowa
+1 FAMS @F0105@
+0 @F0105@ FAM
+1 HUSB @I0215@
+1 WIFE @I0216@
+1 CHIL @I0214@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0217@ INDI
+1 NAME Anna /Brzewski/
+1 SEX F
+1 BIRT
+2 DATE 20 JUL 1890
+2 PLAC Brzezie, dom 43
+1 CHR
+2 DATE 23 JUL 1890
+2 PLAC Brzezie
+1 FAMC @F0106@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 7
+0 @I0218@ INDI
+1 NAME Stanislaus /Brzewski/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Vincentii Brzewski et Catharinae natae Wojcik
+1 FAMS @F0106@
+0 @I0219@ INDI
+1 NAME Marianna /Maurer/
+1 SEX F
+1 NOTE Filia Joannis Maurer et Catharinae natae Dmoch
+1 FAMS @F0106@
+0 @F0106@ FAM
+1 HUSB @I0218@
+1 WIFE @I0219@
+1 CHIL @I0217@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0220@ INDI
+1 NAME Anna /Brzewski/
+1 SEX F
+1 BIRT
+2 DATE 24 JUL 1890
+2 PLAC Brzezie, dom 12
+1 CHR
+2 DATE 26 JUL 1890
+2 PLAC Brzezie
+1 NOTE Illegitima
+1 FAMC @F0107@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 8
+0 @I0221@ INDI
+1 NAME Regina /Brzewski/
+1 SEX F
+1 NOTE Filia Joannis Brzewski et Mariannae natae Dmoch
+1 FAMS @F0107@
+0 @F0107@ FAM
+1 WIFE @I0221@
+1 CHIL @I0220@
+1 NOTE Partus illegitimus, sine matrimonio
+0 @I0222@ INDI
+1 NAME Ludovicus /Brzewski/
+1 SEX M
+1 BIRT
+2 DATE 1 AUG 1890
+2 PLAC Brzezie, dom 14
+1 CHR
+2 DATE 2 AUG 1890
+2 PLAC Brzezie
+1 FAMC @F0108@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 9
+0 @I0223@ INDI
+1 NAME Stanislaus /Brzewski/
+1 SEX M
+1 NOTE Filius Joannis Brzewski et Mariannae natae Dmoch
+1 FAMS @F0108@
+0 @I0224@ INDI
+1 NAME Agnes /Dmoch/
+1 SEX F
+1 NOTE Filia Joannis Dmoch et Mariannae natae Brzewska
+1 FAMS @F0108@
+0 @F0108@ FAM
+1 HUSB @I0223@
+1 WIFE @I0224@
+1 CHIL @I0222@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0225@ INDI
+1 NAME Michael /Brzewski/
+1 SEX M
+1 BIRT
+2 DATE 3 SEP 1890
+2 PLAC Brzezie, dom 6
+1 CHR
+2 DATE 4 SEP 1890
+2 PLAC Brzezie
+1 FAMC @F0109@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 10
+0 @I0226@ INDI
+1 NAME Josephus /Brzewski/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Joannis Brzewski et Catharinae natae Brzewska
+1 FAMS @F0109@
+0 @I0227@ INDI
+1 NAME Catharina /Brzewski/
+1 SEX F
+1 NOTE Filia Joannis Brzewski et Mariannae natae Dmoch
+1 FAMS @F0109@
+0 @F0109@ FAM
+1 HUSB @I0226@
+1 WIFE @I0227@
+1 CHIL @I0225@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0228@ INDI
+1 NAME Nicolaus /Czajowski/
+1 SEX M
+1 BIRT
+2 DATE 7 SEP 1890
+2 PLAC Brzezie, dom 19
+1 CHR
+2 DATE 7 SEP 1890
+2 PLAC Brzezie
+1 DEAT
+2 DATE 30 DEC 1890
+2 PLAC Brzezie
+1 FAMC @F0110@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 11
+0 @I0229@ INDI
+1 NAME Paulus /Czajowski/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Joannis Czajowski et Catharinae natae Brzewska
+1 FAMS @F0110@
+0 @I0230@ INDI
+1 NAME Marianna /Wojciech/
+1 SEX F
+1 NOTE Filia Joannis Wojciech et Mariannae natae Sabuda
+1 FAMS @F0110@
+0 @F0110@ FAM
+1 HUSB @I0229@
+1 WIFE @I0230@
+1 CHIL @I0228@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0231@ INDI
+1 NAME Leovigildus /Bielecki/
+1 SEX M
+1 BIRT
+2 DATE 29 SEP 1890
+2 PLAC Brzezie, dom 25
+1 CHR
+2 DATE 29 SEP 1890
+2 PLAC Brzezie
+2 NOTE Lectio nominis Leovigir, verisimiliter Leovigildus
+1 FAMC @F0111@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 12
+0 @I0232@ INDI
+1 NAME Gabriel /Bielecki/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Joannis Bielecki et Mariannae natae Sobarska
+1 FAMS @F0111@
+0 @I0233@ INDI
+1 NAME Maryanna /Bielecki/
+1 SEX F
+1 NOTE Filia Joannis Bielecki et Mariannae natae Podolinska
+1 FAMS @F0111@
+0 @F0111@ FAM
+1 HUSB @I0232@
+1 WIFE @I0233@
+1 CHIL @I0231@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0234@ INDI
+1 NAME Carolus /Zawadziński/
+1 SEX M
+1 BIRT
+2 DATE 26 OCT 1890
+2 PLAC Brzezie, dom 9
+1 CHR
+2 DATE 26 OCT 1890
+2 PLAC Brzezie
+1 FAMC @F0112@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 13
+0 @I0235@ INDI
+1 NAME Adalbertus /Zawadziński/
+1 SEX M
+1 OCCU agricola
+1 RESI
+2 PLAC Bolechowice
+1 NOTE Filius Adalberti Zawadzinski et Catharinae natae Pyrska
+1 FAMS @F0112@
+0 @I0236@ INDI
+1 NAME Marianna /Baran/
+1 SEX F
+1 NOTE Filia Joannis Baran et Catharinae natae Sedmik
+1 FAMS @F0112@
+0 @F0112@ FAM
+1 HUSB @I0235@
+1 WIFE @I0236@
+1 CHIL @I0234@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0237@ INDI
+1 NAME Carolina /Wegiel/
+1 SEX F
+1 BIRT
+2 DATE 2 NOV 1890
+2 PLAC Brzezie, dom 2
+1 CHR
+2 DATE 3 NOV 1890
+2 PLAC Brzezie
+1 NOTE Illegitima, pater non nominatus
+1 FAMC @F0113@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 14
+0 @I0238@ INDI
+1 NAME Marianna /Wegiel/
+1 SEX F
+1 OCCU serva
+1 NOTE Filia Nicolai Wegiel et Josephinae natae Binkowska, ex Kobylany
+1 FAMS @F0113@
+0 @F0113@ FAM
+1 WIFE @I0238@
+1 CHIL @I0237@
+1 NOTE Partus illegitimus, sine matrimonio
+0 @I0239@ INDI
+1 NAME Eva /Konik/
+1 SEX F
+1 BIRT
+2 DATE 2 DEC 1890
+2 PLAC Brzezie, dom 2
+1 CHR
+2 DATE 2 DEC 1890
+2 PLAC Brzezie
+2 NOTE aqua ab obstetrice baptisata, emergency baptism by midwife
+1 DEAT
+2 DATE 2 DEC 1890
+2 PLAC Brzezie
+1 FAMC @F0114@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 15
+0 @I0240@ INDI
+1 NAME Ludovicus /Konik/
+1 SEX M
+1 OCCU servus
+1 RESI
+2 PLAC Cracovia
+1 NOTE Filius Ignatii Konik et Mariannae natae Sonik
+1 FAMS @F0114@
+0 @I0241@ INDI
+1 NAME Marianna /Sobarski/
+1 SEX F
+1 NOTE Filia Joannis Sobarski et Mariannae natae Berest, ex Wierzchowice
+1 FAMS @F0114@
+0 @F0114@ FAM
+1 HUSB @I0240@
+1 WIFE @I0241@
+1 CHIL @I0239@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0242@ INDI
+1 NAME Adam /Pilala/
+1 SEX M
+1 BIRT
+2 DATE 10 DEC 1890
+2 PLAC Brzezie, dom 2
+1 CHR
+2 DATE 12 DEC 1890
+2 PLAC Brzezie
+1 NOTE Illegitimus
+1 FAMC @F0115@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 16
+0 @I0243@ INDI
+1 NAME Josephus /Nowak/
+1 SEX M
+1 OCCU servus
+1 NOTE Filius illegitimus Cunegundis Nowak, servus Cracoviae
+1 FAMS @F0115@
+0 @I0244@ INDI
+1 NAME Anna /Pilala/
+1 SEX F
+1 NOTE Filia Stanislai Pilala et Annae natae Labinska, ex Krupkowie
+1 FAMS @F0115@
+0 @F0115@ FAM
+1 HUSB @I0243@
+1 WIFE @I0244@
+1 CHIL @I0242@
+1 NOTE Partus illegitimus, sine matrimonio
+0 @I0245@ INDI
+1 NAME Silvester /Marusz/
+1 SEX M
+1 BIRT
+2 DATE 26 DEC 1890
+2 PLAC Brzezie, dom 36
+1 CHR
+2 DATE 27 DEC 1890
+2 PLAC Brzezie
+1 FAMC @F0116@
+1 SOUR @S1@
+2 PAGE Villa Brzezie 1890, nr. 17
+0 @I0246@ INDI
+1 NAME Joannes /Marusz/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Josephi Marusz et Helenae natae Piel
+1 FAMS @F0116@
+0 @I0247@ INDI
+1 NAME Margareta /Pacyna/
+1 SEX F
+1 NOTE Filia illegitima Francisci Pacyna
+1 FAMS @F0116@
+0 @F0116@ FAM
+1 HUSB @I0246@
+1 WIFE @I0247@
+1 CHIL @I0245@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0300@ INDI
+1 NAME Josephus /Smoczyk/
+1 SEX M
+1 BIRT
+2 DATE 10 MAR 1890
+2 PLAC Karniowice, dom 21
+1 CHR
+2 DATE 11 MAR 1890
+2 PLAC Karniowice
+1 DEAT
+2 DATE 18 MAR 1890
+2 PLAC Karniowice
+1 FAMC @F0200@
+1 SOUR @S1@
+2 PAGE Villa Karniowice 1890, nr. 1
+0 @I0301@ INDI
+1 NAME Thomas /Smoczyk/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Joannis Smoczyk et Hedwigis natae Marcek
+1 FAMS @F0200@
+0 @I0302@ INDI
+1 NAME Marianna /Galon/
+1 SEX F
+1 NOTE Filia Joannis Galon et Mariannae natae Wolek
+1 FAMS @F0200@
+0 @F0200@ FAM
+1 HUSB @I0301@
+1 WIFE @I0302@
+1 CHIL @I0300@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0303@ INDI
+1 NAME Magdalena /Ruman/
+1 SEX F
+1 BIRT
+2 DATE 30 JUN 1890
+2 PLAC Karniowice, dom 9
+1 CHR
+2 DATE 1 JUL 1890
+2 PLAC Karniowice
+1 FAMC @F0201@
+1 SOUR @S1@
+2 PAGE Villa Karniowice 1890, nr. 2
+0 @I0304@ INDI
+1 NAME Adalbertus /Ruman/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Blasii Ruman et Hedwigis natae Kaminska
+1 FAMS @F0201@
+0 @I0305@ INDI
+1 NAME Marianna /Smoczyk/
+1 SEX F
+1 NOTE Filia Adalberti Smoczyk et Mariannae natae Wolek
+1 FAMS @F0201@
+0 @F0201@ FAM
+1 HUSB @I0304@
+1 WIFE @I0305@
+1 CHIL @I0303@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0306@ INDI
+1 NAME Casimirus /Jaron/
+1 SEX M
+1 BIRT
+2 DATE 26 AUG 1890
+2 PLAC Karniowice, dom 5
+1 CHR
+2 DATE 27 AUG 1890
+2 PLAC Karniowice
+2 NOTE Gemelli
+1 FAMC @F0202@
+1 SOUR @S1@
+2 PAGE Villa Karniowice 1890, nr. 3
+0 @I0307@ INDI
+1 NAME Petrus /Jaron/
+1 SEX M
+1 BIRT
+2 DATE 26 AUG 1890
+2 PLAC Karniowice, dom 5
+1 CHR
+2 DATE 27 AUG 1890
+2 PLAC Karniowice
+2 NOTE E sola aqua ab obstetrice baptisatus, emergency baptism by midwife
+1 DEAT
+2 DATE 28 AUG 1890
+2 PLAC Karniowice
+1 FAMC @F0202@
+1 SOUR @S1@
+2 PAGE Villa Karniowice 1890, nr. 4
+0 @I0308@ INDI
+1 NAME Thomas /Jaron/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Pauli Jaron et Agnetis natae Patka, ex Brzozinka
+1 FAMS @F0202@
+0 @I0309@ INDI
+1 NAME Marianna /Wolek/
+1 SEX F
+1 NOTE Filia Josephi Wolek et Mariannae natae Broka
+1 FAMS @F0202@
+0 @F0202@ FAM
+1 HUSB @I0308@
+1 WIFE @I0309@
+1 CHIL @I0306@
+1 CHIL @I0307@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0400@ INDI
+1 NAME Blasius /Wierzbicki/
+1 SEX M
+1 BIRT
+2 DATE 17 JAN 1890
+2 PLAC Kobylany, dom 15
+1 CHR
+2 DATE 18 JAN 1890
+2 PLAC Kobylany
+1 FAMC @F0300@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 1
+0 @I0401@ INDI
+1 NAME Thomas /Wierzbicki/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Michaelis Wierzbicki et Evae natae Ziembowska
+1 FAMS @F0300@
+0 @I0402@ INDI
+1 NAME Maryanna /Wierzbicki/
+1 SEX F
+1 NOTE Filiationis lectio ex OCR confusa
+1 FAMS @F0300@
+0 @F0300@ FAM
+1 HUSB @I0401@
+1 WIFE @I0402@
+1 CHIL @I0400@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0403@ INDI
+1 NAME Valentinus /Wierzbicki/
+1 SEX M
+1 BIRT
+2 DATE 8 FEB 1890
+2 PLAC Kobylany, dom 59
+1 CHR
+2 DATE 12 FEB 1890
+2 PLAC Kobylany
+1 DEAT
+2 DATE 15 FEB 1890
+2 PLAC Kobylany
+1 FAMC @F0301@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 2
+0 @I0404@ INDI
+1 NAME Franciscus /Wierzbicki/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Michaelis Mathaei Wierzbicki et Franciscae natae Durek
+1 FAMS @F0301@
+0 @I0405@ INDI
+1 NAME Marianna /Wierzbicki/
+1 SEX F
+1 FAMS @F0301@
+0 @F0301@ FAM
+1 HUSB @I0404@
+1 WIFE @I0405@
+1 CHIL @I0403@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0406@ INDI
+1 NAME Francisca /Korbel/
+1 SEX F
+1 BIRT
+2 DATE 14 FEB 1890
+2 PLAC Kobylany, dom 53
+1 CHR
+2 DATE 17 FEB 1890
+2 PLAC Kobylany
+1 MARR
+2 DATE 4 MAY 1966
+2 PLAC USC Lublin, akt nr 24/19 32/366
+2 NOTE Coniunx Pelite Bedkowski, lectio incerta
+1 FAMC @F0302@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 3
+0 @I0407@ INDI
+1 NAME Jacobus /Korbel/
+1 SEX M
+1 OCCU laboriosus
+1 NOTE Filius Joannis Korbel et Antoniae natae Strugala
+1 FAMS @F0302@
+0 @I0408@ INDI
+1 NAME Marianna /Brzal/
+1 SEX F
+1 NOTE Filia Joannis Brzal et Mariannae natae Rodura
+1 FAMS @F0302@
+0 @F0302@ FAM
+1 HUSB @I0407@
+1 WIFE @I0408@
+1 CHIL @I0406@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0409@ INDI
+1 NAME Stanislaus /Stypuła/
+1 SEX M
+1 BIRT
+2 DATE 3 MAR 1890
+2 PLAC Kobylany, dom 45
+1 CHR
+2 DATE 4 MAR 1890
+2 PLAC Kobylany
+1 FAMC @F0303@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 4
+0 @I0410@ INDI
+1 NAME Theophilus /Stypuła/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius illegitimus Mariannae Stypula
+1 FAMS @F0303@
+0 @I0411@ INDI
+1 NAME Theresia /Marek/
+1 SEX F
+1 NOTE Filia Adalberti Marek et Catharinae natae Sienkowski
+1 FAMS @F0303@
+0 @F0303@ FAM
+1 HUSB @I0410@
+1 WIFE @I0411@
+1 CHIL @I0409@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0412@ INDI
+1 NAME Franciscus /Blek/
+1 SEX M
+1 BIRT
+2 DATE 10 APR 1890
+2 PLAC Kobylany, dom 65
+1 CHR
+2 DATE 11 APR 1890
+2 PLAC Kobylany
+1 MARR
+2 DATE 11 OCT 1974
+2 PLAC USC Lublin, akt nr 29/58/71
+2 NOTE Annotatio civilis posterior
+1 FAMC @F0304@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 5
+0 @I0413@ INDI
+1 NAME Josephus /Blek/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Josephi Blek et Reginae natae Liska
+1 FAMS @F0304@
+0 @I0414@ INDI
+1 NAME Theresia /Stypuła/
+1 SEX F
+1 NOTE Filia Joannis Stypula et Margarithae natae Babka, ex Pelkow
+1 FAMS @F0304@
+0 @F0304@ FAM
+1 HUSB @I0413@
+1 WIFE @I0414@
+1 CHIL @I0412@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0415@ INDI
+1 NAME Balbina /Stypuła/
+1 SEX F
+1 BIRT
+2 DATE 29 APR 1890
+2 PLAC Kobylany, dom 75
+1 CHR
+2 DATE 30 APR 1890
+2 PLAC Kobylany
+1 DEAT
+2 DATE 3 MAY 1890
+2 PLAC Kobylany
+1 FAMC @F0305@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 6
+0 @I0416@ INDI
+1 NAME Jacobus /Stypuła/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Stanislai Stypula et Mariannae natae Klemens
+1 FAMS @F0305@
+0 @I0417@ INDI
+1 NAME Catharina /Stypuła/
+1 SEX F
+1 NOTE Filia Joannis Stypula et Mariannae natae Wolek
+1 FAMS @F0305@
+0 @F0305@ FAM
+1 HUSB @I0416@
+1 WIFE @I0417@
+1 CHIL @I0415@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0418@ INDI
+1 NAME Vincentius /Marek/
+1 SEX M
+1 BIRT
+2 DATE 1 MAY 1890
+2 PLAC Kobylany, dom 97
+1 CHR
+2 DATE 3 MAY 1890
+2 PLAC Kobylany
+1 FAMC @F0306@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 7
+0 @I0419@ INDI
+1 NAME Joannes /Marek/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Josephi Marek et Mariannae natae Wolek
+1 FAMS @F0306@
+0 @I0420@ INDI
+1 NAME Marianna /Faron/
+1 SEX F
+1 NOTE Filia Adalberti Faron et Euphemiae natae Dziadek, ex Pelkow
+1 FAMS @F0306@
+0 @F0306@ FAM
+1 HUSB @I0419@
+1 WIFE @I0420@
+1 CHIL @I0418@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0421@ INDI
+1 NAME Theophila /Borzera/
+1 SEX F
+1 BIRT
+2 DATE 22 MAY 1890
+2 PLAC Kobylany, dom 12
+1 CHR
+2 DATE 23 MAY 1890
+2 PLAC Kobylany
+1 FAMC @F0307@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 8
+0 @I0422@ INDI
+1 NAME Andreas /Borzera/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Joannis Borzera et Reginae natae Pachata
+1 FAMS @F0307@
+0 @I0423@ INDI
+1 NAME Marianna /Bankata/
+1 SEX F
+1 NOTE Filia Joannis Bankata et Mariannae natae Kapslan
+1 FAMS @F0307@
+0 @F0307@ FAM
+1 HUSB @I0422@
+1 WIFE @I0423@
+1 CHIL @I0421@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0424@ INDI
+1 NAME Puer /Brzozkiewicz/
+1 SEX M
+1 BIRT
+2 DATE 18 JUN 1890
+2 PLAC Kobylany, dom 24
+2 NOTE Inanimiter natus puer, natus mortuus, in alvum partus
+1 DEAT
+2 DATE 18 JUN 1890
+2 PLAC Kobylany
+1 FAMC @F0308@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 9
+0 @I0425@ INDI
+1 NAME Petrus /Brzozkiewicz/
+1 SEX M
+1 OCCU operarius
+1 RESI
+2 PLAC Borzinkow
+1 FAMS @F0308@
+0 @I0426@ INDI
+1 NAME Salomea /Brzozkiewicz/
+1 SEX F
+1 NOTE Filia Theresiae natae Brzozkiewicz, uxor Petri Brzozkiewicz
+1 FAMS @F0308@
+0 @F0308@ FAM
+1 HUSB @I0425@
+1 WIFE @I0426@
+1 CHIL @I0424@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0427@ INDI
+1 NAME Margaritha /Basker/
+1 SEX F
+1 BIRT
+2 DATE 7 JUL 1890
+2 PLAC Kobylany, dom 82
+1 CHR
+2 DATE 10 JUL 1890
+2 PLAC Kobylany
+1 FAMC @F0309@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 10
+0 @I0428@ INDI
+1 NAME Joannes /Basker/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Joannis Basker et Reginae natae Baran, ex Nielusice
+1 FAMS @F0309@
+0 @I0429@ INDI
+1 NAME Marianna /Świrata/
+1 SEX F
+1 NOTE Filia Joannis Swirata et Margarithae natae Stypula
+1 FAMS @F0309@
+0 @F0309@ FAM
+1 HUSB @I0428@
+1 WIFE @I0429@
+1 CHIL @I0427@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0430@ INDI
+1 NAME Dominicus /Pachata/
+1 SEX M
+1 BIRT
+2 DATE 20 AUG 1890
+2 PLAC Kobylany, dom 39
+1 CHR
+2 DATE 22 AUG 1890
+2 PLAC Kobylany
+1 FAMC @F0310@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 11
+0 @I0431@ INDI
+1 NAME Andreas /Pachata/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Josephi Pachata et Reginae natae Wogiel
+1 FAMS @F0310@
+0 @I0432@ INDI
+1 NAME Theresia /Stypuła/
+1 SEX F
+1 NOTE Filia Joannis Stypula et Margarithae natae Kapslan
+1 FAMS @F0310@
+0 @F0310@ FAM
+1 HUSB @I0431@
+1 WIFE @I0432@
+1 CHIL @I0430@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0433@ INDI
+1 NAME Cunegundis /Bankata/
+1 SEX F
+1 BIRT
+2 DATE 29 OCT 1890
+2 PLAC Kobylany, dom 85
+1 CHR
+2 DATE 30 OCT 1890
+2 PLAC Kobylany
+1 FAMC @F0311@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 12
+0 @I0434@ INDI
+1 NAME Adalbertus /Bankata/
+1 SEX M
+1 OCCU operarius
+1 NOTE Filius Joannis Bankata et Mariannae natae Kapslan
+1 FAMS @F0311@
+0 @I0435@ INDI
+1 NAME Marianna /Wierzbicki/
+1 SEX F
+1 NOTE Filia Adalberti Wierzbicki et Mariannae natae Stypula
+1 FAMS @F0311@
+0 @F0311@ FAM
+1 HUSB @I0434@
+1 WIFE @I0435@
+1 CHIL @I0433@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0436@ INDI
+1 NAME Magdalena /Pachata/
+1 SEX F
+1 BIRT
+2 DATE 30 OCT 1890
+2 PLAC Kobylany, dom 52
+1 CHR
+2 DATE 31 OCT 1890
+2 PLAC Kobylany
+1 FAMC @F0312@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 13
+0 @I0437@ INDI
+1 NAME Adalbertus /Pachata/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Josephi Pachata et Reginae natae Wogiel
+1 FAMS @F0312@
+0 @I0438@ INDI
+1 NAME Marianna /Pachata/
+1 SEX F
+1 NOTE Filia Joannis Pachata et Reginae natae Wogiel
+1 FAMS @F0312@
+0 @F0312@ FAM
+1 HUSB @I0437@
+1 WIFE @I0438@
+1 CHIL @I0436@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 @I0439@ INDI
+1 NAME Carolus /Wogiel/
+1 SEX M
+1 BIRT
+2 DATE 11 NOV 1890
+2 PLAC Kobylany, dom 24
+1 CHR
+2 DATE 14 NOV 1890
+2 PLAC Kobylany
+1 FAMC @F0313@
+1 SOUR @S1@
+2 PAGE Villa Kobylany 1890, nr. 14
+0 @I0440@ INDI
+1 NAME Andreas /Wogiel/
+1 SEX M
+1 OCCU agricola
+1 NOTE Filius Joannis Wogiel et Reginae natae Pachata
+1 FAMS @F0313@
+0 @I0441@ INDI
+1 NAME Regina /Pachata/
+1 SEX F
+1 NOTE Filia Joannis Pachata et Reginae natae Wogiel
+1 FAMS @F0313@
+0 @F0313@ FAM
+1 HUSB @I0440@
+1 WIFE @I0441@
+1 CHIL @I0439@
+1 MARR
+2 TYPE Religious
+2 NOTE Coniuges legitimi
+0 TRLR

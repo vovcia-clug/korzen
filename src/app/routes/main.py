@@ -1338,7 +1338,22 @@ def duplicates():
     except Exception as e:
         logger.error(f"Error loading duplicates page: {e}", exc_info=True)
         db.session.rollback()
-        return render_template("duplicates.html", candidates=[], error=str(e), pagination=None, stats={})
+        # Get filter parameters with defaults for error case
+        record_type = request.args.get('record_type', 'all')
+        status = request.args.get('status', 'pending')
+        min_score = request.args.get('min_score', 0.0, type=float)
+        return render_template(
+            "duplicates.html",
+            candidates=[],
+            error=str(e),
+            pagination=None,
+            stats={},
+            filters={
+                'record_type': record_type,
+                'status': status,
+                'min_score': min_score
+            }
+        )
 
 
 @bp.route("/api/duplicates/<candidate_id>/review", methods=["POST"])

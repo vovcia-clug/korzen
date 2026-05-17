@@ -174,6 +174,7 @@ class DuplicateDetector:
                         'person',
                         person.id,
                         candidate_person.id,
+                        composite_score,
                         score_breakdown,
                         method='auto'
                     )
@@ -261,6 +262,7 @@ class DuplicateDetector:
                         'baptism',
                         baptism.id,
                         candidate_baptism.id,
+                        composite_score,
                         score_breakdown,
                         method='auto'
                     )
@@ -348,6 +350,7 @@ class DuplicateDetector:
                         'marriage',
                         marriage.id,
                         candidate_marriage.id,
+                        composite_score,
                         score_breakdown,
                         method='auto'
                     )
@@ -435,6 +438,7 @@ class DuplicateDetector:
                         'death',
                         death.id,
                         candidate_death.id,
+                        composite_score,
                         score_breakdown,
                         method='auto'
                     )
@@ -467,6 +471,12 @@ class DuplicateDetector:
         - Date: 20%
         - Location: 10%
         
+        This method implements missing data masking: similarity components are only
+        included in the composite score when the corresponding data is present in
+        BOTH records. Weights are dynamically adjusted and normalized based on
+        available data to prevent missing optional fields from artificially lowering
+        similarity scores.
+        
         Args:
             record1: First record (Person, BaptismRecord, MarriageRecord, or DeathRecord)
             record2: Second record (same type as record1)
@@ -478,9 +488,9 @@ class DuplicateDetector:
             - composite_score: Weighted composite score (0.0-1.0)
             - score_breakdown: Dictionary with individual scores:
                 * vector_sim: Vector similarity
-                * phonetic_sim: Phonetic similarity
-                * date_sim: Date similarity
-                * location_sim: Location similarity
+                * phonetic_sim: Phonetic similarity (or None if data missing)
+                * date_sim: Date similarity (or None if data missing)
+                * location_sim: Location similarity (or None if data missing)
         
         Example:
             >>> person1 = Person.query.get(id1)
@@ -492,27 +502,62 @@ class DuplicateDetector:
             >>> print(f"Phonetic: {breakdown['phonetic_sim']:.2f}")
         """
         try:
-            # Calculate phonetic similarity
+            # Calculate phonetic similarity (returns None if data missing in both)
             phonetic_sim = self._calculate_phonetic_similarity_for_record(
                 record1, record2, record_type
             )
             
-            # Calculate date similarity
+            # Calculate date similarity (returns None if data missing in both)
             date_sim = self._calculate_date_similarity_for_record(
                 record1, record2, record_type
             )
             
-            # Calculate location similarity
+            # Calculate location similarity (returns None if data missing in both)
             location_sim = self._calculate_location_similarity_for_record(
                 record1, record2, record_type
             )
             
-            # Calculate weighted composite score
-            composite_score = (
-                self.WEIGHT_VECTOR * vector_sim +
-                self.WEIGHT_PHONETIC * phonetic_sim +
-                self.WEIGHT_DATE * date_sim +
-                self.WEIGHT_LOCATION * location_sim
+            # Dynamically adjust weights based on available data
+            total_weight = 0.0
+            composite_score = 0.0
+            
+            # Vector similarity is always included (primary signal)
+            composite_score += self.WEIGHT_VECTOR * vector_sim
+            total_weight += self.WEIGHT_VECTOR
+            
+            # Only include phonetic similarity if data is available
+            if phonetic_sim is not None:
+                composite_score += self.WEIGHT_PHONETIC * phonetic_sim
+                total_weight += self.WEIGHT_PHONETIC
+            
+            # Only include date similarity if data is available
+            if date_sim is not None:
+                composite_score += self.WEIGHT_DATE * date_sim
+                total_weight += self.WEIGHT_DATE
+            
+            # Only include location similarity if data is available
+            if location_sim is not None:
+                composite_score += self.WEIGHT_LOCATION * location_sim
+                total_weight += self.WEIGHT_LOCATION
+            
+            # Normalize by actual weights used
+            if total_weight > 0:
+                composite_score = composite_score / total_weight
+            else:
+                composite_score = 0.0
+            
+            # Log which components were used for debugging
+            components_used = ['vector']
+            if phonetic_sim is not None:
+                components_used.append('phonetic')
+            if date_sim is not None:
+                components_used.append('date')
+            if location_sim is not None:
+                components_used.append('location')
+            
+            logger.debug(
+                f"Composite score calculation - Components used: {', '.join(components_used)} "
+                f"(weight: {total_weight:.2f}), Score: {composite_score:.3f}"
             )
             
             score_breakdown = {
@@ -529,19 +574,14 @@ class DuplicateDetector:
             # Return vector similarity as fallback
             return vector_sim, {
                 'vector_sim': vector_sim,
-                'phonetic_sim': 0.0,
-                'date_sim': 0.0,
-                'location_sim': 0.0
+                'phonetic_sim': None,
+                'date_sim': None,
+                'location_sim': None
             }
     
-    def _calculate_phonetic_similarity_for_record(
-        self,
-        record1,
-        record2,
-        record_type: str
-    ) -> float:
+    def _both_have_names(self, record1, record2, record_type: str) -> bool:
         """
-        Calculate phonetic similarity based on record type.
+        Check if both records have name data.
         
         Args:
             record1: First record
@@ -549,8 +589,108 @@ class DuplicateDetector:
             record_type: Type of record ('person', 'baptism', 'marriage', 'death')
         
         Returns:
-            Phonetic similarity score (0.0-1.0)
+            True if both records have at least one name field populated
         """
+        if record_type == 'person':
+            has_name1 = bool(record1.first_name or record1.last_name or record1.maiden_name)
+            has_name2 = bool(record2.first_name or record2.last_name or record2.maiden_name)
+            return has_name1 and has_name2
+        
+        elif record_type == 'baptism':
+            has_name1 = bool(record1.child_name or record1.father_surname or record1.mother_name)
+            has_name2 = bool(record2.child_name or record2.father_surname or record2.mother_name)
+            return has_name1 and has_name2
+        
+        elif record_type == 'marriage':
+            has_name1 = bool(record1.spouse1_name or record1.spouse2_name)
+            has_name2 = bool(record2.spouse1_name or record2.spouse2_name)
+            return has_name1 and has_name2
+        
+        elif record_type == 'death':
+            has_name1 = bool(record1.deceased_name or record1.deceased_surname)
+            has_name2 = bool(record2.deceased_name or record2.deceased_surname)
+            return has_name1 and has_name2
+        
+        return False
+    
+    def _both_have_dates(self, record1, record2, record_type: str) -> bool:
+        """
+        Check if both records have date data.
+        
+        Args:
+            record1: First record
+            record2: Second record
+            record_type: Type of record ('person', 'baptism', 'marriage', 'death')
+        
+        Returns:
+            True if both records have at least one date field populated
+        """
+        if record_type == 'person':
+            has_date1 = bool(record1.birth_date or record1.death_date)
+            has_date2 = bool(record2.birth_date or record2.death_date)
+            return has_date1 and has_date2
+        
+        elif record_type == 'baptism':
+            return bool(record1.baptism_date and record2.baptism_date)
+        
+        elif record_type == 'marriage':
+            return bool(record1.marriage_date and record2.marriage_date)
+        
+        elif record_type == 'death':
+            return bool(record1.death_date and record2.death_date)
+        
+        return False
+    
+    def _both_have_locations(self, record1, record2, record_type: str) -> bool:
+        """
+        Check if both records have location data.
+        
+        Args:
+            record1: First record
+            record2: Second record
+            record_type: Type of record ('person', 'baptism', 'marriage', 'death')
+        
+        Returns:
+            True if both records have at least one location field populated
+        """
+        if record_type == 'person':
+            has_loc1 = bool(record1.birth_place or record1.death_place or
+                           record1.parish or record1.residence)
+            has_loc2 = bool(record2.birth_place or record2.death_place or
+                           record2.parish or record2.residence)
+            return has_loc1 and has_loc2
+        
+        elif record_type in ['baptism', 'marriage', 'death']:
+            has_loc1 = bool(record1.parish or (hasattr(record1, 'village') and record1.village))
+            has_loc2 = bool(record2.parish or (hasattr(record2, 'village') and record2.village))
+            return has_loc1 and has_loc2
+        
+        return False
+    
+    def _calculate_phonetic_similarity_for_record(
+        self,
+        record1,
+        record2,
+        record_type: str
+    ) -> Optional[float]:
+        """
+        Calculate phonetic similarity based on record type.
+        
+        Returns None if both records lack name data, indicating that phonetic
+        similarity should not be included in the composite score calculation.
+        
+        Args:
+            record1: First record
+            record2: Second record
+            record_type: Type of record ('person', 'baptism', 'marriage', 'death')
+        
+        Returns:
+            Phonetic similarity score (0.0-1.0) or None if data missing in both records
+        """
+        # Check if both records have name data
+        if not self._both_have_names(record1, record2, record_type):
+            return None
+        
         if record_type == 'person':
             name1_parts = {
                 'first_name': record1.first_name,
@@ -665,9 +805,12 @@ class DuplicateDetector:
         record1,
         record2,
         record_type: str
-    ) -> float:
+    ) -> Optional[float]:
         """
         Calculate date similarity based on record type.
+        
+        Returns None if both records lack date data, indicating that date
+        similarity should not be included in the composite score calculation.
         
         Args:
             record1: First record
@@ -675,8 +818,12 @@ class DuplicateDetector:
             record_type: Type of record ('person', 'baptism', 'marriage', 'death')
         
         Returns:
-            Date similarity score (0.0-1.0)
+            Date similarity score (0.0-1.0) or None if data missing in both records
         """
+        # Check if both records have date data
+        if not self._both_have_dates(record1, record2, record_type):
+            return None
+        
         if record_type == 'person':
             # Compare birth and death dates
             similarities = []
@@ -760,9 +907,12 @@ class DuplicateDetector:
         record1,
         record2,
         record_type: str
-    ) -> float:
+    ) -> Optional[float]:
         """
         Calculate location similarity based on record type.
+        
+        Returns None if both records lack location data, indicating that location
+        similarity should not be included in the composite score calculation.
         
         Args:
             record1: First record
@@ -770,8 +920,12 @@ class DuplicateDetector:
             record_type: Type of record ('person', 'baptism', 'marriage', 'death')
         
         Returns:
-            Location similarity score (0.0-1.0)
+            Location similarity score (0.0-1.0) or None if data missing in both records
         """
+        # Check if both records have location data
+        if not self._both_have_locations(record1, record2, record_type):
+            return None
+        
         if record_type == 'person':
             # Compare multiple location fields
             similarities = []
@@ -855,6 +1009,7 @@ class DuplicateDetector:
         record_type: str,
         record1_id: UUID,
         record2_id: UUID,
+        composite_score: float,
         scores: dict,
         method: str = 'auto'
     ) -> None:
@@ -868,11 +1023,12 @@ class DuplicateDetector:
             record_type: Type of record ('person', 'baptism', 'marriage', 'death')
             record1_id: UUID of first record
             record2_id: UUID of second record
+            composite_score: Pre-calculated composite similarity score (0.0-1.0)
             scores: Dictionary containing similarity scores:
                 * vector_sim: Vector similarity score
-                * phonetic_sim: Phonetic similarity score
-                * date_sim: Date similarity score
-                * location_sim: Location similarity score
+                * phonetic_sim: Phonetic similarity score (or None if masked)
+                * date_sim: Date similarity score (or None if masked)
+                * location_sim: Location similarity score (or None if masked)
             method: Detection method ('auto', 'import', 'batch', 'manual')
         
         Example:
@@ -883,7 +1039,7 @@ class DuplicateDetector:
             ...     'location_sim': 1.0
             ... }
             >>> detector.save_duplicate_candidate(
-            ...     'person', person1_id, person2_id, scores, 'auto'
+            ...     'person', person1_id, person2_id, 0.91, scores, 'auto'
             ... )
         """
         try:
@@ -906,15 +1062,7 @@ class DuplicateDetector:
                 logger.debug(f"Duplicate candidate already exists: {existing.id}")
                 return
             
-            # Calculate composite score
-            composite_score = (
-                self.WEIGHT_VECTOR * scores['vector_sim'] +
-                self.WEIGHT_PHONETIC * scores['phonetic_sim'] +
-                self.WEIGHT_DATE * scores['date_sim'] +
-                self.WEIGHT_LOCATION * scores['location_sim']
-            )
-            
-            # Create new candidate
+            # Create new candidate (composite_score already calculated correctly by caller)
             candidate = DuplicateCandidate()
             candidate.record_type = record_type
             candidate.record1_id = record1_id

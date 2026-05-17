@@ -116,12 +116,12 @@ class Person(db.Model):
     # Parent relationships
     father_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=True,
     )
     mother_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=True,
     )
     
@@ -238,7 +238,7 @@ class BaptismRecord(db.Model):
     # Child information
     child_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=True,
     )
     child_name = db.Column(String(100), nullable=True)
@@ -247,7 +247,7 @@ class BaptismRecord(db.Model):
     # Parents
     father_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=True,
     )
     father_name = db.Column(String(100), nullable=True)
@@ -255,7 +255,7 @@ class BaptismRecord(db.Model):
     
     mother_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=True,
     )
     mother_name = db.Column(String(100), nullable=True)
@@ -333,7 +333,7 @@ class MarriageRecord(db.Model):
     # Spouse 1 (traditionally groom)
     spouse1_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=True,
     )
     spouse1_name = db.Column(String(100), nullable=True)
@@ -348,7 +348,7 @@ class MarriageRecord(db.Model):
     # Spouse 2 (traditionally bride)
     spouse2_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=True,
     )
     spouse2_name = db.Column(String(100), nullable=True)
@@ -428,7 +428,7 @@ class DeathRecord(db.Model):
     # Deceased person
     deceased_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=True,
     )
     deceased_name = db.Column(String(100), nullable=True)
@@ -493,7 +493,7 @@ class GodparentRelationship(db.Model):
     )
     godparent_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=False,
     )
     godparent_type = db.Column(String(20), nullable=True)  # 'godfather', 'godmother'
@@ -515,7 +515,7 @@ class WitnessRelationship(db.Model):
     )
     witness_id = db.Column(
         UUID(as_uuid=True),
-        ForeignKey("persons.id"),
+        ForeignKey("persons.id", ondelete='CASCADE'),
         nullable=False,
     )
     witness_order = db.Column(Integer, nullable=True)  # Order in which witness appears
