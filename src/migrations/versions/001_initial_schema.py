@@ -20,6 +20,15 @@ def upgrade():
     # Enable pgvector extension first
     op.execute('CREATE EXTENSION IF NOT EXISTS vector')
     
+    # Check if tables already exist (migration already applied)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_tables = inspector.get_table_names()
+    
+    if 'record_batches' in existing_tables:
+        # Tables already exist, skip migration
+        return
+    
     # Create record_batches table
     op.create_table('record_batches',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
