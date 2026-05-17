@@ -43,17 +43,40 @@ def get_uploaded_files():
     return files_list
 
 
+def get_sort_column(model, sort_by, default_column):
+    """Get the sort column for a model, with fallback to default."""
+    if sort_by and hasattr(model, sort_by):
+        return getattr(model, sort_by)
+    return default_column
+
+
 @bp.route("/")
 def index():
     """Main page with upload form."""
     try:
-        # Get files from database instead of filesystem
-        db_files = UploadedFile.query.order_by(UploadedFile.uploaded_at.desc()).all()
-        return render_template("index.html", files=db_files)
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'uploaded_at')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        # Build query with sorting
+        query = UploadedFile.query
+        sort_column = get_sort_column(UploadedFile, sort_by, UploadedFile.uploaded_at)
+        
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc().nullslast())
+        else:
+            query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return render_template("index.html", files=pagination.items, pagination=pagination)
     except Exception as e:
         logger.error(f"Error loading index page: {e}")
         db.session.rollback()
-        return render_template("index.html", files=[], error=str(e))
+        return render_template("index.html", files=[], error=str(e), pagination=None)
 
 
 @bp.route("/upload", methods=["POST"])
@@ -153,10 +176,26 @@ def parse_gedcom(file_id):
 def list_uploaded_files():
     """Get list of all uploaded files with their processing status."""
     try:
-        files = UploadedFile.query.order_by(UploadedFile.uploaded_at.desc()).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'uploaded_at')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        # Build query with sorting
+        query = UploadedFile.query
+        sort_column = get_sort_column(UploadedFile, sort_by, UploadedFile.uploaded_at)
+        
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc().nullslast())
+        else:
+            query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         
         files_data = []
-        for file in files:
+        for file in pagination.items:
             files_data.append({
                 'id': str(file.id),
                 'filename': file.filename,
@@ -167,7 +206,15 @@ def list_uploaded_files():
                 'batch_id': str(file.batch_id) if file.batch_id else None
             })
         
-        return jsonify({"files": files_data}), 200
+        return jsonify({
+            "data": files_data,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages
+            }
+        }), 200
         
     except Exception as e:
         return jsonify({"error": f"Failed to list files: {str(e)}"}), 500
@@ -177,35 +224,104 @@ def list_uploaded_files():
 def list_persons():
     """Display list of all persons in the database."""
     try:
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'last_name')
+        sort_order = request.args.get('sort_order', 'asc')
+        
         # Eagerly load parent relationships to avoid N+1 queries
         from sqlalchemy.orm import joinedload
         
-        # Get all persons ordered by last name, first name
-        persons = Person.query.options(
+        # Build query with sorting
+        query = Person.query.options(
             joinedload(Person.father),
             joinedload(Person.mother)
-        ).order_by(
-            Person.last_name.asc().nullslast(),
-            Person.first_name.asc().nullslast()
-        ).all()
+        )
         
-        return render_template("persons.html", persons=persons, now=datetime.now)
+        # Apply sorting based on sort_by parameter
+        if sort_by == 'last_name':
+            if sort_order == 'asc':
+                query = query.order_by(Person.last_name.asc().nullslast(), Person.first_name.asc().nullslast())
+            else:
+                query = query.order_by(Person.last_name.desc().nullslast(), Person.first_name.desc().nullslast())
+        elif sort_by == 'first_name':
+            if sort_order == 'asc':
+                query = query.order_by(Person.first_name.asc().nullslast(), Person.last_name.asc().nullslast())
+            else:
+                query = query.order_by(Person.first_name.desc().nullslast(), Person.last_name.desc().nullslast())
+        elif sort_by == 'birth_date':
+            if sort_order == 'asc':
+                query = query.order_by(Person.birth_date.asc().nullslast())
+            else:
+                query = query.order_by(Person.birth_date.desc().nullslast())
+        elif sort_by == 'birth_place':
+            if sort_order == 'asc':
+                query = query.order_by(Person.birth_place.asc().nullslast())
+            else:
+                query = query.order_by(Person.birth_place.desc().nullslast())
+        else:
+            sort_column = get_sort_column(Person, sort_by, Person.last_name)
+            if sort_order == 'asc':
+                query = query.order_by(sort_column.asc().nullslast())
+            else:
+                query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return render_template("persons.html", persons=pagination.items, pagination=pagination, now=datetime.now)
         
     except Exception as e:
-        return render_template("persons.html", persons=[], error=str(e), now=datetime.now)
+        return render_template("persons.html", persons=[], error=str(e), pagination=None, now=datetime.now)
 
 
 @bp.route("/api/persons", methods=["GET"])
 def api_list_persons():
     """API endpoint to get list of all persons with their details."""
     try:
-        persons = Person.query.order_by(
-            Person.last_name.asc().nullslast(),
-            Person.first_name.asc().nullslast()
-        ).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'last_name')
+        sort_order = request.args.get('sort_order', 'asc')
+        
+        # Build query with sorting
+        query = Person.query
+        
+        # Apply sorting based on sort_by parameter with special handling for name and date fields
+        if sort_by == 'last_name':
+            if sort_order == 'asc':
+                query = query.order_by(Person.last_name.asc().nullslast(), Person.first_name.asc().nullslast())
+            else:
+                query = query.order_by(Person.last_name.desc().nullslast(), Person.first_name.desc().nullslast())
+        elif sort_by == 'first_name':
+            if sort_order == 'asc':
+                query = query.order_by(Person.first_name.asc().nullslast(), Person.last_name.asc().nullslast())
+            else:
+                query = query.order_by(Person.first_name.desc().nullslast(), Person.last_name.desc().nullslast())
+        elif sort_by == 'birth_date':
+            if sort_order == 'asc':
+                query = query.order_by(Person.birth_date.asc().nullslast())
+            else:
+                query = query.order_by(Person.birth_date.desc().nullslast())
+        elif sort_by == 'birth_place':
+            if sort_order == 'asc':
+                query = query.order_by(Person.birth_place.asc().nullslast())
+            else:
+                query = query.order_by(Person.birth_place.desc().nullslast())
+        else:
+            sort_column = get_sort_column(Person, sort_by, Person.last_name)
+            if sort_order == 'asc':
+                query = query.order_by(sort_column.asc().nullslast())
+            else:
+                query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         
         persons_data = []
-        for person in persons:
+        for person in pagination.items:
             persons_data.append({
                 'id': str(person.id),
                 'first_name': person.first_name,
@@ -223,7 +339,15 @@ def api_list_persons():
                 'parish': person.parish
             })
         
-        return jsonify({"persons": persons_data, "count": len(persons_data)}), 200
+        return jsonify({
+            "data": persons_data,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages
+            }
+        }), 200
         
     except Exception as e:
         return jsonify({"error": f"Failed to list persons: {str(e)}"}), 500
@@ -542,27 +666,54 @@ def get_graph_data():
 def list_baptisms():
     """Display list of all baptism records."""
     try:
-        # Get all baptisms ordered by baptism date (most recent first)
-        baptisms = BaptismRecord.query.order_by(
-            BaptismRecord.baptism_date.desc().nullslast()
-        ).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'baptism_date')
+        sort_order = request.args.get('sort_order', 'desc')
         
-        return render_template("baptisms.html", baptisms=baptisms)
+        # Build query with sorting
+        query = BaptismRecord.query
+        sort_column = get_sort_column(BaptismRecord, sort_by, BaptismRecord.baptism_date)
+        
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc().nullslast())
+        else:
+            query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return render_template("baptisms.html", baptisms=pagination.items, pagination=pagination)
         
     except Exception as e:
-        return render_template("baptisms.html", baptisms=[], error=str(e))
+        return render_template("baptisms.html", baptisms=[], error=str(e), pagination=None)
 
 
 @bp.route("/api/baptisms", methods=["GET"])
 def api_list_baptisms():
     """API endpoint to get list of all baptism records."""
     try:
-        baptisms = BaptismRecord.query.order_by(
-            BaptismRecord.baptism_date.desc().nullslast()
-        ).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'baptism_date')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        # Build query with sorting
+        query = BaptismRecord.query
+        sort_column = get_sort_column(BaptismRecord, sort_by, BaptismRecord.baptism_date)
+        
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc().nullslast())
+        else:
+            query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         
         baptisms_data = []
-        for baptism in baptisms:
+        for baptism in pagination.items:
             baptisms_data.append({
                 'id': str(baptism.id),
                 'baptism_date': baptism.baptism_date.isoformat() if baptism.baptism_date else None,
@@ -578,7 +729,15 @@ def api_list_baptisms():
                 'godmother_name': baptism.godmother_name
             })
         
-        return jsonify({"baptisms": baptisms_data, "count": len(baptisms_data)}), 200
+        return jsonify({
+            "data": baptisms_data,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages
+            }
+        }), 200
         
     except Exception as e:
         return jsonify({"error": f"Failed to list baptisms: {str(e)}"}), 500
@@ -588,33 +747,61 @@ def api_list_baptisms():
 def list_marriages():
     """Display list of all marriage records."""
     try:
-        # Get all marriages ordered by marriage date (most recent first)
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'marriage_date')
+        sort_order = request.args.get('sort_order', 'desc')
+        
         # Eagerly load spouse relationships to avoid N+1 queries
         from sqlalchemy.orm import joinedload
         
-        marriages = MarriageRecord.query.options(
+        # Build query with sorting
+        query = MarriageRecord.query.options(
             joinedload(MarriageRecord.spouse1),
             joinedload(MarriageRecord.spouse2)
-        ).order_by(
-            MarriageRecord.marriage_date.desc().nullslast()
-        ).all()
+        )
         
-        return render_template("marriages.html", marriages=marriages)
+        sort_column = get_sort_column(MarriageRecord, sort_by, MarriageRecord.marriage_date)
+        
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc().nullslast())
+        else:
+            query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return render_template("marriages.html", marriages=pagination.items, pagination=pagination)
         
     except Exception as e:
-        return render_template("marriages.html", marriages=[], error=str(e))
+        return render_template("marriages.html", marriages=[], error=str(e), pagination=None)
 
 
 @bp.route("/api/marriages", methods=["GET"])
 def api_list_marriages():
     """API endpoint to get list of all marriage records."""
     try:
-        marriages = MarriageRecord.query.order_by(
-            MarriageRecord.marriage_date.desc().nullslast()
-        ).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'marriage_date')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        # Build query with sorting
+        query = MarriageRecord.query
+        sort_column = get_sort_column(MarriageRecord, sort_by, MarriageRecord.marriage_date)
+        
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc().nullslast())
+        else:
+            query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         
         marriages_data = []
-        for marriage in marriages:
+        for marriage in pagination.items:
             marriages_data.append({
                 'id': str(marriage.id),
                 'marriage_date': marriage.marriage_date.isoformat() if marriage.marriage_date else None,
@@ -631,7 +818,15 @@ def api_list_marriages():
                 'witnesses': marriage.witnesses
             })
         
-        return jsonify({"marriages": marriages_data, "count": len(marriages_data)}), 200
+        return jsonify({
+            "data": marriages_data,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages
+            }
+        }), 200
         
     except Exception as e:
         return jsonify({"error": f"Failed to list marriages: {str(e)}"}), 500
@@ -641,27 +836,54 @@ def api_list_marriages():
 def list_deaths():
     """Display list of all death records."""
     try:
-        # Get all deaths ordered by death date (most recent first)
-        deaths = DeathRecord.query.order_by(
-            DeathRecord.death_date.desc().nullslast()
-        ).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'death_date')
+        sort_order = request.args.get('sort_order', 'desc')
         
-        return render_template("deaths.html", deaths=deaths)
+        # Build query with sorting
+        query = DeathRecord.query
+        sort_column = get_sort_column(DeathRecord, sort_by, DeathRecord.death_date)
+        
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc().nullslast())
+        else:
+            query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return render_template("deaths.html", deaths=pagination.items, pagination=pagination)
         
     except Exception as e:
-        return render_template("deaths.html", deaths=[], error=str(e))
+        return render_template("deaths.html", deaths=[], error=str(e), pagination=None)
 
 
 @bp.route("/api/deaths", methods=["GET"])
 def api_list_deaths():
     """API endpoint to get list of all death records."""
     try:
-        deaths = DeathRecord.query.order_by(
-            DeathRecord.death_date.desc().nullslast()
-        ).all()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        sort_by = request.args.get('sort_by', 'death_date')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        # Build query with sorting
+        query = DeathRecord.query
+        sort_column = get_sort_column(DeathRecord, sort_by, DeathRecord.death_date)
+        
+        if sort_order == 'asc':
+            query = query.order_by(sort_column.asc().nullslast())
+        else:
+            query = query.order_by(sort_column.desc().nullslast())
+        
+        # Paginate results
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         
         deaths_data = []
-        for death in deaths:
+        for death in pagination.items:
             deaths_data.append({
                 'id': str(death.id),
                 'death_date': death.death_date.isoformat() if death.death_date else None,
@@ -679,7 +901,15 @@ def api_list_deaths():
                 'spouse_name': death.spouse_name
             })
         
-        return jsonify({"deaths": deaths_data, "count": len(deaths_data)}), 200
+        return jsonify({
+            "data": deaths_data,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "total_pages": pagination.pages
+            }
+        }), 200
         
     except Exception as e:
         return jsonify({"error": f"Failed to list deaths: {str(e)}"}), 500

@@ -275,6 +275,42 @@
                 display: none;
             }
         }
+        
+        .btn-page {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        
+        .btn-page:hover:not(.disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-page.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .sort-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .sort-label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -296,6 +332,26 @@
         </div>
         {% endif %}
         
+        <!-- Sorting Controls -->
+        <div class="sort-controls">
+            <span class="sort-label">Sort by:</span>
+            <select id="sortBy" class="filter-select" onchange="updateSort()">
+                <option value="death_date" {% if request.args.get('sort_by', 'death_date') == 'death_date' %}selected{% endif %}>Death Date</option>
+                <option value="burial_date" {% if request.args.get('sort_by') == 'burial_date' %}selected{% endif %}>Burial Date</option>
+                <option value="deceased_surname" {% if request.args.get('sort_by') == 'deceased_surname' %}selected{% endif %}>Surname</option>
+                <option value="age_years" {% if request.args.get('sort_by') == 'age_years' %}selected{% endif %}>Age</option>
+                <option value="parish" {% if request.args.get('sort_by') == 'parish' %}selected{% endif %}>Parish</option>
+                <option value="village" {% if request.args.get('sort_by') == 'village' %}selected{% endif %}>Village</option>
+            </select>
+            <button id="sortOrder" class="btn-parse" onclick="toggleSortOrder()" style="min-width: 100px;">
+                {% if request.args.get('sort_order', 'desc') == 'asc' %}
+                ↑ Ascending
+                {% else %}
+                ↓ Descending
+                {% endif %}
+            </button>
+        </div>
+        
         <div class="search-bar">
             <input type="text" id="searchInput" class="search-input" placeholder="Search by deceased name, parish, village, or cemetery...">
             <select id="statusFilter" class="filter-select">
@@ -316,15 +372,21 @@
         <div class="stats">
             <div class="stat-card">
                 <div class="stat-label">Total Deaths</div>
-                <div class="stat-value" id="totalCount">{{ deaths|length }}</div>
+                <div class="stat-value" id="totalCount">{% if pagination %}{{ pagination.total }}{% else %}0{% endif %}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Displayed</div>
-                <div class="stat-value" id="displayedCount">{{ deaths|length }}</div>
+                <div class="stat-label">Displayed (Filtered)</div>
+                <div class="stat-value" id="displayedCount">{% if pagination %}{{ pagination.items|length }}{% else %}0{% endif %}</div>
             </div>
+            {% if pagination %}
+            <div class="stat-card">
+                <div class="stat-label">Current Page</div>
+                <div class="stat-value">{{ pagination.page }} / {{ pagination.pages }}</div>
+            </div>
+            {% endif %}
         </div>
         
-        {% if deaths %}
+        {% if pagination and pagination.items %}
         <div style="overflow-x: auto;">
             <table class="records-table" id="recordsTable">
                 <thead>
@@ -339,7 +401,7 @@
                     </tr>
                 </thead>
                 <tbody id="recordsTableBody">
-                    {% for death in deaths %}
+                    {% for death in pagination.items %}
                     <tr data-status="{{ death.marital_status or '' }}"
                         data-sacraments="{{ death.sacraments_received }}"
                         data-search="{{ (death.deceased_name or '') + ' ' + (death.deceased_surname or '') + ' ' + (death.deceased_maiden_name or '') + ' ' + (death.parish or '') + ' ' + (death.village or '') + ' ' + (death.cemetery or '') }}">
@@ -406,6 +468,39 @@
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination Controls -->
+        {% if pagination.pages > 1 %}
+        <div class="pagination-controls" style="margin-top: 30px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('main.list_deaths', page=1, per_page=request.args.get('per_page', 50), sort_by=request.args.get('sort_by', 'death_date'), sort_order=request.args.get('sort_order', 'desc')) }}"
+               class="btn-page {% if not pagination.has_prev %}disabled{% endif %}"
+               {% if not pagination.has_prev %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}
+               aria-label="First page">« First</a>
+            
+            <a href="{{ url_for('main.list_deaths', page=pagination.prev_num, per_page=request.args.get('per_page', 50), sort_by=request.args.get('sort_by', 'death_date'), sort_order=request.args.get('sort_order', 'desc')) }}"
+               class="btn-page {% if not pagination.has_prev %}disabled{% endif %}"
+               {% if not pagination.has_prev %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}
+               aria-label="Previous page">‹ Previous</a>
+            
+            <div class="page-info" style="padding: 8px 16px; background: #f8f9ff; border-radius: 6px; font-weight: 600; color: #667eea;">
+                Page {{ pagination.page }} of {{ pagination.pages }}
+            </div>
+            
+            <a href="{{ url_for('main.list_deaths', page=pagination.next_num, per_page=request.args.get('per_page', 50), sort_by=request.args.get('sort_by', 'death_date'), sort_order=request.args.get('sort_order', 'desc')) }}"
+               class="btn-page {% if not pagination.has_next %}disabled{% endif %}"
+               {% if not pagination.has_next %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}
+               aria-label="Next page">Next ›</a>
+            
+            <a href="{{ url_for('main.list_deaths', page=pagination.pages, per_page=request.args.get('per_page', 50), sort_by=request.args.get('sort_by', 'death_date'), sort_order=request.args.get('sort_order', 'desc')) }}"
+               class="btn-page {% if not pagination.has_next %}disabled{% endif %}"
+               {% if not pagination.has_next %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}
+               aria-label="Last page">Last »</a>
+        </div>
+        
+        <div style="margin-top: 15px; text-align: center; color: #666; font-size: 0.9em;">
+            Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} to {{ ((pagination.page - 1) * pagination.per_page) + pagination.items|length }} of {{ pagination.total }} deaths
+        </div>
+        {% endif %}
         {% else %}
         <div class="no-records">
             <div class="no-records-icon">🕊️</div>
@@ -453,6 +548,24 @@
         searchInput.addEventListener('input', filterTable);
         statusFilter.addEventListener('change', filterTable);
         sacramentsFilter.addEventListener('change', filterTable);
+        
+        // Sorting functionality
+        function updateSort() {
+            const sortBy = document.getElementById('sortBy').value;
+            const sortOrder = new URLSearchParams(window.location.search).get('sort_order') || 'desc';
+            const page = new URLSearchParams(window.location.search).get('page') || '1';
+            const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
+            window.location.href = `/deaths?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+        }
+        
+        function toggleSortOrder() {
+            const sortBy = new URLSearchParams(window.location.search).get('sort_by') || 'death_date';
+            const currentOrder = new URLSearchParams(window.location.search).get('sort_order') || 'desc';
+            const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+            const page = new URLSearchParams(window.location.search).get('page') || '1';
+            const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
+            window.location.href = `/deaths?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${newOrder}`;
+        }
     </script>
 </body>
 </html>

@@ -346,6 +346,42 @@
                 display: none;
             }
         }
+        
+        .btn-page {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        
+        .btn-page:hover:not(.disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-page.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .sort-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .sort-label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -367,6 +403,24 @@
         </div>
         {% endif %}
         
+        <!-- Sorting Controls -->
+        <div class="sort-controls">
+            <span class="sort-label">Sort by:</span>
+            <select id="sortBy" class="filter-select" onchange="updateSort()">
+                <option value="last_name" {% if request.args.get('sort_by', 'last_name') == 'last_name' %}selected{% endif %}>Last Name</option>
+                <option value="first_name" {% if request.args.get('sort_by') == 'first_name' %}selected{% endif %}>First Name</option>
+                <option value="birth_date" {% if request.args.get('sort_by') == 'birth_date' %}selected{% endif %}>Birth Date</option>
+                <option value="birth_place" {% if request.args.get('sort_by') == 'birth_place' %}selected{% endif %}>Birth Place</option>
+            </select>
+            <button id="sortOrder" class="btn-parse" onclick="toggleSortOrder()" style="min-width: 100px;">
+                {% if request.args.get('sort_order', 'asc') == 'asc' %}
+                ↑ Ascending
+                {% else %}
+                ↓ Descending
+                {% endif %}
+            </button>
+        </div>
+        
         <div class="search-bar">
             <input type="text" id="searchInput" class="search-input" placeholder="Search by name, place, or occupation...">
             <select id="genderFilter" class="filter-select">
@@ -380,15 +434,21 @@
         <div class="stats">
             <div class="stat-card">
                 <div class="stat-label">Total Persons</div>
-                <div class="stat-value" id="totalCount">{{ persons|length }}</div>
+                <div class="stat-value" id="totalCount">{% if pagination %}{{ pagination.total }}{% else %}0{% endif %}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Displayed</div>
-                <div class="stat-value" id="displayedCount">{{ persons|length }}</div>
+                <div class="stat-label">Displayed (Filtered)</div>
+                <div class="stat-value" id="displayedCount">{% if pagination %}{{ pagination.items|length }}{% else %}0{% endif %}</div>
             </div>
+            {% if pagination %}
+            <div class="stat-card">
+                <div class="stat-label">Current Page</div>
+                <div class="stat-value">{{ pagination.page }} / {{ pagination.pages }}</div>
+            </div>
+            {% endif %}
         </div>
         
-        {% if persons %}
+        {% if pagination and pagination.items %}
         <div style="overflow-x: auto;">
             <table class="persons-table" id="personsTable">
                 <thead>
@@ -404,7 +464,7 @@
                     </tr>
                 </thead>
                 <tbody id="personsTableBody">
-                    {% for person in persons %}
+                    {% for person in pagination.items %}
                     <tr class="expandable-row" data-person-id="{{ person.id }}"
                         data-gender="{{ person.gender or 'Unknown' }}"
                         data-search="{{ (person.first_name or '') + ' ' + (person.last_name or '') + ' ' + (person.maiden_name or '') + ' ' + (person.birth_place or '') + ' ' + (person.death_place or '') + ' ' + (person.occupation or '') + ' ' + (person.parish or '') + ' ' + (person.residence or '') }}">
@@ -678,6 +738,39 @@
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination Controls -->
+        {% if pagination.pages > 1 %}
+        <div class="pagination-controls" style="margin-top: 30px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('main.list_persons', page=1, per_page=request.args.get('per_page', 50), sort_by=request.args.get('sort_by', 'last_name'), sort_order=request.args.get('sort_order', 'asc')) }}"
+               class="btn-page {% if not pagination.has_prev %}disabled{% endif %}"
+               {% if not pagination.has_prev %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}
+               aria-label="First page">« First</a>
+            
+            <a href="{{ url_for('main.list_persons', page=pagination.prev_num, per_page=request.args.get('per_page', 50), sort_by=request.args.get('sort_by', 'last_name'), sort_order=request.args.get('sort_order', 'asc')) }}"
+               class="btn-page {% if not pagination.has_prev %}disabled{% endif %}"
+               {% if not pagination.has_prev %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}
+               aria-label="Previous page">‹ Previous</a>
+            
+            <div class="page-info" style="padding: 8px 16px; background: #f8f9ff; border-radius: 6px; font-weight: 600; color: #667eea;">
+                Page {{ pagination.page }} of {{ pagination.pages }}
+            </div>
+            
+            <a href="{{ url_for('main.list_persons', page=pagination.next_num, per_page=request.args.get('per_page', 50), sort_by=request.args.get('sort_by', 'last_name'), sort_order=request.args.get('sort_order', 'asc')) }}"
+               class="btn-page {% if not pagination.has_next %}disabled{% endif %}"
+               {% if not pagination.has_next %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}
+               aria-label="Next page">Next ›</a>
+            
+            <a href="{{ url_for('main.list_persons', page=pagination.pages, per_page=request.args.get('per_page', 50), sort_by=request.args.get('sort_by', 'last_name'), sort_order=request.args.get('sort_order', 'asc')) }}"
+               class="btn-page {% if not pagination.has_next %}disabled{% endif %}"
+               {% if not pagination.has_next %}aria-disabled="true" style="pointer-events: none; opacity: 0.5;"{% endif %}
+               aria-label="Last page">Last »</a>
+        </div>
+        
+        <div style="margin-top: 15px; text-align: center; color: #666; font-size: 0.9em;">
+            Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} to {{ ((pagination.page - 1) * pagination.per_page) + pagination.items|length }} of {{ pagination.total }} persons
+        </div>
+        {% endif %}
         {% else %}
         <div class="no-persons">
             <div class="no-persons-icon">👤</div>
@@ -769,6 +862,24 @@
         
         searchInput.addEventListener('input', filterTable);
         genderFilter.addEventListener('change', filterTable);
+        
+        // Sorting functionality
+        function updateSort() {
+            const sortBy = document.getElementById('sortBy').value;
+            const sortOrder = new URLSearchParams(window.location.search).get('sort_order') || 'asc';
+            const page = new URLSearchParams(window.location.search).get('page') || '1';
+            const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
+            window.location.href = `/persons?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+        }
+        
+        function toggleSortOrder() {
+            const sortBy = new URLSearchParams(window.location.search).get('sort_by') || 'last_name';
+            const currentOrder = new URLSearchParams(window.location.search).get('sort_order') || 'asc';
+            const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+            const page = new URLSearchParams(window.location.search).get('page') || '1';
+            const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
+            window.location.href = `/persons?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${newOrder}`;
+        }
     </script>
 </body>
 </html>

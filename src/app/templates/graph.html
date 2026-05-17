@@ -705,11 +705,6 @@
                     // If we encounter a node again at a different level, use the minimum level
                     if (levels.has(id) && levels.get(id) > level) {
                         levels.set(id, level);
-                        // Also update spouse to same level
-                        const spouseId = spouseMap.get(id);
-                        if (spouseId && levels.has(spouseId)) {
-                            levels.set(spouseId, level);
-                        }
                     }
                     continue;
                 }
@@ -717,29 +712,9 @@
                 visited.add(id);
                 levels.set(id, level);
                 
-                // Check if spouse exists and ensure they're on same level
-                const spouseId = spouseMap.get(id);
-                if (spouseId) {
-                    // If spouse already has a level, use the maximum of the two
-                    // (both should be at the level of whoever has parents)
-                    if (levels.has(spouseId)) {
-                        const spouseLevel = levels.get(spouseId);
-                        const finalLevel = Math.max(level, spouseLevel);
-                        levels.set(id, finalLevel);
-                        levels.set(spouseId, finalLevel);
-                    } else {
-                        // Spouse not yet processed, set to same level
-                        levels.set(spouseId, level);
-                    }
-                }
-                
                 // Add children to queue at next level
                 parentChildEdges.forEach(edge => {
                     if (edge.from === id && !visited.has(edge.to)) {
-                        queue.push({ id: edge.to, level: level + 1 });
-                    }
-                    // Also check spouse's children
-                    if (spouseId && edge.from === spouseId && !visited.has(edge.to)) {
                         queue.push({ id: edge.to, level: level + 1 });
                     }
                 });
@@ -749,6 +724,29 @@
             nodeIds.forEach(id => {
                 if (!levels.has(id)) {
                     levels.set(id, 0);
+                }
+            });
+            
+            // Phase 2: Synchronize spouse levels after hierarchy is calculated
+            const processedPairs = new Set();
+            
+            nodeIds.forEach(id => {
+                const spouseId = spouseMap.get(id);
+                if (!spouseId) return;
+                
+                // Avoid processing same pair twice
+                const pairKey = [id, spouseId].sort().join('-');
+                if (processedPairs.has(pairKey)) return;
+                processedPairs.add(pairKey);
+                
+                const level1 = levels.get(id) || 0;
+                const level2 = levels.get(spouseId) || 0;
+                
+                if (level1 !== level2) {
+                    // Use Math.max - spouse without parents adopts level of spouse with parents
+                    const finalLevel = Math.max(level1, level2);
+                    levels.set(id, finalLevel);
+                    levels.set(spouseId, finalLevel);
                 }
             });
             

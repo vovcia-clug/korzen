@@ -1074,12 +1074,12 @@ class GedcomParser:
                     'gedcom_id': baptism.gedcom_id,
                     'event_type': 'baptism',
                     'date': baptism.baptism_date,
-                    'place': baptism.baptism_place,
+                    'place': baptism.village,
                     'parish': baptism.parish
                 }
                 importer.create_event_vertex(str(baptism.id), event_props)
                 importer.create_baptized_in_edge(
-                    str(baptism.person_id),
+                    str(baptism.child_id),
                     str(baptism.id),
                     str(baptism.baptism_date) if baptism.baptism_date else None
                 )
