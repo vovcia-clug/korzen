@@ -5,9 +5,10 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
+from sqlalchemy.orm import joinedload, selectinload
 
 from ..extensions import db
-from ..models import UploadedFile, Person, BaptismRecord, MarriageRecord, DeathRecord
+from ..models import UploadedFile, Person, BaptismRecord, MarriageRecord, DeathRecord, SocialStatus
 from ..gedcom_parser import GedcomParser
 
 logger = logging.getLogger(__name__)
@@ -351,6 +352,252 @@ def api_list_persons():
         
     except Exception as e:
         return jsonify({"error": f"Failed to list persons: {str(e)}"}), 500
+
+
+@bp.route("/api/persons/<person_id>/details", methods=["GET"])
+def get_person_details(person_id):
+    """
+    API endpoint to fetch complete person details with all relationships.
+    
+    Returns comprehensive information about a person including:
+    - All basic fields (30+ fields)
+    - Parent relationships (father, mother)
+    - Children relationships
+    - Social status
+    - Marriage records (with spouse info, dates, locations, witnesses)
+    - Baptism records (as child, father, or mother)
+    - Death records (with all details)
+    """
+    try:
+        # Build query with eager loading for all relationships
+        query = Person.query.options(
+            # Parent relationships
+            joinedload(Person.father),
+            joinedload(Person.mother),
+            # Social status
+            joinedload(Person.social_status),
+            # Children relationships (both as father and mother)
+            selectinload(Person.children_as_father),
+            selectinload(Person.children_as_mother),
+            # Marriage records with spouse relationships
+            selectinload(Person.marriages_as_spouse1).joinedload(MarriageRecord.spouse2),
+            selectinload(Person.marriages_as_spouse2).joinedload(MarriageRecord.spouse1),
+            # Baptism records in all roles
+            selectinload(Person.baptism_as_child),
+            selectinload(Person.baptism_as_father).joinedload(BaptismRecord.child),
+            selectinload(Person.baptism_as_mother).joinedload(BaptismRecord.child),
+            # Death records
+            selectinload(Person.death_records)
+        )
+        
+        # Fetch person by ID
+        person = query.filter(Person.id == person_id).first()
+        
+        if not person:
+            return jsonify({"error": "Person not found"}), 404
+        
+        # Helper function to format date with estimated flag
+        def format_date(date_value, estimated_flag):
+            if not date_value:
+                return None
+            return {
+                "date": date_value.isoformat(),
+                "estimated": estimated_flag if estimated_flag is not None else False
+            }
+        
+        # Helper function to format person reference
+        def format_person_ref(person_obj):
+            if not person_obj:
+                return None
+            return {
+                "id": str(person_obj.id),
+                "name": f"{person_obj.first_name or ''} {person_obj.last_name or ''}".strip() or "Unknown"
+            }
+        
+        # Build basic information
+        basic_info = {
+            "first_name": person.first_name,
+            "last_name": person.last_name,
+            "maiden_name": person.maiden_name,
+            "gender": person.gender,
+            "birth_date": format_date(person.birth_date, person.birth_date_estimated),
+            "death_date": format_date(person.death_date, person.death_date_estimated),
+            "birth_place": person.birth_place,
+            "death_place": person.death_place,
+            "residence": person.residence,
+            "house_number": person.house_number,
+            "parish": person.parish,
+            "occupation": person.occupation,
+            "notes": person.notes,
+            "gedcom_id": person.gedcom_id,
+            "social_status": {
+                "latin_name": person.social_status.latin_name,
+                "polish_name": person.social_status.polish_name
+            } if person.social_status else None
+        }
+        
+        # Build parents information
+        parents = {
+            "father": format_person_ref(person.father),
+            "mother": format_person_ref(person.mother)
+        }
+        
+        # Build children list (combine children as father and as mother, removing duplicates)
+        children_dict = {}
+        for child in person.children_as_father:
+            children_dict[str(child.id)] = {
+                "id": str(child.id),
+                "name": f"{child.first_name or ''} {child.last_name or ''}".strip() or "Unknown",
+                "birth_date": child.birth_date.isoformat() if child.birth_date else None
+            }
+        for child in person.children_as_mother:
+            if str(child.id) not in children_dict:
+                children_dict[str(child.id)] = {
+                    "id": str(child.id),
+                    "name": f"{child.first_name or ''} {child.last_name or ''}".strip() or "Unknown",
+                    "birth_date": child.birth_date.isoformat() if child.birth_date else None
+                }
+        children = list(children_dict.values())
+        
+        # Build marriages list (combine marriages as spouse1 and spouse2)
+        marriages = []
+        
+        for marriage in person.marriages_as_spouse1:
+            marriages.append({
+                "id": str(marriage.id),
+                "marriage_date": marriage.marriage_date.isoformat() if marriage.marriage_date else None,
+                "spouse": format_person_ref(marriage.spouse2),
+                "parish": marriage.parish,
+                "village": marriage.village,
+                "spouse_status": marriage.spouse2_status,
+                "spouse_age": marriage.spouse2_age,
+                "spouse_residence": marriage.spouse2_residence,
+                "banns_count": marriage.banns_count,
+                "banns_dates": marriage.banns_dates if marriage.banns_dates else [],
+                "witnesses": marriage.witnesses if marriage.witnesses else [],
+                "priest_name": marriage.priest_name,
+                "notes": marriage.notes
+            })
+        
+        for marriage in person.marriages_as_spouse2:
+            marriages.append({
+                "id": str(marriage.id),
+                "marriage_date": marriage.marriage_date.isoformat() if marriage.marriage_date else None,
+                "spouse": format_person_ref(marriage.spouse1),
+                "parish": marriage.parish,
+                "village": marriage.village,
+                "spouse_status": marriage.spouse1_status,
+                "spouse_age": marriage.spouse1_age,
+                "spouse_residence": marriage.spouse1_residence,
+                "banns_count": marriage.banns_count,
+                "banns_dates": marriage.banns_dates if marriage.banns_dates else [],
+                "witnesses": marriage.witnesses if marriage.witnesses else [],
+                "priest_name": marriage.priest_name,
+                "notes": marriage.notes
+            })
+        
+        # Build baptism records
+        baptisms = []
+        
+        # Baptism as child
+        for baptism in person.baptism_as_child:
+            baptisms.append({
+                "id": str(baptism.id),
+                "role": "child",
+                "baptism_date": baptism.baptism_date.isoformat() if baptism.baptism_date else None,
+                "birth_date": baptism.birth_date.isoformat() if baptism.birth_date else None,
+                "parish": baptism.parish,
+                "village": baptism.village,
+                "house_number": baptism.house_number,
+                "child_name": baptism.child_name,
+                "child_gender": baptism.child_gender,
+                "father_name": f"{baptism.father_name or ''} {baptism.father_surname or ''}".strip() if baptism.father_name or baptism.father_surname else None,
+                "mother_name": f"{baptism.mother_name or ''} {baptism.mother_maiden_name or ''}".strip() if baptism.mother_name or baptism.mother_maiden_name else None,
+                "legitimate": baptism.legitimate,
+                "godfather_name": baptism.godfather_name,
+                "godmother_name": baptism.godmother_name,
+                "godparents_location": baptism.godparents_location,
+                "priest_name": baptism.priest_name,
+                "notes": baptism.notes
+            })
+        
+        # Baptism as father
+        for baptism in person.baptism_as_father:
+            baptisms.append({
+                "id": str(baptism.id),
+                "role": "father",
+                "baptism_date": baptism.baptism_date.isoformat() if baptism.baptism_date else None,
+                "birth_date": baptism.birth_date.isoformat() if baptism.birth_date else None,
+                "parish": baptism.parish,
+                "village": baptism.village,
+                "child": format_person_ref(baptism.child),
+                "child_name": baptism.child_name,
+                "child_gender": baptism.child_gender,
+                "mother_name": f"{baptism.mother_name or ''} {baptism.mother_maiden_name or ''}".strip() if baptism.mother_name or baptism.mother_maiden_name else None,
+                "legitimate": baptism.legitimate,
+                "godfather_name": baptism.godfather_name,
+                "godmother_name": baptism.godmother_name,
+                "priest_name": baptism.priest_name
+            })
+        
+        # Baptism as mother
+        for baptism in person.baptism_as_mother:
+            baptisms.append({
+                "id": str(baptism.id),
+                "role": "mother",
+                "baptism_date": baptism.baptism_date.isoformat() if baptism.baptism_date else None,
+                "birth_date": baptism.birth_date.isoformat() if baptism.birth_date else None,
+                "parish": baptism.parish,
+                "village": baptism.village,
+                "child": format_person_ref(baptism.child),
+                "child_name": baptism.child_name,
+                "child_gender": baptism.child_gender,
+                "father_name": f"{baptism.father_name or ''} {baptism.father_surname or ''}".strip() if baptism.father_name or baptism.father_surname else None,
+                "legitimate": baptism.legitimate,
+                "godfather_name": baptism.godfather_name,
+                "godmother_name": baptism.godmother_name,
+                "priest_name": baptism.priest_name
+            })
+        
+        # Build death records
+        deaths = []
+        for death in person.death_records:
+            deaths.append({
+                "id": str(death.id),
+                "death_date": death.death_date.isoformat() if death.death_date else None,
+                "burial_date": death.burial_date.isoformat() if death.burial_date else None,
+                "parish": death.parish,
+                "village": death.village,
+                "cemetery": death.cemetery,
+                "marital_status": death.marital_status,
+                "age_years": death.age_years,
+                "age_description": death.age_description,
+                "cause_of_death": death.cause_of_death,
+                "sacraments_received": death.sacraments_received,
+                "sacraments_details": death.sacraments_details,
+                "spouse_name": death.spouse_name,
+                "father_name": death.father_name,
+                "mother_name": death.mother_name,
+                "priest_name": death.priest_name,
+                "notes": death.notes
+            })
+        
+        # Build complete response
+        response = {
+            "id": str(person.id),
+            "basic_info": basic_info,
+            "parents": parents,
+            "children": children,
+            "marriages": marriages,
+            "baptisms": baptisms,
+            "deaths": deaths
+        }
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        logger.error(f"Error fetching person details: {e}")
+        return jsonify({"error": f"Failed to fetch person details: {str(e)}"}), 500
 
 
 @bp.route("/reset-database", methods=["POST"])

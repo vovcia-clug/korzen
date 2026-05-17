@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Korzen - Family Tree Visualizer</title>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -146,7 +147,9 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            max-width: 300px;
+            max-width: 450px;
+            max-height: calc(100vh - 80px);
+            overflow-y: auto;
             display: none;
             z-index: 1000;
         }
@@ -192,6 +195,84 @@
         
         .close-btn:hover {
             color: #333;
+        }
+        
+        .info-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-section:last-child {
+            border-bottom: none;
+        }
+        
+        .info-section h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 600;
+        }
+        
+        .info-section h5 {
+            color: #333;
+            margin-top: 10px;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        
+        .info-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .info-list li {
+            margin-bottom: 8px;
+            padding-left: 0;
+        }
+        
+        .person-link {
+            color: #667eea;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .person-link:hover {
+            text-decoration: underline;
+            color: #764ba2;
+        }
+        
+        .record-card {
+            background: #f8f9ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .record-card:last-child {
+            margin-bottom: 0;
+        }
+        
+        .estimated-date {
+            font-style: italic;
+            color: #ff6f00;
+        }
+        
+        .loading-details {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        
+        .error-details {
+            text-align: center;
+            padding: 20px;
+            color: #d32f2f;
+            background: #ffebee;
+            border-radius: 4px;
         }
         
         .stats {
@@ -368,6 +449,12 @@
                 </button>
             </div>
         </div>
+        <div class="control-group" id="treeOptions" style="display: none;">
+            <label>
+                <input type="checkbox" id="hideFatherEdgesTree" checked onchange="toggleFatherEdgesTree()">
+                Hide father-to-child edges
+            </label>
+        </div>
         <div class="control-group" id="clusterOptions" style="display: none;">
             <label>
                 <input type="checkbox" id="hideFatherEdges" checked onchange="toggleFatherEdges()">
@@ -378,10 +465,6 @@
             <div class="stat-item">
                 <span class="stat-label">People:</span>
                 <span class="stat-value" id="nodeCount">0</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Relationships:</span>
-                <span class="stat-value" id="edgeCount">0</span>
             </div>
             <div class="stat-item" id="rootIndicator" style="display: none;">
                 <span class="stat-label">Ancestor:</span>
@@ -434,6 +517,7 @@
         let currentMode = 'hierarchical'; // 'hierarchical' or 'clusters'
         let cachedGraphData = null; // Cache the last loaded data for mode switching
         let hideFatherEdges = true; // Default: hide father-to-child edges in cluster mode
+        let hideFatherEdgesTree = true; // Default: hide father-to-child edges in tree mode
         
         const MODES = {
             HIERARCHICAL: 'hierarchical',
@@ -449,19 +533,29 @@
                 updateModeIndicator(currentMode);
             }
             
-            // Load saved father edges preference
+            // Load saved father edges preference for cluster mode
             const savedHideFatherEdges = localStorage.getItem('hideFatherEdges');
             if (savedHideFatherEdges !== null) {
                 hideFatherEdges = savedHideFatherEdges === 'true';
                 document.getElementById('hideFatherEdges').checked = hideFatherEdges;
             }
             
-            // Show/hide cluster options based on initial mode
+            // Load saved father edges preference for tree mode
+            const savedHideFatherEdgesTree = localStorage.getItem('hideFatherEdgesTree');
+            if (savedHideFatherEdgesTree !== null) {
+                hideFatherEdgesTree = savedHideFatherEdgesTree === 'true';
+                document.getElementById('hideFatherEdgesTree').checked = hideFatherEdgesTree;
+            }
+            
+            // Show/hide mode-specific options based on initial mode
+            const treeOptions = document.getElementById('treeOptions');
             const clusterOptions = document.getElementById('clusterOptions');
-            if (currentMode === MODES.CLUSTERS) {
-                clusterOptions.style.display = 'flex';
-            } else {
+            if (currentMode === MODES.HIERARCHICAL) {
+                treeOptions.style.display = 'flex';
                 clusterOptions.style.display = 'none';
+            } else {
+                treeOptions.style.display = 'none';
+                clusterOptions.style.display = 'flex';
             }
             
             loadGraph();
@@ -501,21 +595,20 @@
             // Update UI indicator
             updateModeIndicator(newMode);
             
-            // Show/hide cluster options based on mode
+            // Show/hide mode-specific options based on mode
+            const treeOptions = document.getElementById('treeOptions');
             const clusterOptions = document.getElementById('clusterOptions');
-            if (newMode === MODES.CLUSTERS) {
-                clusterOptions.style.display = 'flex';
-            } else {
+            if (newMode === MODES.HIERARCHICAL) {
+                treeOptions.style.display = 'flex';
                 clusterOptions.style.display = 'none';
+            } else {
+                treeOptions.style.display = 'none';
+                clusterOptions.style.display = 'flex';
             }
             
-            // If we have cached data, recreate the network with new mode
-            if (cachedGraphData) {
-                createNetwork(cachedGraphData);
-            } else {
-                // Otherwise reload the graph
-                loadGraph();
-            }
+            // Always reload the graph to ensure edges are filtered correctly
+            // based on the current mode and hideFatherEdges setting
+            loadGraph(currentRootId);
             
             showNotification(`Switched to ${newMode === MODES.HIERARCHICAL ? 'Tree View' : 'Family Clusters'} mode`);
         }
@@ -538,33 +631,42 @@
         }
         
         /**
-         * Get hierarchical layout options for tree view mode
+         * Toggle father-to-child edges in tree mode
+         */
+        function toggleFatherEdgesTree() {
+            const checkbox = document.getElementById('hideFatherEdgesTree');
+            hideFatherEdgesTree = checkbox.checked;
+            
+            // Save preference
+            localStorage.setItem('hideFatherEdgesTree', hideFatherEdgesTree);
+            
+            // Reload the graph to apply the new edge filtering
+            if (currentMode === MODES.HIERARCHICAL) {
+                loadGraph(currentRootId);
+                showNotification(hideFatherEdgesTree ? 'Father edges hidden' : 'Father edges shown');
+            }
+        }
+        
+        /**
+         * Get hierarchical layout options for tree view mode.
+         * With dagre preprocessing, we disable vis-network's auto-layout and use fixed positions.
          */
         function getHierarchicalOptions() {
             return {
                 layout: {
                     hierarchical: {
-                        enabled: true,
-                        direction: 'UD',        // Up-Down (top to bottom)
-                        sortMethod: 'directed', // Follow edge direction
-                        nodeSpacing: 120,       // Increased to give spouses more room
-                        levelSeparation: 200,   // Vertical spacing between generations
-                        treeSpacing: 250,       // Spacing between separate family trees
-                        blockShifting: true,
-                        edgeMinimization: true, // Re-enable for better edge routing
-                        parentCentralization: true,
-                        shakeTowards: 'leaves'  // Helps organize tree structure
+                        enabled: false  // Disabled: using dagre-computed positions instead
                     }
                 },
                 physics: {
-                    enabled: false  // Disable physics when using fixed hierarchical levels
+                    enabled: false  // Disabled: nodes have fixed dagre-computed positions
                 },
                 interaction: {
                     hover: true,
                     tooltipDelay: 200,
                     navigationButtons: true,
                     keyboard: true,
-                    dragNodes: true,
+                    dragNodes: false,  // Prevent dragging to maintain dagre layout
                     dragView: true,
                     zoomView: true
                 },
@@ -576,14 +678,14 @@
                     widthConstraint: {
                         minimum: 100,
                         maximum: 200
-                    }
+                    },
+                    fixed: true  // Keep nodes at dagre-computed positions
                 },
                 edges: {
                     smooth: {
                         enabled: true,
-                        type: 'cubicBezier',
-                        forceDirection: 'vertical',
-                        roundness: 0.5
+                        type: 'curvedCW',  // Curved clockwise for better edge routing
+                        roundness: 0.3     // Moderate curvature to avoid clutter
                     },
                     arrows: {
                         to: {
@@ -753,6 +855,216 @@
             return levels;
         }
         
+        /**
+         * Apply dagre layout algorithm to compute optimized node positions
+         * for hierarchical family tree visualization.
+         *
+         * @param {Array} visNodes - Array of vis-network node objects
+         * @param {Array} marriages - Array of marriage objects with spouse1Id and spouse2Id
+         * @param {Array} parentChildEdges - Array of parent-child edge objects
+         * @param {Map} spouseGroups - Map of person ID to spouse group ID
+         * @returns {Object} Object with positioned nodes and metadata
+         */
+        function applyDagreLayout(visNodes, marriages, parentChildEdges, spouseGroups) {
+            // Configuration for dagre layout optimized for genealogy
+            const DAGRE_CONFIG = {
+                rankdir: 'TB',           // Top-to-bottom direction
+                ranksep: 110,            // Vertical spacing between generations (110px)
+                nodesep: 90,             // Horizontal spacing between siblings (90px)
+                edgesep: 25,             // Edge separation (25px)
+                marginx: 50,             // Horizontal margin
+                marginy: 50              // Vertical margin
+            };
+            
+            // Create dagre graph
+            const g = new dagre.graphlib.Graph({
+                multigraph: false,
+                compound: false
+            });
+            
+            // Set graph configuration
+            g.setGraph(DAGRE_CONFIG);
+            
+            // Default node configuration in dagre
+            g.setDefaultNodeLabel(() => ({}));
+            g.setDefaultEdgeLabel(() => ({}));
+            
+            // Build spouse map for adjacency constraints
+            const spouseMap = new Map();
+            marriages.forEach(marriage => {
+                spouseMap.set(marriage.spouse1Id, marriage.spouse2Id);
+                spouseMap.set(marriage.spouse2Id, marriage.spouse1Id);
+            });
+            
+            // Add nodes to dagre graph
+            visNodes.forEach(node => {
+                // Estimate node dimensions based on label length
+                const labelLines = (node.label || '').split('\n').length;
+                const width = 150;  // Fixed width for consistency
+                const height = Math.max(60, labelLines * 25); // Dynamic height based on content
+                
+                g.setNode(node.id, {
+                    width: width,
+                    height: height,
+                    visNode: node  // Store reference to original node
+                });
+            });
+            
+            // Add parent-child edges to dagre (these define the hierarchy)
+            parentChildEdges.forEach(edge => {
+                g.setEdge(edge.from, edge.to, {
+                    weight: 5,  // Higher weight for parent-child edges
+                    minlen: 1   // Minimum rank separation
+                });
+            });
+            
+            // Add marriage edges with special handling
+            // Marriage edges should keep spouses at the same rank
+            marriages.forEach(marriage => {
+                const spouse1 = marriage.spouse1Id;
+                const spouse2 = marriage.spouse2Id;
+                
+                // Add edge with zero minimum length to keep them at same rank
+                g.setEdge(spouse1, spouse2, {
+                    weight: 10,  // Very high weight to keep spouses close
+                    minlen: 0    // Zero minlen allows same rank
+                });
+            });
+            
+            // Run dagre layout algorithm
+            try {
+                dagre.layout(g);
+            } catch (error) {
+                console.error('Dagre layout failed:', error);
+                // Return nodes without positioning if dagre fails
+                return { nodes: visNodes, success: false };
+            }
+            
+            // Extract computed positions from dagre
+            const positionedNodes = visNodes.map(node => {
+                const dagreNode = g.node(node.id);
+                
+                if (!dagreNode) {
+                    console.warn(`Node ${node.id} not found in dagre graph`);
+                    return { ...node, x: 0, y: 0 };
+                }
+                
+                return {
+                    ...node,
+                    x: dagreNode.x,
+                    y: dagreNode.y,
+                    fixed: { x: true, y: true }  // Fix positions computed by dagre
+                };
+            });
+            
+            // Post-processing: Adjust spouse positioning to ensure adjacency
+            // This is a refinement pass to pull spouses closer together
+            const adjustedNodes = adjustSpousePositions(positionedNodes, spouseMap, marriages);
+            
+            return {
+                nodes: adjustedNodes,
+                success: true,
+                graphWidth: g.graph().width,
+                graphHeight: g.graph().height
+            };
+        }
+        
+        /**
+         * Post-process node positions to ensure married couples are positioned
+         * close together horizontally while maintaining their assigned rank (y-position).
+         *
+         * @param {Array} nodes - Array of positioned nodes
+         * @param {Map} spouseMap - Map of personId -> spouseId
+         * @param {Array} marriages - Array of marriage objects
+         * @returns {Array} Adjusted nodes with refined spouse positioning
+         */
+        function adjustSpousePositions(nodes, spouseMap, marriages) {
+            // Create a map for quick node lookup by ID
+            const nodeMap = new Map(nodes.map(n => [n.id, { ...n }]));
+            
+            // Group nodes by their y-coordinate (rank/generation)
+            const rankGroups = new Map();
+            nodes.forEach(node => {
+                const y = Math.round(node.y);
+                if (!rankGroups.has(y)) {
+                    rankGroups.set(y, []);
+                }
+                rankGroups.get(y).push(node.id);
+            });
+            
+            // Process each marriage to adjust spouse positions
+            const processedPairs = new Set();
+            
+            marriages.forEach(marriage => {
+                const spouse1Id = marriage.spouse1Id;
+                const spouse2Id = marriage.spouse2Id;
+                const pairKey = [spouse1Id, spouse2Id].sort().join('-');
+                
+                // Skip if already processed
+                if (processedPairs.has(pairKey)) return;
+                processedPairs.add(pairKey);
+                
+                const spouse1 = nodeMap.get(spouse1Id);
+                const spouse2 = nodeMap.get(spouse2Id);
+                
+                if (!spouse1 || !spouse2) return;
+                
+                // Calculate current distance
+                const distance = Math.abs(spouse1.x - spouse2.x);
+                const MAX_SPOUSE_DISTANCE = 180;
+                
+                // If spouses are too far apart, pull them closer
+                if (distance > MAX_SPOUSE_DISTANCE) {
+                    // Calculate midpoint
+                    const midX = (spouse1.x + spouse2.x) / 2;
+                    
+                    // Move spouses closer to midpoint
+                    const targetDistance = MAX_SPOUSE_DISTANCE * 0.7; // 70% of max distance
+                    
+                    if (spouse1.x < spouse2.x) {
+                        spouse1.x = midX - targetDistance / 2;
+                        spouse2.x = midX + targetDistance / 2;
+                    } else {
+                        spouse1.x = midX + targetDistance / 2;
+                        spouse2.x = midX - targetDistance / 2;
+                    }
+                    
+                    // Update in map
+                    nodeMap.set(spouse1Id, spouse1);
+                    nodeMap.set(spouse2Id, spouse2);
+                }
+            });
+            
+            // Check for overlaps within each rank and resolve
+            rankGroups.forEach((nodeIds, y) => {
+                if (nodeIds.length < 2) return;
+                
+                // Sort nodes by x position
+                const rankNodes = nodeIds
+                    .map(id => nodeMap.get(id))
+                    .filter(n => n !== undefined)
+                    .sort((a, b) => a.x - b.x);
+                
+                const MIN_SPACING = 90;
+                
+                // Resolve overlaps by pushing nodes apart
+                for (let i = 1; i < rankNodes.length; i++) {
+                    const prevNode = rankNodes[i - 1];
+                    const currNode = rankNodes[i];
+                    const gap = currNode.x - prevNode.x;
+                    
+                    if (gap < MIN_SPACING) {
+                        // Push current node to the right
+                        currNode.x = prevNode.x + MIN_SPACING;
+                        nodeMap.set(currNode.id, currNode);
+                    }
+                }
+            });
+            
+            // Convert map back to array
+            return Array.from(nodeMap.values());
+        }
+        
         async function loadGraph(rootId = null) {
             const loadBtn = document.getElementById('loadBtn');
             const loading = document.getElementById('loading');
@@ -784,10 +1096,9 @@
                 
                 // Update stats
                 document.getElementById('nodeCount').textContent = data.nodes.length;
-                document.getElementById('edgeCount').textContent = data.edges.length;
                 
                 // Transform data for vis.js
-                const visNodes = data.nodes.map(node => {
+                let visNodes = data.nodes.map(node => {
                     let color = '#bdbdbd'; // Unknown/default
                     let shape = 'box';
                     let borderWidth = 2;
@@ -953,20 +1264,22 @@
                             size: 16,
                             align: 'middle',
                             strokeWidth: 0
-                        },
-                        smooth: {
-                            enabled: true,
-                            type: 'horizontal',
-                            forceDirection: 'none',
-                            roundness: 0.2
                         }
                     };
                     
-                    // Add physics properties for clusters mode
+                    // Mode-specific edge configuration
                     if (currentMode === MODES.CLUSTERS) {
+                        // Clusters mode: use physics-based spring forces
                         marriageEdge.length = 50;   // Very short distance
                         marriageEdge.physics = true;
                         marriageEdge.smooth = { enabled: true, type: 'continuous' };
+                    } else {
+                        // Hierarchical mode: use smooth curve for better aesthetics with dagre
+                        marriageEdge.smooth = {
+                            enabled: true,
+                            type: 'curvedCW',  // Curved edge for visual distinction
+                            roundness: 0.15    // Gentle curve
+                        };
                     }
                     
                     visEdges.push(marriageEdge);
@@ -1000,6 +1313,19 @@
                             // (this handles cases where gender is unknown)
                         }
                         
+                        // In tree mode with hideFatherEdgesTree enabled, prefer mother
+                        if (currentMode === MODES.HIERARCHICAL && hideFatherEdgesTree) {
+                            const spouse1Gender = getParentGender(couple.spouse1Id);
+                            const spouse2Gender = getParentGender(couple.spouse2Id);
+                            
+                            // If spouse2 is female (mother), use spouse2
+                            if (spouse2Gender === 'F') {
+                                fromParentId = couple.spouse2Id;
+                            }
+                            // If spouse1 is male and spouse2 is not female, still use spouse1
+                            // (this handles cases where gender is unknown)
+                        }
+                        
                         // Create single edge from selected parent to common child
                         const childEdge = {
                             from: fromParentId,
@@ -1022,20 +1348,22 @@
                                 size: 16,
                                 align: 'middle',
                                 strokeWidth: 0
-                            },
-                            smooth: {
-                                enabled: true,
-                                type: 'cubicBezier',
-                                forceDirection: 'vertical',
-                                roundness: 0.5
                             }
                         };
                         
-                        // Add physics properties for clusters mode
+                        // Mode-specific edge configuration
                         if (currentMode === MODES.CLUSTERS) {
+                            // Clusters mode: use physics-based forces
                             childEdge.length = 150;  // Medium distance for parent-child
                             childEdge.physics = true;
                             childEdge.smooth = { enabled: true, type: 'continuous' };
+                        } else {
+                            // Hierarchical mode: smooth curves optimized for dagre layout
+                            childEdge.smooth = {
+                                enabled: true,
+                                type: 'curvedCW',
+                                roundness: 0.2
+                            };
                         }
                         
                         visEdges.push(childEdge);
@@ -1067,6 +1395,16 @@
                         }
                     }
                     
+                    // In tree mode with hideFatherEdgesTree enabled, skip father edges
+                    if (currentMode === MODES.HIERARCHICAL && hideFatherEdgesTree) {
+                        const parentGender = getParentGender(parentId);
+                        if (parentGender === 'M') {
+                            // Skip this edge - it's from a father
+                            processedEdges.add(edgeKey);
+                            return;
+                        }
+                    }
+                    
                     // Add edge for non-common child
                     const nonCommonChildEdge = {
                         from: parentId,
@@ -1089,20 +1427,22 @@
                             size: 16,
                             align: 'middle',
                             strokeWidth: 0
-                        },
-                        smooth: {
-                            enabled: true,
-                            type: 'cubicBezier',
-                            forceDirection: 'vertical',
-                            roundness: 0.5
                         }
                     };
                     
-                    // Add physics properties for clusters mode
+                    // Mode-specific edge configuration
                     if (currentMode === MODES.CLUSTERS) {
+                        // Clusters mode: use physics-based forces
                         nonCommonChildEdge.length = 150;  // Medium distance for parent-child
                         nonCommonChildEdge.physics = true;
                         nonCommonChildEdge.smooth = { enabled: true, type: 'continuous' };
+                    } else {
+                        // Hierarchical mode: smooth curves optimized for dagre layout
+                        nonCommonChildEdge.smooth = {
+                            enabled: true,
+                            type: 'curvedCW',
+                            roundness: 0.2
+                        };
                     }
                     
                     visEdges.push(nonCommonChildEdge);
@@ -1113,23 +1453,35 @@
                 
                 // Apply mode-specific node processing
                 if (currentMode === MODES.HIERARCHICAL) {
-                    // Calculate and assign hierarchical levels to ensure spouses are on same level
-                    const nodeLevels = calculateNodeLevels(visNodes, marriages, parentChildEdges);
+                    // Use dagre layout algorithm for optimized positioning
+                    const dagreResult = applyDagreLayout(visNodes, marriages, parentChildEdges, spouseGroups);
                     
-                    visNodes.forEach(node => {
-                        // Assign calculated level
-                        const level = nodeLevels.get(node.id);
-                        if (level !== undefined) {
-                            node.level = level;
-                            node.fixed = { y: true }; // Fix Y position to maintain level
-                        }
+                    if (dagreResult.success) {
+                        // Apply dagre-computed positions to nodes
+                        visNodes = dagreResult.nodes;
                         
-                        // Keep group assignment for visual grouping
-                        const groupId = spouseGroups.get(node.id);
-                        if (groupId) {
-                            node.group = groupId;
-                        }
-                    });
+                        console.log(`Dagre layout computed: ${dagreResult.nodes.length} nodes, ` +
+                                  `${dagreResult.graphWidth}x${dagreResult.graphHeight}px`);
+                    } else {
+                        // Fallback to original BFS-based level calculation if dagre fails
+                        console.warn('Dagre layout failed, using fallback BFS layout');
+                        const nodeLevels = calculateNodeLevels(visNodes, marriages, parentChildEdges);
+                        
+                        visNodes.forEach(node => {
+                            // Assign calculated level
+                            const level = nodeLevels.get(node.id);
+                            if (level !== undefined) {
+                                node.level = level;
+                                node.fixed = { y: true }; // Fix Y position to maintain level
+                            }
+                            
+                            // Keep group assignment for visual grouping
+                            const groupId = spouseGroups.get(node.id);
+                            if (groupId) {
+                                node.group = groupId;
+                            }
+                        });
+                    }
                 } else {
                     // In clusters mode, don't fix positions - let physics handle it
                     visNodes.forEach(node => {
@@ -1211,32 +1563,274 @@
             }, 100);
             
             // Add click event to show node details
-            network.on('click', function(params) {
+            network.on('click', async function(params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
                     const node = nodes.get(nodeId);
-                    showNodeInfo(node.data);
+                    
+                    // Only fetch detailed data for Person nodes
+                    if (node.data.type === 'Person') {
+                        // Show loading state
+                        showLoadingDetails(node.data.label);
+                        
+                        try {
+                            // Fetch detailed person information from new API endpoint
+                            const response = await fetch(`/api/persons/${nodeId}/details`);
+                            
+                            if (!response.ok) {
+                                throw new Error('Failed to load person details');
+                            }
+                            
+                            const detailedData = await response.json();
+                            
+                            // Show detailed information
+                            showNodeInfo(detailedData);
+                        } catch (error) {
+                            console.error('Error fetching person details:', error);
+                            showErrorDetails(node.data.label, error.message);
+                        }
+                    } else {
+                        // For non-person nodes, show basic info
+                        showNodeInfo(node.data);
+                    }
                 } else {
                     closeInfo();
                 }
             });
             
-            // Add double-click event to set node as ancestor root
+            // Add double-click event to show ancestors and descendants
             network.on('doubleClick', function(params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
                     const node = nodes.get(nodeId);
                     
-                    // Only allow Person nodes to be set as root
+                    // Only allow Person nodes
                     if (node.data.type === 'Person') {
-                        // Reload graph with this node as root ancestor
-                        loadGraph(nodeId);
-                        
-                        // Show notification
-                        showNotification(`Showing descendants of "${node.data.label}"`);
+                        // Filter to show ancestors and descendants
+                        filterToAncestorsAndDescendants(nodeId, node.data.label);
                     }
                 }
             });
+            
+            // Add drag event handlers for pinning in Family Clusters mode
+            network.on('dragStart', function(params) {
+                // Only apply in Family Clusters mode
+                if (currentMode !== MODES.CLUSTERS) {
+                    return;
+                }
+                
+                // Temporarily unpin nodes during drag to allow repositioning
+                if (params.nodes.length > 0) {
+                    params.nodes.forEach(nodeId => {
+                        const node = nodes.get(nodeId);
+                        if (node) {
+                            // Store whether the node was pinned before drag started
+                            node._wasPinned = (node.fixed && (node.fixed.x || node.fixed.y));
+                            
+                            // Temporarily unpin to allow dragging
+                            if (node._wasPinned) {
+                                nodes.update({
+                                    id: nodeId,
+                                    fixed: {
+                                        x: false,
+                                        y: false
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+            
+            network.on('dragEnd', function(params) {
+                // Only apply pinning in Family Clusters mode
+                if (currentMode !== MODES.CLUSTERS) {
+                    return;
+                }
+                
+                if (params.nodes.length > 0) {
+                    // Get the positions of dragged nodes
+                    const nodePositions = network.getPositions(params.nodes);
+                    
+                    // Update each dragged node to pin it at the new position
+                    params.nodes.forEach(nodeId => {
+                        const node = nodes.get(nodeId);
+                        const position = nodePositions[nodeId];
+                        
+                        if (node && position) {
+                            // Pin the node by setting fixed position coordinates
+                            // This allows the node to be repositioned multiple times
+                            nodes.update({
+                                id: nodeId,
+                                fixed: {
+                                    x: true,
+                                    y: true
+                                },
+                                x: position.x,
+                                y: position.y
+                            });
+                        }
+                    });
+                }
+            });
+            
+            // Add context menu (right-click) to unpin nodes in Family Clusters mode
+            network.on('oncontext', function(params) {
+                // Prevent default browser context menu
+                params.event.preventDefault();
+                
+                // Only in Family Clusters mode
+                if (currentMode !== MODES.CLUSTERS) {
+                    return;
+                }
+                
+                // Check if we clicked on a node
+                const nodeId = network.getNodeAt(params.pointer.DOM);
+                if (nodeId) {
+                    const node = nodes.get(nodeId);
+                    
+                    // Check if node is pinned
+                    if (node && node.fixed && (node.fixed.x || node.fixed.y)) {
+                        // Unpin the node - allow physics to move it again
+                        nodes.update({
+                            id: nodeId,
+                            fixed: {
+                                x: false,
+                                y: false
+                            }
+                        });
+                        
+                        showNotification(`Unpinned: ${node.data.label}`);
+                    }
+                }
+            });
+        }
+        
+        /**
+         * Filter the graph to show only ancestors and descendants of the selected node
+         */
+        function filterToAncestorsAndDescendants(nodeId, nodeLabel) {
+            if (!nodes || !edges) {
+                console.error('Graph not loaded');
+                return;
+            }
+            
+            // Get all nodes and edges
+            const allNodes = nodes.get();
+            const allEdges = edges.get();
+            
+            // Build parent and child mappings from edges
+            const childrenMap = new Map(); // parent ID -> Set of child IDs
+            const parentsMap = new Map();  // child ID -> Set of parent IDs
+            
+            allEdges.forEach(edge => {
+                // Look for PARENT_OF edges (edges with arrows pointing to children)
+                // In the graph, parent -> child relationships are shown with arrows
+                if (edge.arrows && edge.arrows.to && edge.arrows.to.enabled) {
+                    const parentId = edge.from;
+                    const childId = edge.to;
+                    
+                    // Add to children map
+                    if (!childrenMap.has(parentId)) {
+                        childrenMap.set(parentId, new Set());
+                    }
+                    childrenMap.get(parentId).add(childId);
+                    
+                    // Add to parents map
+                    if (!parentsMap.has(childId)) {
+                        parentsMap.set(childId, new Set());
+                    }
+                    parentsMap.get(childId).add(parentId);
+                }
+            });
+            
+            // Find all descendants (recursive traversal down)
+            const descendants = new Set();
+            const findDescendants = (currentId) => {
+                const children = childrenMap.get(currentId);
+                if (children) {
+                    children.forEach(childId => {
+                        if (!descendants.has(childId)) {
+                            descendants.add(childId);
+                            findDescendants(childId); // Recurse
+                        }
+                    });
+                }
+            };
+            findDescendants(nodeId);
+            
+            // Find all ancestors (recursive traversal up)
+            const ancestors = new Set();
+            const findAncestors = (currentId) => {
+                const parents = parentsMap.get(currentId);
+                if (parents) {
+                    parents.forEach(parentId => {
+                        if (!ancestors.has(parentId)) {
+                            ancestors.add(parentId);
+                            findAncestors(parentId); // Recurse
+                        }
+                    });
+                }
+            };
+            findAncestors(nodeId);
+            
+            // Combine: the clicked node + ancestors + descendants
+            const nodesToShow = new Set([nodeId, ...ancestors, ...descendants]);
+            
+            // Also include spouses of nodes in our set (married nodes should stay together)
+            const spousesToShow = new Set();
+            allEdges.forEach(edge => {
+                // Marriage edges have no arrows
+                if (!edge.arrows || !edge.arrows.to || !edge.arrows.to.enabled) {
+                    // This is likely a marriage edge
+                    if (nodesToShow.has(edge.from)) {
+                        spousesToShow.add(edge.to);
+                    }
+                    if (nodesToShow.has(edge.to)) {
+                        spousesToShow.add(edge.from);
+                    }
+                }
+            });
+            
+            // Merge spouses into nodes to show
+            spousesToShow.forEach(id => nodesToShow.add(id));
+            
+            // Update visibility: hide nodes not in our set
+            // Important: preserve all original node properties to avoid color/style issues
+            const updates = allNodes.map(node => {
+                return {
+                    ...node,  // Spread all original properties
+                    hidden: !nodesToShow.has(node.id)
+                };
+            });
+            nodes.update(updates);
+            
+            // Hide edges where either endpoint is hidden
+            // Important: preserve all original edge properties
+            const edgeUpdates = allEdges.map(edge => {
+                const fromHidden = !nodesToShow.has(edge.from);
+                const toHidden = !nodesToShow.has(edge.to);
+                return {
+                    ...edge,  // Spread all original properties
+                    hidden: fromHidden || toHidden
+                };
+            });
+            edges.update(edgeUpdates);
+            
+            // Fit view to visible nodes
+            setTimeout(() => {
+                network.fit({
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }, 100);
+            
+            // Show notification
+            const ancestorCount = ancestors.size;
+            const descendantCount = descendants.size;
+            showNotification(`Showing ${nodeLabel}: ${ancestorCount} ancestor(s) and ${descendantCount} descendant(s)`);
         }
         
         function createTooltip(node) {
@@ -1264,50 +1858,333 @@
             return tooltip;
         }
         
-        function showNodeInfo(node) {
+        /**
+         * Show loading state while fetching person details
+         */
+        function showLoadingDetails(personName) {
             const panel = document.getElementById('infoPanel');
             const title = document.getElementById('infoTitle');
             const content = document.getElementById('infoContent');
             
-            title.textContent = node.label;
+            title.textContent = personName;
+            content.innerHTML = '<div class="loading-details">Loading person details...</div>';
+            panel.classList.add('show');
+        }
+        
+        /**
+         * Show error state when fetching fails
+         */
+        function showErrorDetails(personName, errorMessage) {
+            const panel = document.getElementById('infoPanel');
+            const title = document.getElementById('infoTitle');
+            const content = document.getElementById('infoContent');
             
-            let html = '';
+            title.textContent = personName;
+            content.innerHTML = `<div class="error-details">Failed to load details: ${errorMessage}</div>`;
+            panel.classList.add('show');
+        }
+        
+        /**
+         * Format a date object with estimated indicator
+         */
+        function formatDate(dateObj) {
+            if (!dateObj || !dateObj.date) {
+                return '<span style="color: #999;">Not recorded</span>';
+            }
             
-            if (node.type === 'Person') {
-                html += `<div class="info-item"><span class="info-label">Type:</span><span class="info-value">Person</span></div>`;
-                if (node.gender) html += `<div class="info-item"><span class="info-label">Gender:</span><span class="info-value">${node.gender}</span></div>`;
-                if (node.birth_date) html += `<div class="info-item"><span class="info-label">Birth Date:</span><span class="info-value">${node.birth_date}</span></div>`;
-                if (node.death_date) html += `<div class="info-item"><span class="info-label">Death Date:</span><span class="info-value">${node.death_date}</span></div>`;
-                if (node.birth_place) html += `<div class="info-item"><span class="info-label">Birth Place:</span><span class="info-value">${node.birth_place}</span></div>`;
-                if (node.occupation) html += `<div class="info-item"><span class="info-label">Occupation:</span><span class="info-value">${node.occupation}</span></div>`;
+            const dateStr = dateObj.date;
+            const estimated = dateObj.estimated;
+            
+            if (estimated) {
+                return `<span class="estimated-date">~${dateStr}</span>`;
+            }
+            
+            return dateStr;
+        }
+        
+        /**
+         * Create a clickable person link
+         */
+        function createPersonLink(person) {
+            if (!person || !person.id) {
+                return '<span style="color: #999;">Unknown</span>';
+            }
+            
+            return `<a href="#" class="person-link" onclick="navigateToPerson('${person.id}', event); return false;">${person.name}</a>`;
+        }
+        
+        /**
+         * Navigate to a person in the graph
+         */
+        function navigateToPerson(personId, event) {
+            if (event) {
+                event.preventDefault();
+            }
+            
+            // Select the node in the graph
+            network.selectNodes([personId]);
+            
+            // Center on the node
+            network.focus(personId, {
+                scale: 1.5,
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+            
+            // Trigger click to load details
+            const node = nodes.get(personId);
+            if (node && node.data.type === 'Person') {
+                showLoadingDetails(node.data.label);
                 
-                // Add source information
-                if (node.source) {
-                    html += `<div class="info-item"><span class="info-label">Source:</span><span class="info-value">${node.source}</span></div>`;
-                } else {
-                    html += `<div class="info-item"><span class="info-label">Source:</span><span class="info-value">Unknown</span></div>`;
+                fetch(`/api/persons/${personId}/details`)
+                    .then(response => response.json())
+                    .then(data => showNodeInfo(data))
+                    .catch(error => {
+                        console.error('Error fetching person details:', error);
+                        showErrorDetails(node.data.label, error.message);
+                    });
+            }
+        }
+        
+        /**
+         * Display comprehensive person information
+         */
+        function showNodeInfo(data) {
+            const panel = document.getElementById('infoPanel');
+            const title = document.getElementById('infoTitle');
+            const content = document.getElementById('infoContent');
+            
+            // Check if this is detailed API data or old format
+            if (data.basic_info) {
+                // New detailed format
+                const info = data.basic_info;
+                const fullName = `${info.first_name || ''} ${info.last_name || ''}`.trim() || 'Unknown Person';
+                title.textContent = fullName;
+                
+                let html = '';
+                
+                // === BASIC INFORMATION ===
+                html += '<div class="info-section">';
+                html += '<h4>📋 Basic Information</h4>';
+                html += '<ul class="info-list">';
+                
+                if (info.first_name) html += `<li><strong>First Name:</strong> ${info.first_name}</li>`;
+                if (info.last_name) html += `<li><strong>Last Name:</strong> ${info.last_name}</li>`;
+                if (info.maiden_name) html += `<li><strong>Maiden Name:</strong> ${info.maiden_name}</li>`;
+                if (info.gender) html += `<li><strong>Gender:</strong> ${info.gender === 'M' ? 'Male' : info.gender === 'F' ? 'Female' : 'Unknown'}</li>`;
+                
+                html += `<li><strong>Birth Date:</strong> ${formatDate(info.birth_date)}</li>`;
+                html += `<li><strong>Death Date:</strong> ${formatDate(info.death_date)}</li>`;
+                
+                if (info.birth_place) html += `<li><strong>Birth Place:</strong> ${info.birth_place}</li>`;
+                if (info.death_place) html += `<li><strong>Death Place:</strong> ${info.death_place}</li>`;
+                if (info.residence) html += `<li><strong>Residence:</strong> ${info.residence}</li>`;
+                if (info.house_number) html += `<li><strong>House Number:</strong> ${info.house_number}</li>`;
+                if (info.parish) html += `<li><strong>Parish:</strong> ${info.parish}</li>`;
+                if (info.occupation) html += `<li><strong>Occupation:</strong> ${info.occupation}</li>`;
+                
+                if (info.social_status) {
+                    const status = info.social_status.polish_name || info.social_status.latin_name || 'Unknown';
+                    html += `<li><strong>Social Status:</strong> ${status}</li>`;
+                }
+                
+                if (info.gedcom_id) html += `<li><strong>GEDCOM ID:</strong> ${info.gedcom_id}</li>`;
+                if (info.notes) html += `<li><strong>Notes:</strong> ${info.notes}</li>`;
+                
+                html += '</ul>';
+                html += '</div>';
+                
+                // === PARENTS ===
+                if (data.parents && (data.parents.father || data.parents.mother)) {
+                    html += '<div class="info-section">';
+                    html += '<h4>👪 Parents</h4>';
+                    html += '<ul class="info-list">';
+                    html += `<li><strong>Father:</strong> ${createPersonLink(data.parents.father)}</li>`;
+                    html += `<li><strong>Mother:</strong> ${createPersonLink(data.parents.mother)}</li>`;
+                    html += '</ul>';
+                    html += '</div>';
+                }
+                
+                // === CHILDREN ===
+                if (data.children && data.children.length > 0) {
+                    html += '<div class="info-section">';
+                    html += '<h4>👶 Children</h4>';
+                    html += '<ul class="info-list">';
+                    
+                    data.children.forEach(child => {
+                        const birthDate = child.birth_date ? ` (b. ${child.birth_date})` : '';
+                        html += `<li>${createPersonLink(child)}${birthDate}</li>`;
+                    });
+                    
+                    html += '</ul>';
+                    html += '</div>';
+                }
+                
+                // === MARRIAGES ===
+                if (data.marriages && data.marriages.length > 0) {
+                    html += '<div class="info-section">';
+                    html += '<h4>💒 Marriages</h4>';
+                    
+                    data.marriages.forEach((marriage, index) => {
+                        html += '<div class="record-card">';
+                        html += `<h5>Marriage ${index + 1}</h5>`;
+                        html += '<ul class="info-list">';
+                        
+                        html += `<li><strong>Spouse:</strong> ${createPersonLink(marriage.spouse)}</li>`;
+                        
+                        if (marriage.marriage_date) {
+                            html += `<li><strong>Date:</strong> ${marriage.marriage_date}</li>`;
+                        }
+                        
+                        if (marriage.parish) html += `<li><strong>Parish:</strong> ${marriage.parish}</li>`;
+                        if (marriage.village) html += `<li><strong>Village:</strong> ${marriage.village}</li>`;
+                        if (marriage.spouse_status) html += `<li><strong>Spouse Status:</strong> ${marriage.spouse_status}</li>`;
+                        if (marriage.spouse_age) html += `<li><strong>Spouse Age:</strong> ${marriage.spouse_age}</li>`;
+                        if (marriage.spouse_residence) html += `<li><strong>Spouse Residence:</strong> ${marriage.spouse_residence}</li>`;
+                        
+                        if (marriage.banns_count) {
+                            html += `<li><strong>Banns:</strong> ${marriage.banns_count}`;
+                            if (marriage.banns_dates && marriage.banns_dates.length > 0) {
+                                html += ` (${marriage.banns_dates.join(', ')})`;
+                            }
+                            html += '</li>';
+                        }
+                        
+                        if (marriage.witnesses && marriage.witnesses.length > 0) {
+                            html += `<li><strong>Witnesses:</strong> ${marriage.witnesses.join(', ')}</li>`;
+                        }
+                        
+                        if (marriage.priest_name) html += `<li><strong>Priest:</strong> ${marriage.priest_name}</li>`;
+                        if (marriage.notes) html += `<li><strong>Notes:</strong> ${marriage.notes}</li>`;
+                        
+                        html += '</ul>';
+                        html += '</div>';
+                    });
+                    
+                    html += '</div>';
+                }
+                
+                // === BAPTISM RECORDS ===
+                if (data.baptisms && data.baptisms.length > 0) {
+                    html += '<div class="info-section">';
+                    html += '<h4>⛪ Baptism Records</h4>';
+                    
+                    data.baptisms.forEach((baptism, index) => {
+                        html += '<div class="record-card">';
+                        
+                        const roleLabel = baptism.role === 'child' ? 'As Child' :
+                                         baptism.role === 'father' ? 'As Father' : 'As Mother';
+                        html += `<h5>Baptism ${index + 1} (${roleLabel})</h5>`;
+                        html += '<ul class="info-list">';
+                        
+                        if (baptism.baptism_date) html += `<li><strong>Baptism Date:</strong> ${baptism.baptism_date}</li>`;
+                        if (baptism.birth_date) html += `<li><strong>Birth Date:</strong> ${baptism.birth_date}</li>`;
+                        if (baptism.parish) html += `<li><strong>Parish:</strong> ${baptism.parish}</li>`;
+                        if (baptism.village) html += `<li><strong>Village:</strong> ${baptism.village}</li>`;
+                        if (baptism.house_number) html += `<li><strong>House Number:</strong> ${baptism.house_number}</li>`;
+                        
+                        if (baptism.child_name) html += `<li><strong>Child Name:</strong> ${baptism.child_name}</li>`;
+                        if (baptism.child) html += `<li><strong>Child:</strong> ${createPersonLink(baptism.child)}</li>`;
+                        if (baptism.child_gender) html += `<li><strong>Child Gender:</strong> ${baptism.child_gender}</li>`;
+                        
+                        if (baptism.father_name) html += `<li><strong>Father:</strong> ${baptism.father_name}</li>`;
+                        if (baptism.mother_name) html += `<li><strong>Mother:</strong> ${baptism.mother_name}</li>`;
+                        
+                        if (baptism.legitimate !== null && baptism.legitimate !== undefined) {
+                            html += `<li><strong>Legitimate:</strong> ${baptism.legitimate ? 'Yes' : 'No'}</li>`;
+                        }
+                        
+                        if (baptism.godfather_name) html += `<li><strong>Godfather:</strong> ${baptism.godfather_name}</li>`;
+                        if (baptism.godmother_name) html += `<li><strong>Godmother:</strong> ${baptism.godmother_name}</li>`;
+                        if (baptism.godparents_location) html += `<li><strong>Godparents Location:</strong> ${baptism.godparents_location}</li>`;
+                        if (baptism.priest_name) html += `<li><strong>Priest:</strong> ${baptism.priest_name}</li>`;
+                        if (baptism.notes) html += `<li><strong>Notes:</strong> ${baptism.notes}</li>`;
+                        
+                        html += '</ul>';
+                        html += '</div>';
+                    });
+                    
+                    html += '</div>';
+                }
+                
+                // === DEATH RECORDS ===
+                if (data.deaths && data.deaths.length > 0) {
+                    html += '<div class="info-section">';
+                    html += '<h4>🕊️ Death Records</h4>';
+                    
+                    data.deaths.forEach((death, index) => {
+                        html += '<div class="record-card">';
+                        html += `<h5>Death Record ${index + 1}</h5>`;
+                        html += '<ul class="info-list">';
+                        
+                        if (death.death_date) html += `<li><strong>Death Date:</strong> ${death.death_date}</li>`;
+                        if (death.burial_date) html += `<li><strong>Burial Date:</strong> ${death.burial_date}</li>`;
+                        if (death.parish) html += `<li><strong>Parish:</strong> ${death.parish}</li>`;
+                        if (death.village) html += `<li><strong>Village:</strong> ${death.village}</li>`;
+                        if (death.cemetery) html += `<li><strong>Cemetery:</strong> ${death.cemetery}</li>`;
+                        if (death.marital_status) html += `<li><strong>Marital Status:</strong> ${death.marital_status}</li>`;
+                        if (death.age_years) html += `<li><strong>Age:</strong> ${death.age_years} years</li>`;
+                        if (death.age_description) html += `<li><strong>Age Description:</strong> ${death.age_description}</li>`;
+                        if (death.cause_of_death) html += `<li><strong>Cause of Death:</strong> ${death.cause_of_death}</li>`;
+                        
+                        if (death.sacraments_received !== null && death.sacraments_received !== undefined) {
+                            html += `<li><strong>Sacraments Received:</strong> ${death.sacraments_received ? 'Yes' : 'No'}`;
+                            if (death.sacraments_details) {
+                                html += ` (${death.sacraments_details})`;
+                            }
+                            html += '</li>';
+                        }
+                        
+                        if (death.spouse_name) html += `<li><strong>Spouse:</strong> ${death.spouse_name}</li>`;
+                        if (death.father_name) html += `<li><strong>Father:</strong> ${death.father_name}</li>`;
+                        if (death.mother_name) html += `<li><strong>Mother:</strong> ${death.mother_name}</li>`;
+                        if (death.priest_name) html += `<li><strong>Priest:</strong> ${death.priest_name}</li>`;
+                        if (death.notes) html += `<li><strong>Notes:</strong> ${death.notes}</li>`;
+                        
+                        html += '</ul>';
+                        html += '</div>';
+                    });
+                    
+                    html += '</div>';
                 }
                 
                 // Add hint about double-clicking
                 html += `<div class="info-item" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
-                    <span class="info-value" style="color: #667eea; font-size: 0.85em;">💡 Double-click to show this person's descendants</span>
+                    <span class="info-value" style="color: #667eea; font-size: 0.85em;">💡 Double-click to show this person's ancestors and descendants</span>
                 </div>`;
-            } else if (node.type === 'Event') {
-                html += `<div class="info-item"><span class="info-label">Type:</span><span class="info-value">Event</span></div>`;
-                if (node.event_type) html += `<div class="info-item"><span class="info-label">Event Type:</span><span class="info-value">${node.event_type}</span></div>`;
-                if (node.date) html += `<div class="info-item"><span class="info-label">Date:</span><span class="info-value">${node.date}</span></div>`;
-                if (node.place) html += `<div class="info-item"><span class="info-label">Place:</span><span class="info-value">${node.place}</span></div>`;
                 
-                // Add source information for events too
-                if (node.source) {
-                    html += `<div class="info-item"><span class="info-label">Source:</span><span class="info-value">${node.source}</span></div>`;
-                } else {
-                    html += `<div class="info-item"><span class="info-label">Source:</span><span class="info-value">Unknown</span></div>`;
+                content.innerHTML = html;
+                panel.classList.add('show');
+                
+            } else {
+                // Old format (backward compatibility)
+                title.textContent = data.label || 'Node Details';
+                
+                let html = '';
+                
+                if (data.type === 'Person') {
+                    html += `<div class="info-item"><span class="info-label">Type:</span><span class="info-value">Person</span></div>`;
+                    if (data.gender) html += `<div class="info-item"><span class="info-label">Gender:</span><span class="info-value">${data.gender}</span></div>`;
+                    if (data.birth_date) html += `<div class="info-item"><span class="info-label">Birth Date:</span><span class="info-value">${data.birth_date}</span></div>`;
+                    if (data.death_date) html += `<div class="info-item"><span class="info-label">Death Date:</span><span class="info-value">${data.death_date}</span></div>`;
+                    if (data.birth_place) html += `<div class="info-item"><span class="info-label">Birth Place:</span><span class="info-value">${data.birth_place}</span></div>`;
+                    if (data.occupation) html += `<div class="info-item"><span class="info-label">Occupation:</span><span class="info-value">${data.occupation}</span></div>`;
+                    
+                    html += `<div class="info-item" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                        <span class="info-value" style="color: #667eea; font-size: 0.85em;">💡 Double-click to show this person's ancestors and descendants</span>
+                    </div>`;
+                } else if (data.type === 'Event') {
+                    html += `<div class="info-item"><span class="info-label">Type:</span><span class="info-value">Event</span></div>`;
+                    if (data.event_type) html += `<div class="info-item"><span class="info-label">Event Type:</span><span class="info-value">${data.event_type}</span></div>`;
+                    if (data.date) html += `<div class="info-item"><span class="info-label">Date:</span><span class="info-value">${data.date}</span></div>`;
+                    if (data.place) html += `<div class="info-item"><span class="info-label">Place:</span><span class="info-value">${data.place}</span></div>`;
                 }
+                
+                content.innerHTML = html;
+                panel.classList.add('show');
             }
-            
-            content.innerHTML = html;
-            panel.classList.add('show');
         }
         
         function closeInfo() {

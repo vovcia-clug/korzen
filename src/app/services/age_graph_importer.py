@@ -7,11 +7,130 @@ into Apache AGE graph database.
 
 import json
 import logging
-from typing import Dict, List, Optional, Any
+import time
+from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 from psycopg import Connection
 
 logger = logging.getLogger(__name__)
+
+
+class ImportProgress:
+    """Track progress during AGE graph import operations."""
+    
+    def __init__(self):
+        self.start_time = time.time()
+        self.vertices_created = {
+            'Person': 0,
+            'Event': 0,
+            'Source': 0
+        }
+        self.vertices_skipped = {
+            'Person': 0,
+            'Event': 0,
+            'Source': 0
+        }
+        self.edges_created = {
+            'PARENT_OF': 0,
+            'MARRIED_TO': 0,
+            'BAPTIZED_IN': 0,
+            'DIED_IN': 0,
+            'GODPARENT_OF': 0,
+            'FROM_SOURCE': 0
+        }
+        self.edges_skipped = {
+            'PARENT_OF': 0,
+            'MARRIED_TO': 0,
+            'BAPTIZED_IN': 0,
+            'DIED_IN': 0,
+            'GODPARENT_OF': 0,
+            'FROM_SOURCE': 0
+        }
+        self.errors = []
+        self.warnings = []
+    
+    def elapsed_time(self) -> float:
+        """Get elapsed time in seconds."""
+        return time.time() - self.start_time
+    
+    def elapsed_time_str(self) -> str:
+        """Get formatted elapsed time string."""
+        elapsed = self.elapsed_time()
+        if elapsed < 60:
+            return f"{elapsed:.1f}s"
+        elif elapsed < 3600:
+            return f"{elapsed/60:.1f}m"
+        else:
+            return f"{elapsed/3600:.1f}h"
+    
+    def total_vertices_created(self) -> int:
+        """Get total number of vertices created."""
+        return sum(self.vertices_created.values())
+    
+    def total_vertices_skipped(self) -> int:
+        """Get total number of vertices skipped."""
+        return sum(self.vertices_skipped.values())
+    
+    def total_edges_created(self) -> int:
+        """Get total number of edges created."""
+        return sum(self.edges_created.values())
+    
+    def total_edges_skipped(self) -> int:
+        """Get total number of edges skipped."""
+        return sum(self.edges_skipped.values())
+    
+    def add_error(self, message: str):
+        """Add an error message."""
+        self.errors.append(message)
+        logger.error(message)
+    
+    def add_warning(self, message: str):
+        """Add a warning message."""
+        self.warnings.append(message)
+        logger.warning(message)
+    
+    def get_summary(self) -> Dict[str, Any]:
+        """Get import progress summary."""
+        return {
+            'elapsed_time': self.elapsed_time_str(),
+            'vertices': {
+                'created': dict(self.vertices_created),
+                'skipped': dict(self.vertices_skipped),
+                'total_created': self.total_vertices_created(),
+                'total_skipped': self.total_vertices_skipped()
+            },
+            'edges': {
+                'created': dict(self.edges_created),
+                'skipped': dict(self.edges_skipped),
+                'total_created': self.total_edges_created(),
+                'total_skipped': self.total_edges_skipped()
+            },
+            'errors': len(self.errors),
+            'warnings': len(self.warnings)
+        }
+    
+    def log_summary(self):
+        """Log a summary of the import progress."""
+        summary = self.get_summary()
+        logger.info("="*80)
+        logger.info("AGE GRAPH IMPORT SUMMARY")
+        logger.info("="*80)
+        logger.info(f"Total time: {summary['elapsed_time']}")
+        logger.info(f"Vertices created: {summary['vertices']['total_created']}")
+        for vtype, count in summary['vertices']['created'].items():
+            if count > 0:
+                logger.info(f"  - {vtype}: {count}")
+        logger.info(f"Vertices skipped (already exist): {summary['vertices']['total_skipped']}")
+        logger.info(f"Edges created: {summary['edges']['total_created']}")
+        for etype, count in summary['edges']['created'].items():
+            if count > 0:
+                logger.info(f"  - {etype}: {count}")
+        logger.info(f"Edges skipped (already exist): {summary['edges']['total_skipped']}")
+        if summary['errors'] > 0:
+            logger.info(f"Errors encountered: {summary['errors']}")
+        if summary['warnings'] > 0:
+            logger.info(f"Warnings encountered: {summary['warnings']}")
+        logger.info("="*80)
 
 
 class AgeGraphImporter:
@@ -31,6 +150,7 @@ class AgeGraphImporter:
         """
         self.conn = connection
         self.graph_name = 'genealogy'
+        self.progress = ImportProgress()
         self._setup_search_path()
     
     def _setup_search_path(self):
@@ -111,6 +231,7 @@ class AgeGraphImporter:
         """
         # Check if vertex already exists
         if self.vertex_exists('Person', uuid):
+            self.progress.vertices_skipped['Person'] += 1
             logger.debug(f"Person vertex already exists: {uuid}")
             return False
         
@@ -153,12 +274,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.vertices_created['Person'] += 1
                 logger.debug(f"Created Person vertex: {uuid}")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating Person vertex {uuid}: {e}")
+            error_msg = f"Error creating Person vertex {uuid}: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def create_event_vertex(self, uuid: str, properties: Dict[str, Any]) -> bool:
@@ -173,6 +296,7 @@ class AgeGraphImporter:
             True if created successfully, False otherwise
         """
         if self.vertex_exists('Event', uuid):
+            self.progress.vertices_skipped['Event'] += 1
             logger.debug(f"Event vertex already exists: {uuid}")
             return False
         
@@ -203,12 +327,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.vertices_created['Event'] += 1
                 logger.debug(f"Created Event vertex: {uuid}")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating Event vertex {uuid}: {e}")
+            error_msg = f"Error creating Event vertex {uuid}: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def create_source_vertex(self, uuid: str, properties: Dict[str, Any]) -> bool:
@@ -223,6 +349,7 @@ class AgeGraphImporter:
             True if created successfully, False otherwise
         """
         if self.vertex_exists('Source', uuid):
+            self.progress.vertices_skipped['Source'] += 1
             logger.debug(f"Source vertex already exists: {uuid}")
             return False
         
@@ -249,12 +376,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.vertices_created['Source'] += 1
                 logger.debug(f"Created Source vertex: {uuid}")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating Source vertex {uuid}: {e}")
+            error_msg = f"Error creating Source vertex {uuid}: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def edge_exists(self, edge_type: str, from_uuid: str, to_uuid: str) -> bool:
@@ -303,6 +432,7 @@ class AgeGraphImporter:
             True if created successfully, False otherwise
         """
         if self.edge_exists('PARENT_OF', parent_uuid, child_uuid):
+            self.progress.edges_skipped['PARENT_OF'] += 1
             logger.debug(f"PARENT_OF edge already exists: {parent_uuid} -> {child_uuid}")
             return False
         
@@ -325,12 +455,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.edges_created['PARENT_OF'] += 1
                 logger.debug(f"Created PARENT_OF edge: {parent_uuid} -> {child_uuid} ({parent_type})")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating PARENT_OF edge: {e}")
+            error_msg = f"Error creating PARENT_OF edge: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def create_marriage_edge(
@@ -357,6 +489,7 @@ class AgeGraphImporter:
         # Check if either direction exists
         if (self.edge_exists('MARRIED_TO', spouse1_uuid, spouse2_uuid) or
             self.edge_exists('MARRIED_TO', spouse2_uuid, spouse1_uuid)):
+            self.progress.edges_skipped['MARRIED_TO'] += 2  # Both directions
             logger.debug(f"MARRIED_TO edge already exists: {spouse1_uuid} <-> {spouse2_uuid}")
             return False
         
@@ -390,12 +523,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.edges_created['MARRIED_TO'] += 2  # Two edges (bidirectional)
                 logger.debug(f"Created MARRIED_TO edges: {spouse1_uuid} <-> {spouse2_uuid}")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating MARRIED_TO edges: {e}")
+            error_msg = f"Error creating MARRIED_TO edges: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def create_baptized_in_edge(
@@ -416,6 +551,7 @@ class AgeGraphImporter:
             True if created successfully, False otherwise
         """
         if self.edge_exists('BAPTIZED_IN', person_uuid, event_uuid):
+            self.progress.edges_skipped['BAPTIZED_IN'] += 1
             logger.debug(f"BAPTIZED_IN edge already exists: {person_uuid} -> {event_uuid}")
             return False
         
@@ -438,12 +574,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.edges_created['BAPTIZED_IN'] += 1
                 logger.debug(f"Created BAPTIZED_IN edge: {person_uuid} -> {event_uuid}")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating BAPTIZED_IN edge: {e}")
+            error_msg = f"Error creating BAPTIZED_IN edge: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def create_died_in_edge(
@@ -464,6 +602,7 @@ class AgeGraphImporter:
             True if created successfully, False otherwise
         """
         if self.edge_exists('DIED_IN', person_uuid, event_uuid):
+            self.progress.edges_skipped['DIED_IN'] += 1
             logger.debug(f"DIED_IN edge already exists: {person_uuid} -> {event_uuid}")
             return False
         
@@ -486,12 +625,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.edges_created['DIED_IN'] += 1
                 logger.debug(f"Created DIED_IN edge: {person_uuid} -> {event_uuid}")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating DIED_IN edge: {e}")
+            error_msg = f"Error creating DIED_IN edge: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def create_godparent_edge(
@@ -512,6 +653,7 @@ class AgeGraphImporter:
             True if created successfully, False otherwise
         """
         if self.edge_exists('GODPARENT_OF', godparent_uuid, child_uuid):
+            self.progress.edges_skipped['GODPARENT_OF'] += 1
             logger.debug(f"GODPARENT_OF edge already exists: {godparent_uuid} -> {child_uuid}")
             return False
         
@@ -534,12 +676,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.edges_created['GODPARENT_OF'] += 1
                 logger.debug(f"Created GODPARENT_OF edge: {godparent_uuid} -> {child_uuid}")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating GODPARENT_OF edge: {e}")
+            error_msg = f"Error creating GODPARENT_OF edge: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def create_from_source_edge(
@@ -558,6 +702,7 @@ class AgeGraphImporter:
             True if created successfully, False otherwise
         """
         if self.edge_exists('FROM_SOURCE', entity_uuid, source_uuid):
+            self.progress.edges_skipped['FROM_SOURCE'] += 1
             logger.debug(f"FROM_SOURCE edge already exists: {entity_uuid} -> {source_uuid}")
             return False
         
@@ -579,12 +724,14 @@ class AgeGraphImporter:
                 
                 cur.execute(query, (json.dumps(params),))
                 self.conn.commit()
+                self.progress.edges_created['FROM_SOURCE'] += 1
                 logger.debug(f"Created FROM_SOURCE edge: {entity_uuid} -> {source_uuid}")
                 return True
                 
         except Exception as e:
             self.conn.rollback()
-            logger.error(f"Error creating FROM_SOURCE edge: {e}")
+            error_msg = f"Error creating FROM_SOURCE edge: {e}"
+            self.progress.add_error(error_msg)
             return False
     
     def get_statistics(self) -> Dict[str, int]:

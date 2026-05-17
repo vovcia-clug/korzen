@@ -727,12 +727,46 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    showMessage(`✓ ${data.message}. Persons: ${data.statistics.persons}, Baptisms: ${data.statistics.baptisms}, Marriages: ${data.statistics.marriages}, Deaths: ${data.statistics.deaths}`, 'success');
+                    // Build detailed success message with AGE import stats
+                    let msg = `✓ ${data.message}\n\n`;
+                    msg += `📊 Import Statistics:\n`;
+                    msg += `  • Persons: ${data.statistics.persons}\n`;
+                    msg += `  • Baptisms: ${data.statistics.baptisms}\n`;
+                    msg += `  • Marriages: ${data.statistics.marriages}\n`;
+                    msg += `  • Deaths: ${data.statistics.deaths}\n`;
+                    
+                    // Add AGE graph import stats if available
+                    if (data.statistics.age_import) {
+                        const ageStats = data.statistics.age_import;
+                        msg += `\n🌐 AGE Graph Import:\n`;
+                        msg += `  • Time: ${ageStats.elapsed_time}\n`;
+                        msg += `  • Vertices created: ${ageStats.vertices.total_created}\n`;
+                        msg += `  • Edges created: ${ageStats.edges.total_created}\n`;
+                        
+                        if (ageStats.errors > 0) {
+                            msg += `  ⚠️ Errors: ${ageStats.errors}\n`;
+                        }
+                        if (ageStats.warnings > 0) {
+                            msg += `  ⚠️ Warnings: ${ageStats.warnings}\n`;
+                        }
+                    }
+                    
+                    // Add current graph stats if available
+                    if (data.statistics.age_graph_stats) {
+                        const graphStats = data.statistics.age_graph_stats;
+                        msg += `\n📈 Total in Graph:\n`;
+                        msg += `  • Persons: ${graphStats.persons || 0}\n`;
+                        msg += `  • Events: ${graphStats.events || 0}\n`;
+                        msg += `  • Parent-child edges: ${graphStats.parent_of_edges || 0}\n`;
+                        msg += `  • Marriage edges: ${graphStats.married_to_edges || 0}\n`;
+                    }
+                    
+                    showMessage(msg, 'success');
                     
                     // Reload page after delay to show updated status
                     setTimeout(() => {
                         window.location.reload();
-                    }, 3000);
+                    }, 5000);  // Extended to 5s to allow reading the stats
                 } else {
                     showMessage(`✗ ${data.error || 'Parsing failed'}`, 'error');
                     button.disabled = false;
@@ -746,6 +780,9 @@
         }
         
         function showMessage(text, type) {
+            // Use pre-formatted text to preserve line breaks
+            message.style.whiteSpace = 'pre-line';
+            message.style.textAlign = 'left';
             message.textContent = text;
             message.className = `message ${type}`;
         }

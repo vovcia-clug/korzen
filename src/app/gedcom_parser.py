@@ -446,6 +446,70 @@ class GedcomParser:
         except Exception as e:
             logger.warning(f"Failed to generate embedding for person: {e}")
     
+    def _generate_baptism_embedding(self, baptism: BaptismRecord) -> None:
+        """Generate and store embedding and phonetic codes for a baptism record."""
+        try:
+            # Extract features
+            features = self.feature_extractor.extract_baptism_features(baptism)
+            
+            # Generate phonetic codes
+            if baptism.child_name:
+                baptism.child_name_phonetic = self.phonetic_encoder.encode(baptism.child_name)
+            if baptism.father_surname:
+                baptism.father_surname_phonetic = self.phonetic_encoder.encode(baptism.father_surname)
+            if baptism.mother_maiden_name:
+                baptism.mother_maiden_name_phonetic = self.phonetic_encoder.encode(baptism.mother_maiden_name)
+            
+            # Generate embedding
+            embedding = self.embedding_generator.generate_event_embedding(features, 'baptism')
+            baptism.embedding = embedding.tolist()
+            
+            logger.debug(f"Generated embedding for baptism record: {baptism.gedcom_id}")
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for baptism: {e}")
+    
+    def _generate_marriage_embedding(self, marriage: MarriageRecord) -> None:
+        """Generate and store embedding and phonetic codes for a marriage record."""
+        try:
+            # Extract features
+            features = self.feature_extractor.extract_marriage_features(marriage)
+            
+            # Generate phonetic codes
+            if marriage.spouse1_surname:
+                marriage.spouse1_surname_phonetic = self.phonetic_encoder.encode(marriage.spouse1_surname)
+            if marriage.spouse2_surname:
+                marriage.spouse2_surname_phonetic = self.phonetic_encoder.encode(marriage.spouse2_surname)
+            if marriage.spouse2_maiden_name:
+                marriage.spouse2_maiden_name_phonetic = self.phonetic_encoder.encode(marriage.spouse2_maiden_name)
+            
+            # Generate embedding
+            embedding = self.embedding_generator.generate_event_embedding(features, 'marriage')
+            marriage.embedding = embedding.tolist()
+            
+            logger.debug(f"Generated embedding for marriage record: {marriage.gedcom_id}")
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for marriage: {e}")
+    
+    def _generate_death_embedding(self, death: DeathRecord) -> None:
+        """Generate and store embedding and phonetic codes for a death record."""
+        try:
+            # Extract features
+            features = self.feature_extractor.extract_death_features(death)
+            
+            # Generate phonetic codes
+            if death.deceased_surname:
+                death.deceased_surname_phonetic = self.phonetic_encoder.encode(death.deceased_surname)
+            if death.deceased_maiden_name:
+                death.deceased_maiden_name_phonetic = self.phonetic_encoder.encode(death.deceased_maiden_name)
+            
+            # Generate embedding
+            embedding = self.embedding_generator.generate_event_embedding(features, 'death')
+            death.embedding = embedding.tolist()
+            
+            logger.debug(f"Generated embedding for death record: {death.gedcom_id}")
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for death: {e}")
+    
     def _check_for_duplicates(self, person: Person) -> None:
         """Check for potential duplicates and log warnings."""
         try:
@@ -521,6 +585,9 @@ class GedcomParser:
             birth_date=person.birth_date,
             parish=parish
         )
+        
+        # Generate embedding and phonetic codes for duplicate detection
+        self._generate_baptism_embedding(baptism_record)
         
         return baptism_record
     
@@ -633,6 +700,9 @@ class GedcomParser:
             spouse2_maiden_name=spouse2_maiden_name
         )
         
+        # Generate embedding and phonetic codes for duplicate detection
+        self._generate_marriage_embedding(marriage_record)
+        
         return marriage_record
     
     def create_death_record(self, individual: Individual, person: Person) -> Optional[DeathRecord]:
@@ -689,6 +759,9 @@ class GedcomParser:
             death_date=death_date.date(),
             parish=parish
         )
+        
+        # Generate embedding and phonetic codes for duplicate detection
+        self._generate_death_embedding(death_record)
         
         return death_record
     
@@ -1028,12 +1101,16 @@ class GedcomParser:
     
     def _import_to_age_graph(self, stats: Dict[str, int]):
         """
-        Import the parsed data into Apache AGE graph database.
+        Import the parsed data into Apache AGE graph database with detailed progress tracking.
         
         Args:
             stats: Statistics dictionary to update with graph import info
         """
         try:
+            logger.info("="*80)
+            logger.info("STARTING AGE GRAPH IMPORT")
+            logger.info("="*80)
+            
             # Get raw psycopg connection for AGE
             raw_conn = db.session.connection().connection
             
@@ -1041,17 +1118,45 @@ class GedcomParser:
             importer = AgeGraphImporter(raw_conn)
             importer.create_graph_if_not_exists()
             
+            # Query all records to be imported
+            persons = Person.query.filter_by(source_batch_id=self.batch.id).all()
+            baptisms = BaptismRecord.query.filter_by(source_batch_id=self.batch.id).all()
+            deaths = DeathRecord.query.filter_by(source_batch_id=self.batch.id).all()
+            marriages = MarriageRecord.query.filter_by(source_batch_id=self.batch.id).all()
+            
+            # Calculate totals for progress tracking
+            total_persons = len(persons)
+            total_baptisms = len(baptisms)
+            total_deaths = len(deaths)
+            total_marriages = len(marriages)
+            total_parent_edges = sum(1 for p in persons if p.father_id) + sum(1 for p in persons if p.mother_id)
+            
+            total_records = total_persons + total_baptisms + total_deaths + total_marriages
+            
+            logger.info(f"Records to import:")
+            logger.info(f"  - Persons: {total_persons}")
+            logger.info(f"  - Baptism events: {total_baptisms}")
+            logger.info(f"  - Death events: {total_deaths}")
+            logger.info(f"  - Marriage relationships: {total_marriages}")
+            logger.info(f"  - Parent-child relationships: {total_parent_edges}")
+            logger.info(f"Total entities: {total_records}")
+            logger.info("")
+            
             # Create source vertex for this batch
+            logger.info("Creating source vertex...")
             source_props = {
                 'source_name': self.filepath,
                 'import_date': datetime.utcnow().isoformat(),
                 'description': f'GEDCOM import batch {self.batch.id}'
             }
             importer.create_source_vertex(str(self.batch.id), source_props)
+            logger.info(f"✓ Source vertex created for batch {self.batch.id}")
+            logger.info("")
             
             # Import all persons
-            persons = Person.query.filter_by(source_batch_id=self.batch.id).all()
-            for person in persons:
+            logger.info(f"Importing {total_persons} person vertices...")
+            processed = 0
+            for i, person in enumerate(persons, 1):
                 person_props = {
                     'gedcom_id': person.gedcom_id,
                     'first_name': person.first_name,
@@ -1066,87 +1171,151 @@ class GedcomParser:
                 }
                 importer.create_person_vertex(str(person.id), person_props)
                 importer.create_from_source_edge(str(person.id), str(self.batch.id))
+                processed += 1
+                
+                # Log progress every 10% or every 100 records
+                if i % max(1, total_persons // 10) == 0 or i % 100 == 0:
+                    percentage = (i / total_persons) * 100
+                    logger.info(f"  Progress: {i}/{total_persons} persons ({percentage:.1f}%) - Elapsed: {importer.progress.elapsed_time_str()}")
+            
+            logger.info(f"✓ Completed person import: {importer.progress.vertices_created['Person']} created, {importer.progress.vertices_skipped['Person']} skipped")
+            logger.info(f"  Time elapsed: {importer.progress.elapsed_time_str()}")
+            logger.info("")
             
             # Import baptism events
-            baptisms = BaptismRecord.query.filter_by(source_batch_id=self.batch.id).all()
-            for baptism in baptisms:
-                event_props = {
-                    'gedcom_id': baptism.gedcom_id,
-                    'event_type': 'baptism',
-                    'date': baptism.baptism_date,
-                    'place': baptism.village,
-                    'parish': baptism.parish
-                }
-                importer.create_event_vertex(str(baptism.id), event_props)
-                importer.create_baptized_in_edge(
-                    str(baptism.child_id),
-                    str(baptism.id),
-                    str(baptism.baptism_date) if baptism.baptism_date else None
-                )
-                importer.create_from_source_edge(str(baptism.id), str(self.batch.id))
+            if total_baptisms > 0:
+                logger.info(f"Importing {total_baptisms} baptism event vertices...")
+                for i, baptism in enumerate(baptisms, 1):
+                    event_props = {
+                        'gedcom_id': baptism.gedcom_id,
+                        'event_type': 'baptism',
+                        'date': baptism.baptism_date,
+                        'place': baptism.village,
+                        'parish': baptism.parish
+                    }
+                    importer.create_event_vertex(str(baptism.id), event_props)
+                    if baptism.child_id:
+                        importer.create_baptized_in_edge(
+                            str(baptism.child_id),
+                            str(baptism.id),
+                            str(baptism.baptism_date) if baptism.baptism_date else None
+                        )
+                    importer.create_from_source_edge(str(baptism.id), str(self.batch.id))
+                    
+                    # Log progress every 10% or every 50 records
+                    if i % max(1, total_baptisms // 10) == 0 or i % 50 == 0:
+                        percentage = (i / total_baptisms) * 100
+                        logger.info(f"  Progress: {i}/{total_baptisms} baptisms ({percentage:.1f}%) - Elapsed: {importer.progress.elapsed_time_str()}")
+                
+                logger.info(f"✓ Completed baptism import: {importer.progress.edges_created['BAPTIZED_IN']} edges created")
+                logger.info(f"  Time elapsed: {importer.progress.elapsed_time_str()}")
+                logger.info("")
             
             # Import death events
-            deaths = DeathRecord.query.filter_by(source_batch_id=self.batch.id).all()
-            for death in deaths:
-                event_props = {
-                    'gedcom_id': death.gedcom_id,
-                    'event_type': 'death',
-                    'date': death.death_date,
-                    'place': death.village or death.cemetery,  # DeathRecord has village/cemetery, not death_place
-                    'parish': death.parish
-                }
-                importer.create_event_vertex(str(death.id), event_props)
-                importer.create_died_in_edge(
-                    str(death.deceased_id),  # DeathRecord has deceased_id, not person_id
-                    str(death.id),
-                    str(death.death_date) if death.death_date else None
-                )
-                importer.create_from_source_edge(str(death.id), str(self.batch.id))
+            if total_deaths > 0:
+                logger.info(f"Importing {total_deaths} death event vertices...")
+                for i, death in enumerate(deaths, 1):
+                    event_props = {
+                        'gedcom_id': death.gedcom_id,
+                        'event_type': 'death',
+                        'date': death.death_date,
+                        'place': death.village or death.cemetery,
+                        'parish': death.parish
+                    }
+                    importer.create_event_vertex(str(death.id), event_props)
+                    if death.deceased_id:
+                        importer.create_died_in_edge(
+                            str(death.deceased_id),
+                            str(death.id),
+                            str(death.death_date) if death.death_date else None
+                        )
+                    importer.create_from_source_edge(str(death.id), str(self.batch.id))
+                    
+                    # Log progress every 10% or every 50 records
+                    if i % max(1, total_deaths // 10) == 0 or i % 50 == 0:
+                        percentage = (i / total_deaths) * 100
+                        logger.info(f"  Progress: {i}/{total_deaths} deaths ({percentage:.1f}%) - Elapsed: {importer.progress.elapsed_time_str()}")
+                
+                logger.info(f"✓ Completed death import: {importer.progress.edges_created['DIED_IN']} edges created")
+                logger.info(f"  Time elapsed: {importer.progress.elapsed_time_str()}")
+                logger.info("")
             
             # Import marriages and create MARRIED_TO edges
-            marriages = MarriageRecord.query.filter_by(source_batch_id=self.batch.id).all()
-            for marriage in marriages:
-                if marriage.spouse1_id and marriage.spouse2_id:  # MarriageRecord has spouse1_id/spouse2_id, not husband_id/wife_id
-                    importer.create_marriage_edge(
-                        str(marriage.spouse1_id),
-                        str(marriage.spouse2_id),
-                        str(marriage.marriage_date) if marriage.marriage_date else None,
-                        marriage.village or marriage.parish,  # MarriageRecord has village/parish, not marriage_place
-                        marriage.gedcom_id
-                    )
+            if total_marriages > 0:
+                logger.info(f"Importing {total_marriages} marriage relationships...")
+                valid_marriages = 0
+                for i, marriage in enumerate(marriages, 1):
+                    if marriage.spouse1_id and marriage.spouse2_id:
+                        importer.create_marriage_edge(
+                            str(marriage.spouse1_id),
+                            str(marriage.spouse2_id),
+                            str(marriage.marriage_date) if marriage.marriage_date else None,
+                            marriage.village or marriage.parish,
+                            marriage.gedcom_id
+                        )
+                        valid_marriages += 1
+                    
+                    # Log progress every 10% or every 50 records
+                    if i % max(1, total_marriages // 10) == 0 or i % 50 == 0:
+                        percentage = (i / total_marriages) * 100
+                        logger.info(f"  Progress: {i}/{total_marriages} marriages ({percentage:.1f}%) - Elapsed: {importer.progress.elapsed_time_str()}")
+                
+                logger.info(f"✓ Completed marriage import: {importer.progress.edges_created['MARRIED_TO']//2} marriages ({importer.progress.edges_created['MARRIED_TO']} bi-directional edges)")
+                logger.info(f"  Marriages with both spouses: {valid_marriages}")
+                logger.info(f"  Time elapsed: {importer.progress.elapsed_time_str()}")
+                logger.info("")
             
             # Import parent-child relationships
-            print("\n" + "="*80)
-            print("IMPORTING PARENT-CHILD RELATIONSHIPS TO AGE GRAPH")
-            print("="*80)
-            parent_edges_created = 0
-            for person in persons:
-                if person.father_id:
-                    print(f"Creating father edge: {person.father_id} -> {person.id} ({person.first_name} {person.last_name})")
-                    result = importer.create_parent_child_edge(
-                        str(person.father_id),
-                        str(person.id),
-                        'father'
-                    )
-                    if result:
-                        parent_edges_created += 1
-                    print(f"  Result: {result}")
-                if person.mother_id:
-                    print(f"Creating mother edge: {person.mother_id} -> {person.id} ({person.first_name} {person.last_name})")
-                    result = importer.create_parent_child_edge(
-                        str(person.mother_id),
-                        str(person.id),
-                        'mother'
-                    )
-                    if result:
-                        parent_edges_created += 1
-                    print(f"  Result: {result}")
-            print(f"\nTotal PARENT_OF edges created: {parent_edges_created}")
-            print("="*80 + "\n")
+            if total_parent_edges > 0:
+                logger.info(f"Importing {total_parent_edges} parent-child relationships...")
+                processed_edges = 0
+                for person in persons:
+                    if person.father_id:
+                        result = importer.create_parent_child_edge(
+                            str(person.father_id),
+                            str(person.id),
+                            'father'
+                        )
+                        processed_edges += 1
+                        
+                        # Log progress every 10% or every 100 edges
+                        if processed_edges % max(1, total_parent_edges // 10) == 0 or processed_edges % 100 == 0:
+                            percentage = (processed_edges / total_parent_edges) * 100
+                            logger.info(f"  Progress: {processed_edges}/{total_parent_edges} parent edges ({percentage:.1f}%) - Elapsed: {importer.progress.elapsed_time_str()}")
+                    
+                    if person.mother_id:
+                        result = importer.create_parent_child_edge(
+                            str(person.mother_id),
+                            str(person.id),
+                            'mother'
+                        )
+                        processed_edges += 1
+                        
+                        # Log progress every 10% or every 100 edges
+                        if processed_edges % max(1, total_parent_edges // 10) == 0 or processed_edges % 100 == 0:
+                            percentage = (processed_edges / total_parent_edges) * 100
+                            logger.info(f"  Progress: {processed_edges}/{total_parent_edges} parent edges ({percentage:.1f}%) - Elapsed: {importer.progress.elapsed_time_str()}")
+                
+                logger.info(f"✓ Completed parent-child import: {importer.progress.edges_created['PARENT_OF']} edges created, {importer.progress.edges_skipped['PARENT_OF']} skipped")
+                logger.info(f"  Time elapsed: {importer.progress.elapsed_time_str()}")
+                logger.info("")
+            
+            # Log final summary
+            importer.progress.log_summary()
             
             # Get graph statistics
             graph_stats = importer.get_statistics()
-            logger.info(f"AGE graph statistics: {graph_stats}")
+            logger.info("")
+            logger.info("Current AGE graph statistics:")
+            logger.info(f"  - Total persons in graph: {graph_stats.get('persons', 0)}")
+            logger.info(f"  - Total events in graph: {graph_stats.get('events', 0)}")
+            logger.info(f"  - Total sources in graph: {graph_stats.get('sources', 0)}")
+            logger.info(f"  - Total parent-child relationships: {graph_stats.get('parent_of_edges', 0)}")
+            logger.info(f"  - Total marriage relationships: {graph_stats.get('married_to_edges', 0)}")
+            
+            # Update stats with import summary
+            stats['age_import'] = importer.progress.get_summary()
+            stats['age_graph_stats'] = graph_stats
             
         except Exception as e:
             logger.error(f"Error importing to AGE graph: {e}")

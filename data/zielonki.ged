@@ -1,0 +1,1032 @@
+0 HEAD
+1 GEDC
+2 VERS 7.0
+1 SOUR ClaudeOpus
+2 NAME Anthropic Claude Opus
+2 VERS 2026.05
+1 DATE 14 MAY 2026
+1 LANG la
+1 SUBM @U1@
+1 NOTE Converted from OCR of "Liber Natorum et Baptisatorum", Parish of Zielonki, Galicia, year 1893, entries 1-12. Officiating priest: Rev. Franciscus Wojciech. Annotation: record amended 25 Sep 1909, copy issued AZ Nr 60/2009 USC Zielonki.
+
+0 @U1@ SUBM
+1 NAME Claude Opus
+1 LANG en
+
+0 @S1@ SOUR
+1 TITL Liber Natorum et Baptisatorum, Parochia Zielonki
+1 AUTH Parochia Zielonki
+1 PUBL Zielonki, 1893
+1 LANG la
+1 REPO @R1@
+2 CALN AZ Nr 60/2009 USC Zielonki
+3 MEDI BOOK
+
+0 @R1@ REPO
+1 NAME Urząd Stanu Cywilnego Zielonki
+1 ADDR
+2 CITY Zielonki
+2 CTRY Poland
+
+0 @I900@ INDI
+1 NAME Franciscus /Wojciech/
+1 SEX M
+1 OCCU Parochus
+2 NOTE Roman Catholic parish priest, Parochia Zielonki
+1 RESI
+2 PLAC Zielonki, Galicia
+
+0 @I901@ INDI
+1 NAME Marianna /Pichorz/
+1 SEX F
+1 OCCU Obstetrix
+2 NOTE Midwife serving Parochia Zielonki
+
+0 @I902@ INDI
+1 NAME Catharina /Pichorz/
+1 SEX F
+1 OCCU Obstetrix
+2 NOTE Midwife serving Parochia Zielonki
+
+0 @I011@ INDI
+1 NAME Vincentius /Crapiuski/
+1 SEX M
+1 BIRT
+2 DATE 27 JUN 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 7
+2 SOUR @S1@
+1 BAPM
+2 DATE 29 JUN 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I018@
+3 ROLE GODP
+2 ASSO @I019@
+3 ROLE GODP
+2 ASSO @I901@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F01A@
+
+0 @I012@ INDI
+1 NAME Vincentius /Crapiuski/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F01A@
+1 FAMC @F01B@
+
+0 @I013@ INDI
+1 NAME Antonina /Jantos/
+1 SEX F
+1 FAMS @F01A@
+1 FAMC @F01C@
+
+0 @I014@ INDI
+1 NAME Thaddaeus /Crapiuski/
+1 SEX M
+1 FAMS @F01B@
+
+0 @I015@ INDI
+1 NAME Agnes /Rudzi/
+1 SEX F
+1 FAMS @F01B@
+
+0 @I016@ INDI
+1 NAME Petrus /Jantos/
+1 SEX M
+1 FAMS @F01C@
+
+0 @I017@ INDI
+1 NAME Margaritha /Ledwicz/
+1 SEX F
+1 FAMS @F01C@
+
+0 @I018@ INDI
+1 NAME Joannes /Jantos/
+1 SEX M
+
+0 @I019@ INDI
+1 NAME Agatha /Solonowicz/
+1 SEX F
+
+0 @F01A@ FAM
+1 HUSB @I012@
+1 WIFE @I013@
+1 CHIL @I011@
+1 MARR
+1 NOTE Parents listed as legitimi (legitimately married) in baptism record.
+
+0 @F01B@ FAM
+1 HUSB @I014@
+1 WIFE @I015@
+1 CHIL @I012@
+
+0 @F01C@ FAM
+1 HUSB @I016@
+1 WIFE @I017@
+1 CHIL @I013@
+
+0 @I021@ INDI
+1 NAME Marianna /Zabiegaj/
+1 SEX F
+1 BIRT
+2 DATE 7 JUL 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 31; serial #8
+2 SOUR @S1@
+1 BAPM
+2 DATE 13 JUL 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I028@
+3 ROLE GODP
+2 ASSO @I029@
+3 ROLE GODP
+2 ASSO @I902@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F02A@
+
+0 @I022@ INDI
+1 NAME Franciscus /Zabiegaj/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F02A@
+1 FAMC @F02B@
+
+0 @I023@ INDI
+1 NAME Anna Maria /Siemiacki/
+1 SEX F
+1 FAMS @F02A@
+1 FAMC @F02C@
+
+0 @I024@ INDI
+1 NAME Andreas /Zabiegaj/
+1 SEX M
+1 FAMS @F02B@
+
+0 @I025@ INDI
+1 NAME Marianna /Dęty/
+1 SEX F
+1 FAMS @F02B@
+
+0 @I026@ INDI
+1 NAME Theofilus /Siemiacki/
+1 SEX M
+1 FAMS @F02C@
+
+0 @I027@ INDI
+1 NAME Catharina /Ehran/
+1 SEX F
+1 FAMS @F02C@
+
+0 @I028@ INDI
+1 NAME Franciscus /Piszczek/
+1 SEX M
+1 RESI
+2 PLAC Cracovia (Kraków), Galicia
+
+0 @I029@ INDI
+1 NAME Marianna /Motyka/
+1 SEX F
+1 RESI
+2 PLAC Bolan, Galicia
+
+0 @F02A@ FAM
+1 HUSB @I022@
+1 WIFE @I023@
+1 CHIL @I021@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F02B@ FAM
+1 HUSB @I024@
+1 WIFE @I025@
+1 CHIL @I022@
+
+0 @F02C@ FAM
+1 HUSB @I026@
+1 WIFE @I027@
+1 CHIL @I023@
+
+0 @I031@ INDI
+1 NAME Antonina /Chodurek/
+1 SEX F
+1 BIRT
+2 DATE 18 JUL 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 59; serial #9
+2 SOUR @S1@
+1 BAPM
+2 DATE 20 JUL 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I038@
+3 ROLE GODP
+2 ASSO @I039@
+3 ROLE GODP
+2 ASSO @I902@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F03A@
+
+0 @I032@ INDI
+1 NAME Franciscus /Chodurek/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F03A@
+1 FAMC @F03B@
+
+0 @I033@ INDI
+1 NAME Catharina /Siwek/
+1 SEX F
+1 FAMS @F03A@
+1 FAMC @F03C@
+
+0 @I034@ INDI
+1 NAME Ludovicus /Chodurek/
+1 SEX M
+1 FAMS @F03B@
+
+0 @I035@ INDI
+1 NAME Rosina /Kotla/
+1 SEX F
+1 FAMS @F03B@
+
+0 @I036@ INDI
+1 NAME Ludovicus Kini /Siwek/
+1 SEX M
+1 FAMS @F03C@
+
+0 @I037@ INDI
+1 NAME Barbara /Frątkowicz/
+1 SEX F
+1 FAMS @F03C@
+
+0 @I038@ INDI
+1 NAME Joannes /Siwek/
+1 SEX M
+
+0 @I039@ INDI
+1 NAME Antonina /Piotrykowska/
+1 SEX F
+
+0 @F03A@ FAM
+1 HUSB @I032@
+1 WIFE @I033@
+1 CHIL @I031@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F03B@ FAM
+1 HUSB @I034@
+1 WIFE @I035@
+1 CHIL @I032@
+
+0 @F03C@ FAM
+1 HUSB @I036@
+1 WIFE @I037@
+1 CHIL @I033@
+
+0 @I041@ INDI
+1 NAME Sophia /Siwek/
+1 SEX F
+1 BIRT
+2 DATE 25 JUL 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 15; serial #10
+2 SOUR @S1@
+1 BAPM
+2 DATE 3 AUG 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I048@
+3 ROLE GODP
+2 ASSO @I049@
+3 ROLE GODP
+2 ASSO @I902@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F04A@
+
+0 @I042@ INDI
+1 NAME Jacobus /Siwek/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F04A@
+1 FAMC @F04B@
+
+0 @I043@ INDI
+1 NAME Agnes /Polak/
+1 SEX F
+1 FAMS @F04A@
+1 FAMC @F04C@
+
+0 @I044@ INDI
+1 NAME Paulus /Siwek/
+1 SEX M
+1 FAMS @F04B@
+
+0 @I045@ INDI
+1 NAME Catharina /Bajak/
+1 SEX F
+1 FAMS @F04B@
+
+0 @I046@ INDI
+1 NAME Jacobus /Polak/
+1 SEX M
+1 FAMS @F04C@
+
+0 @I047@ INDI
+1 NAME Antonina /Pachowska/
+1 SEX F
+1 FAMS @F04C@
+
+0 @I048@ INDI
+1 NAME Albertus /Polak/
+1 SEX M
+
+0 @I049@ INDI
+1 NAME Sophia /Zakawa/
+1 SEX F
+
+0 @F04A@ FAM
+1 HUSB @I042@
+1 WIFE @I043@
+1 CHIL @I041@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F04B@ FAM
+1 HUSB @I044@
+1 WIFE @I045@
+1 CHIL @I042@
+
+0 @F04C@ FAM
+1 HUSB @I046@
+1 WIFE @I047@
+1 CHIL @I043@
+
+0 @I051@ INDI
+1 NAME Paulus /Polak/
+1 SEX M
+1 BIRT
+2 DATE 11 AUG 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 15; serial #11
+2 SOUR @S1@
+1 BAPM
+2 DATE 12 AUG 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I058@
+3 ROLE GODP
+2 ASSO @I059@
+3 ROLE GODP
+2 ASSO @I902@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F05A@
+
+0 @I052@ INDI
+1 NAME Joannes /Polak/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F05A@
+1 FAMC @F05B@
+
+0 @I053@ INDI
+1 NAME Marianna /Jantos/
+1 SEX F
+1 FAMS @F05A@
+1 FAMC @F05C@
+
+0 @I054@ INDI
+1 NAME Vincentius /Polak/
+1 SEX M
+1 FAMS @F05B@
+
+0 @I055@ INDI
+1 NAME Agnes /Siwek/
+1 SEX F
+1 FAMS @F05B@
+
+0 @I056@ INDI
+1 NAME Andreas /Jantos/
+1 SEX M
+1 FAMS @F05C@
+
+0 @I057@ INDI
+1 NAME Antonina /Prępyrzyńska/
+1 SEX F
+1 FAMS @F05C@
+
+0 @I058@ INDI
+1 NAME Vincentius /Jantos/
+1 SEX M
+
+0 @I059@ INDI
+1 NAME Sophia /Piotrowicz/
+1 SEX F
+
+0 @F05A@ FAM
+1 HUSB @I052@
+1 WIFE @I053@
+1 CHIL @I051@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F05B@ FAM
+1 HUSB @I054@
+1 WIFE @I055@
+1 CHIL @I052@
+
+0 @F05C@ FAM
+1 HUSB @I056@
+1 WIFE @I057@
+1 CHIL @I053@
+
+0 @I061@ INDI
+1 NAME Paulus /Wojciech/
+1 SEX M
+1 BIRT
+2 DATE 28 AUG 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 30; serial #12
+2 SOUR @S1@
+1 BAPM
+2 DATE 31 AUG 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I068@
+3 ROLE GODP
+2 ASSO @I069@
+3 ROLE GODP
+2 ASSO @I902@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F06A@
+
+0 @I062@ INDI
+1 NAME Franciscus /Wojciech/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F06A@
+1 FAMC @F06B@
+1 NOTE Father shares name with parish priest @I900@; likely a namesake (different parents listed).
+
+0 @I063@ INDI
+1 NAME Agatha /Dobiniak/
+1 SEX F
+1 FAMS @F06A@
+1 FAMC @F06C@
+
+0 @I064@ INDI
+1 NAME Josephus /Wojciech/
+1 SEX M
+1 FAMS @F06B@
+
+0 @I065@ INDI
+1 NAME Agatha /Drab/
+1 SEX F
+1 FAMS @F06B@
+
+0 @I066@ INDI
+1 NAME Paulus /Dobiniak/
+1 SEX M
+1 FAMS @F06C@
+
+0 @I067@ INDI
+1 NAME Marianna /Polak/
+1 SEX F
+1 FAMS @F06C@
+
+0 @I068@ INDI
+1 NAME Paulus /Szymczyk/
+1 SEX M
+
+0 @I069@ INDI
+1 NAME Agatha /Pojatowska/
+1 SEX F
+
+0 @F06A@ FAM
+1 HUSB @I062@
+1 WIFE @I063@
+1 CHIL @I061@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F06B@ FAM
+1 HUSB @I064@
+1 WIFE @I065@
+1 CHIL @I062@
+
+0 @F06C@ FAM
+1 HUSB @I066@
+1 WIFE @I067@
+1 CHIL @I063@
+
+0 @I071@ INDI
+1 NAME Antonina /Dabrowski/
+1 SEX F
+1 BIRT
+2 DATE 27 AUG 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 36
+2 SOUR @S1@
+1 BAPM
+2 DATE 31 AUG 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I078@
+3 ROLE GODP
+2 ASSO @I079@
+3 ROLE GODP
+2 ASSO @I901@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F07A@
+
+0 @I072@ INDI
+1 NAME Albertus /Dabrowski/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F07A@
+1 FAMC @F07B@
+
+0 @I073@ INDI
+1 NAME Marianna /Hawula/
+1 SEX F
+1 FAMS @F07A@
+1 FAMC @F07C@
+
+0 @I074@ INDI
+1 NAME Joannes /Dabrowski/
+1 SEX M
+1 FAMS @F07B@
+
+0 @I075@ INDI
+1 NAME Francisca /Radek/
+1 SEX F
+1 FAMS @F07B@
+
+0 @I076@ INDI
+1 NAME Joannes /Hawula/
+1 SEX M
+1 FAMS @F07C@
+
+0 @I077@ INDI
+1 NAME Francisca /Ledwicz/
+1 SEX F
+1 FAMS @F07C@
+
+0 @I078@ INDI
+1 NAME Joannes /Motyka/
+1 SEX M
+
+0 @I079@ INDI
+1 NAME Antonina /Pichorz/
+1 SEX F
+
+0 @F07A@ FAM
+1 HUSB @I072@
+1 WIFE @I073@
+1 CHIL @I071@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F07B@ FAM
+1 HUSB @I074@
+1 WIFE @I075@
+1 CHIL @I072@
+
+0 @F07C@ FAM
+1 HUSB @I076@
+1 WIFE @I077@
+1 CHIL @I073@
+
+0 @I081@ INDI
+1 NAME Joannes /Woch/
+1 SEX M
+1 BIRT
+2 DATE 8 OCT 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 46
+2 SOUR @S1@
+1 BAPM
+2 DATE 8 OCT 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I088@
+3 ROLE GODP
+2 ASSO @I089@
+3 ROLE GODP
+2 ASSO @I901@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F08A@
+
+0 @I082@ INDI
+1 NAME Joannes /Woch/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F08A@
+1 FAMC @F08B@
+
+0 @I083@ INDI
+1 NAME Marianna /Piotryk/
+1 SEX F
+1 FAMS @F08A@
+1 FAMC @F08C@
+
+0 @I084@ INDI
+1 NAME Blasius /Woch/
+1 SEX M
+1 FAMS @F08B@
+
+0 @I085@ INDI
+1 NAME Rosina /Majtanek/
+1 SEX F
+1 FAMS @F08B@
+
+0 @I086@ INDI
+1 NAME Valentinus /Piotryk/
+1 SEX M
+1 FAMS @F08C@
+
+0 @I087@ INDI
+1 NAME Rosina /Trzcińska/
+1 SEX F
+1 FAMS @F08C@
+
+0 @I088@ INDI
+1 NAME Joannes /Piotryk/
+1 SEX M
+
+0 @I089@ INDI
+1 NAME Lucia /Piotrykowska/
+1 SEX F
+
+0 @F08A@ FAM
+1 HUSB @I082@
+1 WIFE @I083@
+1 CHIL @I081@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F08B@ FAM
+1 HUSB @I084@
+1 WIFE @I085@
+1 CHIL @I082@
+
+0 @F08C@ FAM
+1 HUSB @I086@
+1 WIFE @I087@
+1 CHIL @I083@
+
+0 @I091@ INDI
+1 NAME Joannes /Grzywacz/
+1 SEX M
+1 BIRT
+2 DATE 9 OCT 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 50
+2 SOUR @S1@
+1 BAPM
+2 DATE 12 OCT 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I098@
+3 ROLE GODP
+2 ASSO @I099@
+3 ROLE GODP
+2 ASSO @I902@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F09A@
+
+0 @I092@ INDI
+1 NAME Andreas /Grzywacz/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F09A@
+1 FAMC @F09B@
+
+0 @I093@ INDI
+1 NAME Marianna /Sobasinski/
+1 SEX F
+1 FAMS @F09A@
+1 FAMC @F09C@
+
+0 @I094@ INDI
+1 NAME Josephus /Grzywacz/
+1 SEX M
+1 FAMS @F09B@
+
+0 @I095@ INDI
+1 NAME Marianna /Polak/
+1 SEX F
+1 FAMS @F09B@
+
+0 @I096@ INDI
+1 NAME Stanislaus /Sobasinski/
+1 SEX M
+1 FAMS @F09C@
+
+0 @I097@ INDI
+1 NAME Marianna /Trzcińska/
+1 SEX F
+1 FAMS @F09C@
+
+0 @I098@ INDI
+1 NAME Albertus /Chmur/
+1 SEX M
+
+0 @I099@ INDI
+1 NAME Catharina /Lusina/
+1 SEX F
+
+0 @F09A@ FAM
+1 HUSB @I092@
+1 WIFE @I093@
+1 CHIL @I091@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F09B@ FAM
+1 HUSB @I094@
+1 WIFE @I095@
+1 CHIL @I092@
+
+0 @F09C@ FAM
+1 HUSB @I096@
+1 WIFE @I097@
+1 CHIL @I093@
+
+0 @I101@ INDI
+1 NAME Albertus /Chodurek/
+1 SEX M
+1 BIRT
+2 DATE 17 OCT 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 30
+2 SOUR @S1@
+1 BAPM
+2 DATE 19 OCT 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I108@
+3 ROLE GODP
+2 ASSO @I109@
+3 ROLE GODP
+2 ASSO @I902@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F10A@
+
+0 @I102@ INDI
+1 NAME Franciscus /Chodurek/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F10A@
+1 FAMC @F10B@
+1 NOTE Possibly same person as @I032@ (Entry 3); both named Franciscus Chodurek, occupation operarius. Different parents listed, so likely a namesake.
+
+0 @I103@ INDI
+1 NAME Anna /Polak/
+1 SEX F
+1 FAMS @F10A@
+1 FAMC @F10C@
+
+0 @I104@ INDI
+1 NAME Joannes /Chodurek/
+1 SEX M
+1 FAMS @F10B@
+
+0 @I105@ INDI
+1 NAME Marianna /Ledwicz/
+1 SEX F
+1 FAMS @F10B@
+
+0 @I106@ INDI
+1 NAME Jacobus /Polak/
+1 SEX M
+1 FAMS @F10C@
+
+0 @I107@ INDI
+1 NAME Josepha /Stachura/
+1 SEX F
+1 FAMS @F10C@
+
+0 @I108@ INDI
+1 NAME Albertus /Dabrowski/
+1 SEX M
+
+0 @I109@ INDI
+1 NAME Victoria /Kucharska/
+1 SEX F
+1 RESI
+2 PLAC Zielonki, Galicia
+
+0 @F10A@ FAM
+1 HUSB @I102@
+1 WIFE @I103@
+1 CHIL @I101@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F10B@ FAM
+1 HUSB @I104@
+1 WIFE @I105@
+1 CHIL @I102@
+
+0 @F10C@ FAM
+1 HUSB @I106@
+1 WIFE @I107@
+1 CHIL @I103@
+
+0 @I111@ INDI
+1 NAME Joannes /Sucker/
+1 SEX M
+1 BIRT
+2 DATE 20 OCT 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 64
+2 SOUR @S1@
+1 BAPM
+2 DATE 22 OCT 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I118@
+3 ROLE GODP
+2 ASSO @I119@
+3 ROLE GODP
+2 ASSO @I901@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F11A@
+
+0 @I112@ INDI
+1 NAME Josephus /Sucker/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F11A@
+1 FAMC @F11B@
+
+0 @I113@ INDI
+1 NAME Marianna /Dęty/
+1 SEX F
+1 FAMS @F11A@
+1 FAMC @F11C@
+
+0 @I114@ INDI
+1 NAME Bartholomaeus /Sucker/
+1 SEX M
+1 FAMS @F11B@
+1 NOTE OCR rendered "Bara Tholomaei" — interpreted as Bartholomaeus.
+
+0 @I115@ INDI
+1 NAME Lucia /Woch/
+1 SEX F
+1 FAMS @F11B@
+
+0 @I116@ INDI
+1 NAME Albertus /Dęty/
+1 SEX M
+1 FAMS @F11C@
+
+0 @I117@ INDI
+1 NAME Catharina /Ledwicz/
+1 SEX F
+1 FAMS @F11C@
+
+0 @I118@ INDI
+1 NAME Joannes /Gola/
+1 SEX M
+
+0 @I119@ INDI
+1 NAME Anna /Kucharska/
+1 SEX F
+
+0 @F11A@ FAM
+1 HUSB @I112@
+1 WIFE @I113@
+1 CHIL @I111@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F11B@ FAM
+1 HUSB @I114@
+1 WIFE @I115@
+1 CHIL @I112@
+
+0 @F11C@ FAM
+1 HUSB @I116@
+1 WIFE @I117@
+1 CHIL @I113@
+
+0 @I121@ INDI
+1 NAME Angela /Motyka/
+1 SEX F
+1 BIRT
+2 DATE 10 NOV 1893
+2 PLAC Zielonki, Galicia
+2 NOTE House No. 42
+2 SOUR @S1@
+1 BAPM
+2 DATE 16 NOV 1893
+2 PLAC Zielonki, Galicia
+2 SOUR @S1@
+2 ASSO @I900@
+3 ROLE OFFICIATOR
+2 ASSO @I128@
+3 ROLE GODP
+2 ASSO @I129@
+3 ROLE GODP
+2 ASSO @I901@
+3 ROLE OTHER
+3 PHRASE Obstetrix (midwife)
+1 FAMC @F12A@
+
+0 @I122@ INDI
+1 NAME Alfredus /Motyka/
+1 SEX M
+1 OCCU Operarius
+1 FAMS @F12A@
+1 FAMC @F12B@
+
+0 @I123@ INDI
+1 NAME Catharina /Grzywacz/
+1 SEX F
+1 FAMS @F12A@
+1 FAMC @F12C@
+
+0 @I124@ INDI
+1 NAME Jacobus /Motyka/
+1 SEX M
+1 FAMS @F12B@
+
+0 @I125@ INDI
+1 NAME Marianna /Nowak/
+1 SEX F
+1 FAMS @F12B@
+
+0 @I126@ INDI
+1 NAME Joannes /Grzywacz/
+1 SEX M
+1 FAMS @F12C@
+
+0 @I127@ INDI
+1 NAME Marianna /Labig/
+1 SEX F
+1 FAMS @F12C@
+
+0 @I128@ INDI
+1 NAME Petrus /Liotke/
+1 SEX M
+
+0 @I129@ INDI
+1 NAME Angela /Chmur/
+1 SEX F
+
+0 @F12A@ FAM
+1 HUSB @I122@
+1 WIFE @I123@
+1 CHIL @I121@
+1 MARR
+1 NOTE Parents listed as legitimi.
+
+0 @F12B@ FAM
+1 HUSB @I124@
+1 WIFE @I125@
+1 CHIL @I122@
+
+0 @F12C@ FAM
+1 HUSB @I126@
+1 WIFE @I127@
+1 CHIL @I123@
+
+0 TRLR
