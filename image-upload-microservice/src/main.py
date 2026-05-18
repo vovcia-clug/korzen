@@ -231,6 +231,11 @@ def main() -> None:
             sqs_notifier=sqs_notifier,
             post_upload_action=config.post_upload_action,
             archive_directory=config.archive_directory,
+            enable_metadata_extraction=config.enable_metadata_extraction,
+            enable_duplicate_detection=config.enable_duplicate_detection,
+            enable_metadata_enrichment=config.enable_metadata_enrichment,
+            perceptual_hash_size=config.perceptual_hash_size,
+            similarity_threshold=config.similarity_threshold,
         )
 
         # Directory watcher

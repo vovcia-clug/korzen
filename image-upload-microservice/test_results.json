@@ -1,0 +1,95 @@
+{
+  "test_1_standalone": true,
+  "test_2_companion": true,
+  "test_3_workflow": true,
+  "test_4_batch": true,
+  "metadata_examples": [
+    {
+      "place": "Bolech\u00f3w",
+      "unit": "4500 M-1874-1937-Bolech\u00f3w",
+      "years": "1874-1937",
+      "page": "301.jpg (301 z 303)",
+      "source_url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=301.jpg"
+    }
+  ],
+  "errors": [],
+  "workflow_data": {
+    "s3_uploads": [
+      {
+        "bucket": "test-bucket",
+        "key": "uploads/test_upload.jpg",
+        "metadata": {
+          "skanoteka-place": "Bolech\u00f3w",
+          "skanoteka-unit": "4500 M-1874-1937-Bolech\u00f3w",
+          "skanoteka-years": "1874-1937",
+          "skanoteka-page": "301.jpg (301 z 303)",
+          "skanoteka-source-url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=301.jpg",
+          "upload-timestamp": "2026-05-18T09:07:11.779758"
+        }
+      }
+    ],
+    "sqs_messages": [
+      {
+        "queue_url": "https://sqs.region.amazonaws.com/account/queue",
+        "body": {
+          "s3_bucket": "test-bucket",
+          "s3_key": "uploads/test_upload.jpg",
+          "filename": "test_upload.jpg",
+          "metadata": {
+            "place": "Bolech\u00f3w",
+            "unit": "4500 M-1874-1937-Bolech\u00f3w",
+            "years": "1874-1937",
+            "page": "301.jpg (301 z 303)",
+            "source_url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=301.jpg"
+          },
+          "timestamp": "2026-05-18T09:07:11.780313"
+        }
+      }
+    ],
+    "metadata": {
+      "place": "Bolech\u00f3w",
+      "unit": "4500 M-1874-1937-Bolech\u00f3w",
+      "years": "1874-1937",
+      "page": "301.jpg (301 z 303)",
+      "source_url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=301.jpg"
+    }
+  },
+  "batch_results": [
+    {
+      "filename": "bolechow_001.jpg",
+      "url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=301.jpg",
+      "metadata": {
+        "place": "Bolech\u00f3w",
+        "unit": "4500 M-1874-1937-Bolech\u00f3w",
+        "years": "1874-1937",
+        "page": "301.jpg (301 z 303)",
+        "source_url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=301.jpg"
+      },
+      "success": true
+    },
+    {
+      "filename": "bolechow_002.jpg",
+      "url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=302.jpg",
+      "metadata": {
+        "place": "Bolech\u00f3w",
+        "unit": "4500 M-1874-1937-Bolech\u00f3w",
+        "years": "1874-1937",
+        "page": "302.jpg (1 z 303)",
+        "source_url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=302.jpg"
+      },
+      "success": true
+    },
+    {
+      "filename": "bolechow_003.jpg",
+      "url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=303.jpg",
+      "metadata": {
+        "place": "Bolech\u00f3w",
+        "unit": "4500 M-1874-1937-Bolech\u00f3w",
+        "years": "1874-1937",
+        "page": "303.jpg (1 z 303)",
+        "source_url": "https://skanoteka.genealodzy.pl/index.php?op=pg&id=5545&se=&sy=4500&kt=1&plik=303.jpg"
+      },
+      "success": true
+    }
+  ]
+}

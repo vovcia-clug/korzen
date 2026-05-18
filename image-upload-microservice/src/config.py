@@ -144,6 +144,32 @@ class Config(BaseModel):
         description="Maximum backoff delay"
     )
 
+    # === Duplicate Detection Configuration ===
+    enable_duplicate_detection: bool = Field(
+        default=True,
+        description="Enable perceptual hash-based duplicate detection"
+    )
+    enable_metadata_extraction: bool = Field(
+        default=True,
+        description="Enable Skanoteka metadata extraction"
+    )
+    enable_metadata_enrichment: bool = Field(
+        default=True,
+        description="Enable metadata enrichment for duplicates"
+    )
+    perceptual_hash_size: int = Field(
+        default=8,
+        ge=4,
+        le=16,
+        description="Size of perceptual hash (8 = 64-bit hash)"
+    )
+    similarity_threshold: int = Field(
+        default=5,
+        ge=0,
+        le=64,
+        description="Maximum Hamming distance for duplicates (0-64)"
+    )
+
     model_config = {"arbitrary_types_allowed": True}
 
     @field_validator("watch_directory", mode="before")
@@ -248,4 +274,11 @@ class Config(BaseModel):
             max_retries=int(os.getenv("MAX_RETRIES", "3")),
             retry_backoff_base=float(os.getenv("RETRY_BACKOFF_BASE", "2.0")),
             retry_backoff_max=float(os.getenv("RETRY_BACKOFF_MAX", "60.0")),
+            
+            # Duplicate Detection Configuration
+            enable_duplicate_detection=os.getenv("ENABLE_DUPLICATE_DETECTION", "true").lower() == "true",
+            enable_metadata_extraction=os.getenv("ENABLE_METADATA_EXTRACTION", "true").lower() == "true",
+            enable_metadata_enrichment=os.getenv("ENABLE_METADATA_ENRICHMENT", "true").lower() == "true",
+            perceptual_hash_size=int(os.getenv("PERCEPTUAL_HASH_SIZE", "8")),
+            similarity_threshold=int(os.getenv("SIMILARITY_THRESHOLD", "5")),
         )

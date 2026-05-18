@@ -7,7 +7,7 @@ metadata attachment, and retry logic.
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import boto3
 from botocore.config import Config as BotoConfig
@@ -19,9 +19,13 @@ from tenacity import (
     wait_exponential,
 )
 
-from ..utils.logger import get_logger
-
-logger = get_logger(__name__)
+try:
+    from utils.logger import get_logger
+    logger = get_logger(__name__)
+except ImportError:
+    # Fallback for testing
+    import logging
+    logger = logging.getLogger(__name__)
 
 
 class S3Uploader:
@@ -262,6 +266,14 @@ class S3Uploader:
                 s3_metadata["file-hash"] = hash_value
                 s3_metadata["hash-algorithm"] = hash_algo
 
+        # Add perceptual hashes if available
+        if "perceptual_hash" in metadata and metadata["perceptual_hash"]:
+            s3_metadata["perceptual-hash"] = str(metadata["perceptual_hash"])
+        if "average_hash" in metadata and metadata["average_hash"]:
+            s3_metadata["average-hash"] = str(metadata["average_hash"])
+        if "difference_hash" in metadata and metadata["difference_hash"]:
+            s3_metadata["difference-hash"] = str(metadata["difference_hash"])
+
         # Add dimensions if available
         if "image_dimensions" in metadata:
             dims = metadata["image_dimensions"]
@@ -271,6 +283,20 @@ class S3Uploader:
         # Add image format if available
         if "image_format" in metadata:
             s3_metadata["image-format"] = str(metadata["image_format"])
+        
+        # Add Skanoteka metadata if available
+        if "skanoteka" in metadata and isinstance(metadata["skanoteka"], dict):
+            skanoteka = metadata["skanoteka"]
+            if skanoteka.get("place"):
+                s3_metadata["skanoteka-place"] = str(skanoteka["place"])
+            if skanoteka.get("unit"):
+                s3_metadata["skanoteka-unit"] = str(skanoteka["unit"])
+            if skanoteka.get("years"):
+                s3_metadata["skanoteka-years"] = str(skanoteka["years"])
+            if skanoteka.get("page"):
+                s3_metadata["skanoteka-page"] = str(skanoteka["page"])
+            if skanoteka.get("source_url"):
+                s3_metadata["skanoteka-source-url"] = str(skanoteka["source_url"])
 
         return s3_metadata
 
@@ -323,6 +349,158 @@ class S3Uploader:
                 error=str(e),
             )
             return None
+
+    def find_duplicate_by_perceptual_hash(
+        self,
+        perceptual_hash: str,
+        similarity_threshold: int = 5,
+    ) -> Optional[Tuple[str, Dict[str, str], int]]:
+        """Find duplicate image by perceptual hash.
+        
+        Args:
+            perceptual_hash: Perceptual hash to search for
+            similarity_threshold: Maximum Hamming distance for duplicates
+            
+        Returns:
+            Tuple of (s3_uri, metadata, distance) if duplicate found, None otherwise
+        """
+        try:
+            import imagehash
+            
+            target_hash = imagehash.hex_to_hash(perceptual_hash)
+            
+            # List objects and check perceptual hashes
+            paginator = self.s3_client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=self.bucket, Prefix=self.prefix)
+            
+            best_match = None
+            best_distance = float('inf')
+            best_metadata = {}
+            
+            for page in pages:
+                if 'Contents' not in page:
+                    continue
+                    
+                for obj in page['Contents']:
+                    try:
+                        response = self.s3_client.head_object(
+                            Bucket=self.bucket,
+                            Key=obj['Key']
+                        )
+                        metadata = response.get('Metadata', {})
+                        existing_phash = metadata.get('perceptual-hash', '')
+                        
+                        if existing_phash:
+                            existing_hash = imagehash.hex_to_hash(existing_phash)
+                            distance = target_hash - existing_hash
+                            
+                            if distance <= similarity_threshold and distance < best_distance:
+                                best_match = f"s3://{self.bucket}/{obj['Key']}"
+                                best_distance = distance
+                                best_metadata = metadata
+                                
+                    except ClientError:
+                        continue
+            
+            if best_match:
+                logger.info(
+                    "duplicate_found_by_perceptual_hash",
+                    perceptual_hash=perceptual_hash,
+                    match_uri=best_match,
+                    distance=best_distance,
+                )
+                return best_match, best_metadata, int(best_distance)
+            
+            return None
+            
+        except Exception as e:
+            logger.error(
+                "perceptual_hash_search_failed",
+                perceptual_hash=perceptual_hash,
+                error=str(e),
+                exc_info=True,
+            )
+            return None
+
+    def enrich_metadata(
+        self,
+        s3_uri: str,
+        new_metadata: Dict[str, str],
+        overwrite: bool = False,
+    ) -> bool:
+        """Enrich existing S3 object metadata.
+        
+        Only adds metadata that doesn't already exist (unless overwrite=True).
+        
+        Args:
+            s3_uri: S3 URI of the object (s3://bucket/key)
+            new_metadata: New metadata to add
+            overwrite: If True, overwrite existing metadata
+            
+        Returns:
+            True if metadata was enriched, False otherwise
+        """
+        try:
+            # Parse S3 URI
+            if not s3_uri.startswith("s3://"):
+                logger.error("invalid_s3_uri", uri=s3_uri)
+                return False
+            
+            parts = s3_uri[5:].split("/", 1)
+            if len(parts) != 2:
+                logger.error("invalid_s3_uri_format", uri=s3_uri)
+                return False
+            
+            bucket, key = parts
+            
+            # Get existing metadata
+            response = self.s3_client.head_object(Bucket=bucket, Key=key)
+            existing_metadata = response.get('Metadata', {})
+            
+            # Determine which metadata to add
+            metadata_to_add = {}
+            for k, v in new_metadata.items():
+                if overwrite or k not in existing_metadata or not existing_metadata[k]:
+                    metadata_to_add[k] = v
+            
+            if not metadata_to_add:
+                logger.info(
+                    "no_metadata_enrichment_needed",
+                    s3_uri=s3_uri,
+                )
+                return False
+            
+            # Merge metadata
+            enriched_metadata = {**existing_metadata, **metadata_to_add}
+            
+            # Copy object to itself with new metadata
+            copy_source = {'Bucket': bucket, 'Key': key}
+            self.s3_client.copy_object(
+                CopySource=copy_source,
+                Bucket=bucket,
+                Key=key,
+                Metadata=enriched_metadata,
+                MetadataDirective='REPLACE',
+                ServerSideEncryption=self.server_side_encryption,
+                StorageClass=self.storage_class,
+            )
+            
+            logger.info(
+                "metadata_enriched",
+                s3_uri=s3_uri,
+                added_keys=list(metadata_to_add.keys()),
+            )
+            
+            return True
+            
+        except ClientError as e:
+            logger.error(
+                "metadata_enrichment_failed",
+                s3_uri=s3_uri,
+                error=str(e),
+                exc_info=True,
+            )
+            return False
 
     def verify_bucket_access(self) -> bool:
         """Verify that the S3 bucket is accessible.

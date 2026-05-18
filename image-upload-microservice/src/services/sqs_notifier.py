@@ -235,6 +235,10 @@ class SQSNotifier:
         # Add image format if available
         if "image_format" in metadata:
             message["metadata"]["image_format"] = metadata["image_format"]
+        
+        # Add Skanoteka metadata if available
+        if "skanoteka" in metadata and isinstance(metadata["skanoteka"], dict):
+            message["metadata"]["skanoteka"] = metadata["skanoteka"]
 
         return message
 

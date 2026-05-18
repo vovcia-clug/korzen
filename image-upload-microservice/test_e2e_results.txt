@@ -1,0 +1,193 @@
+
+================================================================================
+DUPLICATE DETECTION & METADATA ENRICHMENT
+END-TO-END INTEGRATION TESTS
+================================================================================
+
+================================================================================
+SCENARIO 1: No Enrichment When Duplicate Lacks Metadata
+================================================================================
+
+1. First Upload (with metadata):
+   - File: image1_with_metadata.jpg
+   - Perceptual hash: 8000000000000000
+   - File hash: 323982c8947d29ca...
+   - Has Skanoteka metadata: YES
+   ✓ First image uploaded with metadata
+
+2. Second Upload (duplicate, no metadata):
+   - File: image2_no_metadata.jpg
+   - Perceptual hash: 8000000000000000
+   - File hash: 323982c8947d29ca...
+   - Has Skanoteka metadata: NO
+   ✓ Duplicate detected (distance: 0)
+   ✓ Existing image: s3://test-bucket/uploads/2024/01/01/image1_with_metadata.jpg
+
+3. Enrichment Decision:
+   - Existing image has Skanoteka metadata: True
+   - New image has Skanoteka metadata: NO
+   - Should enrich existing image: NO
+   ✓ No enrichment performed (correct behavior)
+
+✅ SCENARIO 1 PASSED: No enrichment when duplicate lacks metadata
+
+================================================================================
+SCENARIO 2: Enrichment When Duplicate Has Metadata
+================================================================================
+
+1. First Upload (no metadata):
+   - File: image1_no_metadata.jpg
+   - Perceptual hash: 8000000000000000
+   - File hash: 3388e40f7708ff35...
+   - Has Skanoteka metadata: NO
+   ✓ First image uploaded without Skanoteka metadata
+
+2. Second Upload (duplicate, with metadata):
+   - File: image2_with_metadata.jpg
+   - Perceptual hash: 8000000000000000
+   - File hash: 3388e40f7708ff35...
+   - Has Skanoteka metadata: YES
+   - Place: Zielonki
+   - Unit: 5000 M-1900-1950-Zielonki
+   - Years: 1900-1950
+   ✓ Duplicate detected (distance: 0)
+   ✓ Existing image: s3://test-bucket/uploads/2024/01/01/image1_no_metadata.jpg
+
+3. Enrichment Decision:
+   - Existing image has Skanoteka metadata: False
+   - New image has Skanoteka metadata: YES
+   - Should enrich existing image: YES
+   ✓ Enrichment performed successfully
+
+4. Enriched Metadata:
+   - skanoteka-place: Zielonki
+   - skanoteka-unit: 5000 M-1900-1950-Zielonki
+   - skanoteka-years: 1900-1950
+   - skanoteka-page: 42
+   ✓ Original metadata preserved
+
+✅ SCENARIO 2 PASSED: Enrichment when duplicate has metadata
+
+================================================================================
+SCENARIO 3: No Overwrite of Existing Metadata
+================================================================================
+
+1. First Upload (with metadata A):
+   - File: image1_metadata_a.jpg
+   - Perceptual hash: 8000000000000000
+   - Place: Bolechów
+   - Unit: 4500 M-1874-1937-Bolechów
+   - Page: 10
+   ✓ First image uploaded with metadata A
+
+2. Second Upload (duplicate, with different metadata B):
+   - File: image2_metadata_b.jpg
+   - Perceptual hash: 8000000000000000
+   - Place: Zielonki
+   - Unit: 5000 M-1900-1950-Zielonki
+   - Page: 42
+   ✓ Duplicate detected (distance: 0)
+   ✓ Existing image: s3://test-bucket/uploads/2024/01/01/image1_metadata_a.jpg
+
+3. Enrichment Decision:
+   - Existing image has Skanoteka metadata: True
+   - New image has Skanoteka metadata: YES (but different)
+   - Should overwrite existing metadata: NO
+   ✓ Enrichment skipped (correct behavior)
+   ✓ Original metadata preserved:
+     - Place: Bolechów (unchanged)
+     - Unit: 4500 M-1874-1937-Bolechów (unchanged)
+     - Page: 10 (unchanged)
+
+✅ SCENARIO 3 PASSED: No overwrite of existing metadata
+
+================================================================================
+SCENARIO 4: Perceptual Hash Duplicate Detection
+================================================================================
+
+1. Original Image:
+   - Size: 100x100
+   - Color: RGB(255, 0, 0)
+   - Perceptual hash: 8000000000000000
+
+2. Resized Image:
+   - Size: 80x80 (20% smaller)
+   - Color: RGB(255, 0, 0)
+   - Perceptual hash: 8000000000000000
+   - Hamming distance: 0
+   - Is duplicate: True
+   ✓ Resized image correctly detected as duplicate
+
+3. Color-Shifted Image:
+   - Size: 100x100
+   - Color: RGB(250, 5, 5) (slightly different)
+   - Perceptual hash: 8000000000000000
+   - Hamming distance: 0
+   - Is duplicate: True
+   ✓ Color-shifted image correctly detected as duplicate
+
+4. Summary:
+   - Similarity threshold: 5
+   - Resized detection: PASS
+   - Color-shifted detection: PASS
+
+   Note: Solid color images have limited features for perceptual hashing.
+   In production, real images with more detail will have better detection rates.
+
+✅ SCENARIO 4 PASSED: Perceptual hash detection tested
+
+================================================================================
+SCENARIO 5: Complete S3 Workflow
+================================================================================
+
+1. Upload First Image:
+   - File: church_record_001.jpg
+   - Perceptual hash: 8000000000000000
+   - File hash: 30a4d04e4f297b1c...
+   ✓ Uploaded to: s3://test-bucket/uploads/2024/01/01/church_record_001.jpg
+   ✓ Metadata stored in S3
+
+2. Upload Second Image (Duplicate):
+   - File: church_record_001_duplicate.jpg
+   - Perceptual hash: 8000000000000000
+   - File hash: 30a4d04e4f297b1c...
+
+3. Search for Duplicates:
+   ✓ Duplicate found: s3://test-bucket/uploads/2024/01/01/church_record_001.jpg
+   ✓ Hamming distance: 0
+   ✓ Original upload time: 2024-01-01T12:00:00Z
+
+4. Add Skanoteka Metadata:
+   - skanoteka-place: Bolechów
+   - skanoteka-unit: 4500 M-1874-1937-Bolechów
+   - skanoteka-years: 1874-1937
+   - skanoteka-page: 15
+   - skanoteka-url: https://www.skanoteka.pl/...
+
+5. Enrich First Image:
+   - First image has Skanoteka metadata: False
+   ✓ Enrichment successful
+   ✓ Enriched metadata keys: ['perceptual-hash', 'file-hash', 'original-filename', 'upload-timestamp', 'skanoteka-place', 'skanoteka-unit', 'skanoteka-years', 'skanoteka-page', 'skanoteka-url']
+     ✓ skanoteka-place: Bolechów
+     ✓ skanoteka-unit: 4500 M-1874-1937-Bolechów
+     ✓ skanoteka-years: 1874-1937
+     ✓ skanoteka-page: 15
+     ✓ skanoteka-url: https://www.skanoteka.pl/...
+
+6. Workflow Summary:
+   ✓ Image uploaded to S3
+   ✓ Perceptual hash calculated and stored
+   ✓ Duplicate detected via perceptual hash
+   ✓ Metadata enrichment performed
+   ✓ S3 metadata updated
+
+✅ SCENARIO 5 PASSED: Complete S3 workflow
+
+================================================================================
+TEST RESULTS
+================================================================================
+Total tests: 5
+Passed: 5
+Failed: 0
+Success rate: 100.0%
+================================================================================

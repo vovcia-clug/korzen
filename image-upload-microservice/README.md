@@ -48,8 +48,11 @@ The Image Upload Microservice serves as the entry point for an automated image p
 - **📊 Structured Logging**: JSON logging for easy monitoring and debugging
 - **🐳 Docker Ready**: Full containerization with Docker and Docker Compose
 - **⚙️ Highly Configurable**: Comprehensive environment-based configuration
+- **🏛️ Skanoteka Metadata Extraction**: Automatic extraction of genealogical archive metadata from Skanoteka URLs
 
-> **🆕 New in Latest Version**: Recursive scanning, initial directory scan on startup, file hashing, and S3 duplicate detection. See [RECURSIVE_SCAN_FEATURE.md](RECURSIVE_SCAN_FEATURE.md) for details.
+> **🆕 New in Latest Version**:
+> - Recursive scanning, initial directory scan on startup, file hashing, and S3 duplicate detection. See [RECURSIVE_SCAN_FEATURE.md](RECURSIVE_SCAN_FEATURE.md) for details.
+> - **Skanoteka metadata integration**: Automatically extracts and attaches metadata (place, unit, years, page) from Skanoteka genealogical archives. See [METADATA_INTEGRATION.md](METADATA_INTEGRATION.md) for details.
 
 ## 📦 Prerequisites
 
@@ -465,6 +468,8 @@ Attach this policy to your IAM user or role:
 
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md:1)** - Detailed technical architecture and design
 - **[`USAGE.md`](USAGE.md:1)** - Step-by-step usage guide and examples
+- **[`METADATA_INTEGRATION.md`](METADATA_INTEGRATION.md:1)** - Skanoteka metadata extraction integration
+- **[`RECURSIVE_SCAN_FEATURE.md`](RECURSIVE_SCAN_FEATURE.md:1)** - Recursive scanning and duplicate detection
 - **[`../ocr-microservice/README.md`](../ocr-microservice/README.md:1)** - Downstream OCR service documentation
 
 ## 🧪 Testing
