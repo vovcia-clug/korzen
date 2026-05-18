@@ -19,7 +19,7 @@ class Config(BaseModel):
         description="Directory to monitor for new image files"
     )
     watch_recursive: bool = Field(
-        default=False,
+        default=True,
         description="Enable recursive subdirectory monitoring"
     )
     debounce_seconds: float = Field(

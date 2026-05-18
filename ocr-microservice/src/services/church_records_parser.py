@@ -324,12 +324,13 @@ class ChurchRecordsParser:
             Tuple of (given_names, surname)
         """
         # Use unidecode to convert Latin characters to ASCII equivalents
-        given_names = unidecode(record.given_names.strip())
-        surname = unidecode(record.surname.strip())
+        # Handle None values gracefully
+        given_names = unidecode(record.given_names.strip()) if record.given_names else ""
+        surname = unidecode(record.surname.strip()) if record.surname else ""
         
         # Capitalize properly
-        given_names = self._capitalize_name(given_names)
-        surname = self._capitalize_name(surname)
+        given_names = self._capitalize_name(given_names) if given_names else ""
+        surname = self._capitalize_name(surname) if surname else ""
         
         return given_names, surname
     
@@ -399,6 +400,9 @@ class ChurchRecordsParser:
         Returns:
             Month number as string (01-12) or None
         """
+        if not month_str:
+            return None
+            
         month_lower = month_str.lower().strip()
         
         # Check Latin months

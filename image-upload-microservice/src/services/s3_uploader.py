@@ -274,6 +274,56 @@ class S3Uploader:
 
         return s3_metadata
 
+    def object_exists_by_hash(self, file_hash: str) -> Optional[str]:
+        """Check if an object with the given hash already exists in S3.
+        
+        Args:
+            file_hash: SHA256 hash of the file
+            
+        Returns:
+            S3 URI if object exists, None otherwise
+        """
+        try:
+            # List objects with the hash in metadata
+            paginator = self.s3_client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=self.bucket, Prefix=self.prefix)
+            
+            for page in pages:
+                if 'Contents' not in page:
+                    continue
+                    
+                for obj in page['Contents']:
+                    # Get object metadata to check hash
+                    try:
+                        response = self.s3_client.head_object(
+                            Bucket=self.bucket,
+                            Key=obj['Key']
+                        )
+                        metadata = response.get('Metadata', {})
+                        object_hash = metadata.get('file-hash', '')
+                        
+                        if object_hash == file_hash:
+                            s3_uri = f"s3://{self.bucket}/{obj['Key']}"
+                            logger.info(
+                                "object_found_by_hash",
+                                hash=file_hash,
+                                s3_uri=s3_uri,
+                            )
+                            return s3_uri
+                    except ClientError:
+                        # Skip objects we can't access
+                        continue
+                        
+            return None
+            
+        except ClientError as e:
+            logger.warning(
+                "hash_check_failed",
+                hash=file_hash,
+                error=str(e),
+            )
+            return None
+
     def verify_bucket_access(self) -> bool:
         """Verify that the S3 bucket is accessible.
         

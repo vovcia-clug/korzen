@@ -170,7 +170,7 @@ Output Format: Return ONLY valid JSON (no markdown, no commentary) with this exa
       "event_place": "place name",
       "person": {
         "given_names": "first and middle names",
-        "surname": "family name",
+        "surname": "family name or null if not present in record",
         "full_name": "complete name",
         "gender": "M|F|unknown",
         "birth_date": "YYYY-MM-DD if mentioned"
@@ -181,7 +181,7 @@ Output Format: Return ONLY valid JSON (no markdown, no commentary) with this exa
       "parents": [
         {
           "given_names": "name",
-          "surname": "surname",
+          "surname": "surname or null if not present in record",
           "full_name": "full name",
           "role": "father|mother"
         }
@@ -189,7 +189,7 @@ Output Format: Return ONLY valid JSON (no markdown, no commentary) with this exa
       "witnesses": [
         {
           "given_names": "name",
-          "surname": "surname", 
+          "surname": "surname or null if not present in record",
           "full_name": "full name",
           "role": "godfather|godmother|witness",
           "residence": "place if mentioned"
@@ -204,6 +204,11 @@ Output Format: Return ONLY valid JSON (no markdown, no commentary) with this exa
   ]
 }
 
+IMPORTANT: Historical records often lack surnames for certain individuals (peasants, children, godparents). When a surname is not present in the record:
+- Set "surname" to null (not an empty string)
+- In "full_name", include only the given names if no surname is available
+- Do not fabricate or infer surnames that are not explicitly in the source text
+
 Parse dates considering:
 - Anno Domini YYYY = year
 - Month names: Januarius, Februarius, Martius, Aprilis, Maius, Junius, Julius, Augustus, September/7ber, October/8ber, November/9ber, December/10ber
@@ -211,7 +216,7 @@ Parse dates considering:
 - Date formats like "D[ie] 5 Ejusdem" = day 5 of the same month
 - "Eodem die" = same day, "Eodem anno" = same year
 
-Be thorough and extract all genealogical information present."""
+Be thorough and extract all genealogical information present. If something is unknown, use null values."""
 
 USER_PROMPT_TEMPLATE = """Extract all genealogical records from this church document OCR output:
 

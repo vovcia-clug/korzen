@@ -66,6 +66,13 @@ class OpenRouterClient:
         """
         self.logger.info(f"Extracting structured data from {len(markdown_text)} characters of OCR text")
         
+        # DIAGNOSTIC: Log OCR input for surname analysis
+        self.logger.debug("=" * 80)
+        self.logger.debug("DIAGNOSTIC - OCR INPUT TEXT:")
+        self.logger.debug("=" * 80)
+        self.logger.debug(markdown_text)
+        self.logger.debug("=" * 80)
+        
         messages = get_extraction_prompt(markdown_text)
         
         # Retry loop for handling transient failures
@@ -196,17 +203,35 @@ class OpenRouterClient:
             self.logger.error(f"Validation error: {str(e)}")
             self.logger.debug(f"Data structure: {json.dumps(data, indent=2)[:500]}...")
             
-            # DIAGNOSTIC: Log first record structure to identify schema mismatch
-            if isinstance(data, dict) and "records" in data and len(data["records"]) > 0:
-                first_record = data["records"][0]
-                self.logger.error("DIAGNOSTIC - First record structure:")
-                self.logger.error(f"  - record_type: {first_record.get('record_type', 'MISSING')}")
-                self.logger.error(f"  - person keys: {list(first_record.get('person', {}).keys())}")
-                if "parents" in first_record and len(first_record["parents"]) > 0:
-                    self.logger.error(f"  - first parent keys: {list(first_record['parents'][0].keys())}")
-                if "witnesses" in first_record and len(first_record["witnesses"]) > 0:
-                    self.logger.error(f"  - first witness keys: {list(first_record['witnesses'][0].keys())}")
-                self.logger.error(f"  - Full first record: {json.dumps(first_record, indent=2)}")
+            # DIAGNOSTIC: Log ALL records to identify surname null pattern
+            if isinstance(data, dict) and "records" in data:
+                self.logger.error("=" * 80)
+                self.logger.error("DIAGNOSTIC - FULL API RESPONSE FOR SURNAME NULL ANALYSIS:")
+                self.logger.error("=" * 80)
+                self.logger.error(json.dumps(data, indent=2))
+                self.logger.error("=" * 80)
+                
+                # Check each record for null surnames
+                for idx, record in enumerate(data.get("records", [])):
+                    person = record.get("person", {})
+                    if person.get("surname") is None:
+                        self.logger.error(f"Record {idx}: person.surname is NULL")
+                        self.logger.error(f"  - given_names: {person.get('given_names')}")
+                        self.logger.error(f"  - full_name: {person.get('full_name')}")
+                        self.logger.error(f"  - source_text: {record.get('source_text', '')[:100]}")
+                    
+                    for parent_idx, parent in enumerate(record.get("parents", [])):
+                        if parent.get("surname") is None:
+                            self.logger.error(f"Record {idx}: parent[{parent_idx}].surname is NULL")
+                            self.logger.error(f"  - given_names: {parent.get('given_names')}")
+                            self.logger.error(f"  - full_name: {parent.get('full_name')}")
+                            self.logger.error(f"  - role: {parent.get('role')}")
+                    
+                    for witness_idx, witness in enumerate(record.get("witnesses", [])):
+                        if witness.get("surname") is None:
+                            self.logger.error(f"Record {idx}: witness[{witness_idx}].surname is NULL")
+                            self.logger.error(f"  - given_names: {witness.get('given_names')}")
+                            self.logger.error(f"  - full_name: {witness.get('full_name')}")
             
             raise ValueError(f"Response doesn't match expected schema: {str(e)}")
     

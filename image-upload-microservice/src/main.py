@@ -88,6 +88,74 @@ def verify_aws_connectivity(config: Config, s3_uploader: S3Uploader, sqs_notifie
     return True
 
 
+def scan_existing_files(
+    directory: Path,
+    orchestrator: UploadOrchestrator,
+    supported_extensions: set,
+    recursive: bool = False
+) -> int:
+    """Scan directory for existing files and process them.
+    
+    Args:
+        directory: Directory to scan
+        orchestrator: Upload orchestrator to process files
+        supported_extensions: Set of supported file extensions
+        recursive: Whether to scan subdirectories
+        
+    Returns:
+        Number of files found
+    """
+    scan_logger = get_logger(__name__)
+    files_found = 0
+    
+    try:
+        if recursive:
+            # Recursively scan all subdirectories
+            for file_path in directory.rglob("*"):
+                if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
+                    # Skip hidden files and system files
+                    if not file_path.name.startswith(".") and file_path.name not in {"Thumbs.db", ".DS_Store", "desktop.ini"}:
+                        files_found += 1
+                        scan_logger.info("initial_scan_file_found", file=str(file_path))
+                        # Process file in background (don't block startup)
+                        try:
+                            orchestrator.process_file(file_path)
+                        except Exception as e:
+                            scan_logger.error(
+                                "initial_scan_file_failed",
+                                file=str(file_path),
+                                error=str(e),
+                                exc_info=True
+                            )
+        else:
+            # Only scan top-level files
+            for file_path in directory.iterdir():
+                if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
+                    # Skip hidden files and system files
+                    if not file_path.name.startswith(".") and file_path.name not in {"Thumbs.db", ".DS_Store", "desktop.ini"}:
+                        files_found += 1
+                        scan_logger.info("initial_scan_file_found", file=str(file_path))
+                        # Process file in background (don't block startup)
+                        try:
+                            orchestrator.process_file(file_path)
+                        except Exception as e:
+                            scan_logger.error(
+                                "initial_scan_file_failed",
+                                file=str(file_path),
+                                error=str(e),
+                                exc_info=True
+                            )
+    except Exception as e:
+        scan_logger.error(
+            "initial_scan_error",
+            directory=str(directory),
+            error=str(e),
+            exc_info=True
+        )
+    
+    return files_found
+
+
 def main() -> None:
     """Main entry point for the service."""
     global watcher, orchestrator, logger
@@ -175,6 +243,20 @@ def main() -> None:
         )
 
         logger.info("services_initialized")
+
+        # Initial scan of existing files
+        logger.info("starting_initial_directory_scan", directory=str(config.watch_directory))
+        initial_files_found = scan_existing_files(
+            config.watch_directory,
+            orchestrator,
+            set(config.supported_extensions),
+            config.watch_recursive
+        )
+        logger.info(
+            "initial_scan_completed",
+            files_found=initial_files_found,
+            directory=str(config.watch_directory)
+        )
 
         # Start watching directory
         watcher.start()

@@ -119,17 +119,32 @@ class UploadOrchestrator:
                 self._handle_failed_file(file_path, reason, status)
                 return False
 
-            # Check for duplicates by hash
+            # Check for duplicates by hash in memory
             file_hash_value = metadata.get("file_hash", {}).get("value", "")
             if file_hash_value and file_hash_value in self.processed_hashes:
                 logger.info(
-                    "file_duplicate_skipped",
+                    "file_duplicate_skipped_memory",
                     file=str(file_path),
                     hash=file_hash_value,
                 )
                 # Still considered successful, just skip
                 self._handle_post_upload_action(file_path)
                 return True
+            
+            # Check if file already exists in S3 by hash
+            if file_hash_value:
+                existing_s3_uri = self.s3_uploader.object_exists_by_hash(file_hash_value)
+                if existing_s3_uri:
+                    logger.info(
+                        "file_duplicate_skipped_s3",
+                        file=str(file_path),
+                        hash=file_hash_value,
+                        existing_s3_uri=existing_s3_uri,
+                    )
+                    # Track hash and handle post-upload action
+                    self.processed_hashes.add(file_hash_value)
+                    self._handle_post_upload_action(file_path)
+                    return True
 
             # Stage 2: Upload to S3
             status = UploadStatus.UPLOADING

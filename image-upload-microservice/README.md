@@ -35,6 +35,10 @@ The Image Upload Microservice serves as the entry point for an automated image p
 ## ✨ Features
 
 - **🔍 Automatic File Detection**: Real-time monitoring using the `watchdog` library
+- **📂 Recursive Directory Scanning**: Automatically descends into subdirectories to find all images
+- **🚀 Initial Startup Scan**: Processes all existing files on startup, not just new ones
+- **#️⃣ File Hashing**: SHA-256 hash calculation for every file
+- **🔁 Duplicate Detection**: Checks S3 before upload to avoid re-uploading existing files
 - **✅ Multi-Format Support**: JPEG, PNG, GIF, BMP, TIFF, WebP, and more
 - **🛡️ Robust Validation**: Multi-layer validation (extension, MIME type, image headers)
 - **☁️ AWS S3 Integration**: Efficient uploads with multipart support for large files
@@ -44,6 +48,8 @@ The Image Upload Microservice serves as the entry point for an automated image p
 - **📊 Structured Logging**: JSON logging for easy monitoring and debugging
 - **🐳 Docker Ready**: Full containerization with Docker and Docker Compose
 - **⚙️ Highly Configurable**: Comprehensive environment-based configuration
+
+> **🆕 New in Latest Version**: Recursive scanning, initial directory scan on startup, file hashing, and S3 duplicate detection. See [RECURSIVE_SCAN_FEATURE.md](RECURSIVE_SCAN_FEATURE.md) for details.
 
 ## 📦 Prerequisites
 
