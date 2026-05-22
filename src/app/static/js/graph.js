@@ -84,26 +84,13 @@ function getGraphOptions() {
             }
         },
         physics: {
-            enabled: true,
-            stabilization: {
-                enabled: true,
-                iterations: 1000,
-                updateInterval: 25
-            },
-            hierarchicalRepulsion: {
-                centralGravity: 0.0,
-                springLength: 150,
-                springConstant: 0.01,
-                nodeDistance: 200,
-                damping: 0.09
-            },
-            solver: 'hierarchicalRepulsion'
+            enabled: false  // Disable physics for pure hierarchical layout
         },
         layout: {
             hierarchical: {
                 enabled: true,
                 direction: 'UD',  // Up-Down: older nodes at top, newer at bottom
-                sortMethod: 'directed',
+                sortMethod: 'hubsize',
                 nodeSpacing: 200,
                 levelSeparation: 200,
                 treeSpacing: 250,
@@ -121,21 +108,14 @@ function getGraphOptions() {
     };
 }
 
-// Calculate hierarchical levels with spouse grouping
+// Calculate hierarchical levels based on birth dates with spouse grouping
 function calculateHierarchicalLevels(nodes, edges) {
-    const nodeMap = new Map();
     const levels = new Map();
     const marriages = new Map(); // Track marriage relationships
     
-    // Build node map
-    nodes.forEach(node => {
-        nodeMap.set(node.id, node);
-    });
-    
-    // Identify marriage relationships and build spouse groups
+    // Identify marriage relationships
     edges.forEach(edge => {
         if (edge.type === 'MARRIED_TO') {
-            // Store both directions for easy lookup
             if (!marriages.has(edge.from)) {
                 marriages.set(edge.from, new Set());
             }
@@ -147,131 +127,89 @@ function calculateHierarchicalLevels(nodes, edges) {
         }
     });
     
-    // Build parent-child relationships for easier lookup
-    const childrenMap = new Map(); // parent -> [children]
-    const parentsMap = new Map(); // child -> [parents]
+    // Extract birth years and calculate levels
+    const birthYears = new Map();
+    let minYear = Infinity;
+    let maxYear = -Infinity;
     
-    edges.forEach(edge => {
-        if (edge.type === 'PARENT_OF') {
-            // PARENT_OF goes from parent to child
-            if (!childrenMap.has(edge.from)) {
-                childrenMap.set(edge.from, []);
+    nodes.forEach(node => {
+        if (node.type === 'Person' && node.birth_date) {
+            const year = parseInt(node.birth_date.split('-')[0]);
+            if (!isNaN(year)) {
+                birthYears.set(node.id, year);
+                minYear = Math.min(minYear, year);
+                maxYear = Math.max(maxYear, year);
             }
-            childrenMap.get(edge.from).push(edge.to);
-            
-            if (!parentsMap.has(edge.to)) {
-                parentsMap.set(edge.to, []);
-            }
-            parentsMap.get(edge.to).push(edge.from);
         }
     });
     
-    // Find root nodes (nodes with no parents)
-    const roots = nodes.filter(node => !parentsMap.has(node.id));
-    
-    // Helper function to get all spouses of a person
-    function getAllSpouses(personId) {
-        const spouses = new Set();
-        if (marriages.has(personId)) {
-            marriages.get(personId).forEach(spouseId => {
-                spouses.add(spouseId);
-            });
-        }
-        return Array.from(spouses);
-    }
-    
-    // Helper function to set level for a person and all their spouses
-    function setLevelWithSpouses(personId, targetLevel) {
-        const toProcess = [personId];
-        const processed = new Set();
-        let finalLevel = targetLevel;
+    // If we have birth years, use them to calculate levels
+    if (minYear !== Infinity && maxYear !== -Infinity) {
+        // Group years into levels (e.g., every 25-30 years is a generation)
+        const yearsPerLevel = 25;
         
-        while (toProcess.length > 0) {
-            const currentId = toProcess.shift();
-            
-            if (processed.has(currentId)) {
-                continue;
+        // First pass: assign levels based on birth years
+        nodes.forEach(node => {
+            if (birthYears.has(node.id)) {
+                const year = birthYears.get(node.id);
+                // Calculate level: older = lower level number (top of graph)
+                const level = Math.floor((year - minYear) / yearsPerLevel);
+                levels.set(node.id, level);
+            } else {
+                // Nodes without birth dates go to level 0
+                levels.set(node.id, 0);
             }
-            
-            processed.add(currentId);
-            
-            // Set or update level
-            const existingLevel = levels.get(currentId);
-            if (existingLevel === undefined) {
-                levels.set(currentId, finalLevel);
-            } else if (existingLevel !== finalLevel) {
-                // Conflict: keep minimum level (closer to ancestors)
-                finalLevel = Math.min(existingLevel, finalLevel);
-                levels.set(currentId, finalLevel);
-            }
-            
-            // Add all spouses to process at same level
-            const spouses = getAllSpouses(currentId);
-            spouses.forEach(spouseId => {
-                if (!processed.has(spouseId)) {
-                    toProcess.push(spouseId);
-                }
-            });
-        }
-        
-        return finalLevel; // Return the final level used
-    }
-    
-    // BFS to assign levels
-    const queue = [];
-    const processed = new Set();
-    
-    // Start with root nodes at level 0
-    roots.forEach(root => {
-        queue.push({ id: root.id, level: 0 });
-    });
-    
-    // If no roots found (circular relationships), start with first node
-    if (queue.length === 0 && nodes.length > 0) {
-        queue.push({ id: nodes[0].id, level: 0 });
-    }
-    
-    while (queue.length > 0) {
-        const { id, level } = queue.shift();
-        
-        // Skip if already processed
-        if (processed.has(id)) {
-            continue;
-        }
-        
-        // Set level for this person and all spouses
-        const finalLevel = setLevelWithSpouses(id, level);
-        
-        // Mark person as processed
-        processed.add(id);
-        
-        // Mark all spouses as processed
-        const spouses = getAllSpouses(id);
-        spouses.forEach(spouseId => {
-            processed.add(spouseId);
         });
         
-        // Add children to queue at next level
-        // Check children of both the person and their spouses
-        const peopleToCheckChildren = [id, ...spouses];
+        // Second pass: adjust spouse levels to match
+        const processed = new Set();
         
-        peopleToCheckChildren.forEach(personId => {
-            if (childrenMap.has(personId)) {
-                childrenMap.get(personId).forEach(childId => {
-                    if (!processed.has(childId)) {
-                        queue.push({ id: childId, level: finalLevel + 1 });
-                    }
+        nodes.forEach(node => {
+            if (processed.has(node.id)) return;
+            
+            // Get all spouses for this person
+            const spouseGroup = [node.id];
+            const toCheck = [node.id];
+            const groupProcessed = new Set([node.id]);
+            
+            while (toCheck.length > 0) {
+                const currentId = toCheck.shift();
+                if (marriages.has(currentId)) {
+                    marriages.get(currentId).forEach(spouseId => {
+                        if (!groupProcessed.has(spouseId)) {
+                            spouseGroup.push(spouseId);
+                            toCheck.push(spouseId);
+                            groupProcessed.add(spouseId);
+                        }
+                    });
+                }
+            }
+            
+            // Find the average level for the spouse group
+            let totalLevel = 0;
+            let count = 0;
+            spouseGroup.forEach(id => {
+                if (levels.has(id)) {
+                    totalLevel += levels.get(id);
+                    count++;
+                }
+            });
+            
+            if (count > 0) {
+                const avgLevel = Math.round(totalLevel / count);
+                // Set all spouses to the same level
+                spouseGroup.forEach(id => {
+                    levels.set(id, avgLevel);
+                    processed.add(id);
                 });
             }
         });
-    }
-    
-    // Assign levels to any remaining unprocessed nodes (disconnected components)
-    nodes.forEach(node => {
-        if (!levels.has(node.id)) {
+    } else {
+        // Fallback: all nodes at level 0
+        nodes.forEach(node => {
             levels.set(node.id, 0);
-        }
-    });
+        });
+    }
     
     return levels;
 }
@@ -347,7 +285,64 @@ function renderGraph(data) {
         }
     });
     
-    // Process nodes (no hierarchical levels needed for force-directed layout)
+    // Build marriage map to identify spouse pairs
+    const marriages = new Map(); // person_id -> Set of spouse_ids
+    data.edges.forEach(edge => {
+        if (edge.type === 'MARRIED_TO') {
+            if (!marriages.has(edge.from)) {
+                marriages.set(edge.from, new Set());
+            }
+            if (!marriages.has(edge.to)) {
+                marriages.set(edge.to, new Set());
+            }
+            marriages.get(edge.from).add(edge.to);
+            marriages.get(edge.to).add(edge.from);
+        }
+    });
+    
+    // Deduplicate parent-child edges: only one edge per child from married couples
+    const childToParents = new Map(); // child_id -> [parent_ids]
+    const parentChildEdges = data.edges.filter(e => e.type === 'PARENT_OF');
+    
+    parentChildEdges.forEach(edge => {
+        const childId = edge.to;
+        if (!childToParents.has(childId)) {
+            childToParents.set(childId, []);
+        }
+        childToParents.get(childId).push(edge.from);
+    });
+    
+    // Determine which parent-child edges to keep
+    const edgesToKeep = new Set();
+    childToParents.forEach((parents, childId) => {
+        if (parents.length === 1) {
+            // Only one parent, keep the edge
+            edgesToKeep.add(`${parents[0]}-${childId}-PARENT_OF`);
+        } else if (parents.length === 2) {
+            // Check if parents are married to each other
+            const [parent1, parent2] = parents;
+            const areMarried = marriages.has(parent1) && marriages.get(parent1).has(parent2);
+            
+            if (areMarried) {
+                // Parents are married, keep only one edge (prefer first parent)
+                edgesToKeep.add(`${parent1}-${childId}-PARENT_OF`);
+            } else {
+                // Parents are not married, keep both edges
+                edgesToKeep.add(`${parent1}-${childId}-PARENT_OF`);
+                edgesToKeep.add(`${parent2}-${childId}-PARENT_OF`);
+            }
+        } else {
+            // More than 2 parents (unusual), keep all edges
+            parents.forEach(parentId => {
+                edgesToKeep.add(`${parentId}-${childId}-PARENT_OF`);
+            });
+        }
+    });
+    
+    // Calculate hierarchical levels with spouse grouping
+    const levels = calculateHierarchicalLevels(data.nodes, data.edges);
+    
+    // Process nodes with hierarchical levels
     const processedNodes = data.nodes.map(node => {
         const color = getNodeColor(node);
         const title = getNodeTooltip(node);
@@ -377,14 +372,26 @@ function renderGraph(data) {
                     size: 14
                 }
             },
+            level: levels.get(node.id) || 0,  // Assign hierarchical level
             hidden: hideSource && sourceNodeIds.has(node.id)
         };
     });
     
-    // Process edges with special handling for marriage edges
+    // Process edges with special handling for marriage edges and parent-child deduplication
     // Filter out edges that should be hidden instead of marking them as hidden
     const processedEdges = data.edges
-        .filter(edge => !shouldHideEdge(edge.type))
+        .filter(edge => {
+            // Filter out hidden edges
+            if (shouldHideEdge(edge.type)) return false;
+            
+            // Filter out duplicate parent-child edges
+            if (edge.type === 'PARENT_OF') {
+                const edgeKey = `${edge.from}-${edge.to}-PARENT_OF`;
+                return edgesToKeep.has(edgeKey);
+            }
+            
+            return true;
+        })
         .map(edge => {
             const color = getEdgeColor(edge.type);
             const label = edge.type === 'MARRIED_TO' ? '💑' : '';
