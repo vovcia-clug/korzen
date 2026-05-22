@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="{{ get_locale() }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ _('Korzen - Genealogy Application') }}{% endblock %}</title>
+    
+    <!-- Common CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    {% block extra_css %}{% endblock %}
+    
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <!-- Header with navigation -->
+    {% include 'includes/header.html' %}
+    
+    <!-- Main content area -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    {% include 'includes/footer.html' %}
+    
+    <!-- Common JavaScript -->
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

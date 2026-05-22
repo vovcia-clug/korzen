@@ -1,0 +1,40 @@
+{% if pagination and pagination.pages > 1 %}
+{% set args = request.args.copy() %}
+{% set dummy = args.pop('page', None) %}
+<div class="pagination-controls">
+    <a href="{{ url_for(endpoint, page=1, **args.to_dict(flat=False)) }}"
+       class="btn-page {% if not pagination.has_prev %}disabled{% endif %}"
+       {% if not pagination.has_prev %}aria-disabled="true"{% endif %}>
+        « {{ _('First') }}
+    </a>
+    
+    <a href="{{ url_for(endpoint, page=pagination.prev_num, **args.to_dict(flat=False)) }}"
+       class="btn-page {% if not pagination.has_prev %}disabled{% endif %}"
+       {% if not pagination.has_prev %}aria-disabled="true"{% endif %}>
+        ‹ {{ _('Previous') }}
+    </a>
+    
+    <div class="page-info">
+        {{ _('Page %(current)s of %(total)s', current=pagination.page, total=pagination.pages) }}
+    </div>
+    
+    <a href="{{ url_for(endpoint, page=pagination.next_num, **args.to_dict(flat=False)) }}"
+       class="btn-page {% if not pagination.has_next %}disabled{% endif %}"
+       {% if not pagination.has_next %}aria-disabled="true"{% endif %}>
+        {{ _('Next') }} ›
+    </a>
+    
+    <a href="{{ url_for(endpoint, page=pagination.pages, **args.to_dict(flat=False)) }}"
+       class="btn-page {% if not pagination.has_next %}disabled{% endif %}"
+       {% if not pagination.has_next %}aria-disabled="true"{% endif %}>
+        {{ _('Last') }} »
+    </a>
+</div>
+
+<div class="pagination-info">
+    {{ _('Showing %(start)s to %(end)s of %(total)s items',
+         start=((pagination.page - 1) * pagination.per_page) + 1,
+         end=min(pagination.page * pagination.per_page, pagination.total),
+         total=pagination.total) }}
+</div>
+{% endif %}

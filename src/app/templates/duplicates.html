@@ -1,927 +1,681 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Duplicate Detection - Korzen</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 1600px;
-            margin: 0 auto;
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-        
-        h1 {
-            color: #333;
-            font-size: 2em;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .btn-nav {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            display: inline-block;
-            border: none;
-            cursor: pointer;
-            font-size: 1em;
-        }
-        
-        .btn-nav:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
-        
-        .stat-card h3 {
-            font-size: 0.9em;
-            opacity: 0.9;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        
-        .stat-card .number {
-            font-size: 2em;
-            font-weight: 700;
-        }
-        
-        .stat-card.warning {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        
-        .stat-card.success {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-        
-        .stat-card.info {
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+{% extends "base.html" %}
+
+{% block title %}{{ _('Duplicate Detection') }} - Korzen{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card.warning {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .stat-card.success {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .stat-card.info {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+    
+    .duplicate-card {
+        background: white;
+        border: 2px solid #e0e3ff;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .duplicate-card:hover {
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+        border-color: #667eea;
+    }
+    
+    .duplicate-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    
+    .duplicate-type {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.85em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .type-person { background: #e3f2fd; color: #1976d2; }
+    .type-baptism { background: #f3e5f5; color: #7b1fa2; }
+    .type-marriage { background: #fce4ec; color: #c2185b; }
+    .type-death { background: #f1f8e9; color: #558b2f; }
+    
+    .score-badge {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.2em;
+        font-weight: 700;
+    }
+    
+    .score-bar {
+        width: 100px;
+        height: 8px;
+        background: #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .score-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+    
+    .score-high { background: linear-gradient(90deg, #f5576c 0%, #ff6b7a 100%); }
+    .score-medium { background: linear-gradient(90deg, #ffa726 0%, #ffb74d 100%); }
+    .score-low { background: linear-gradient(90deg, #66bb6a 0%, #81c784 100%); }
+    
+    .comparison-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .record-card {
+        background: #fafbff;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #e0e3ff;
+    }
+    
+    .record-title {
+        font-weight: 600;
+        color: #667eea;
+        margin-bottom: 12px;
+        font-size: 0.95em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .record-field {
+        margin-bottom: 8px;
+        font-size: 0.95em;
+    }
+    
+    .field-label {
+        color: #666;
+        font-weight: 600;
+        min-width: 120px;
+        display: inline-block;
+    }
+    
+    .field-value {
+        color: #333;
+    }
+    
+    .similarity-breakdown {
+        background: #f8f9ff;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .similarity-title {
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #333;
+    }
+    
+    .similarity-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .similarity-label {
+        color: #666;
+        font-size: 0.9em;
+    }
+    
+    .similarity-value {
+        font-weight: 700;
+        font-size: 0.95em;
+    }
+    
+    .similarity-mini-bar {
+        width: 80px;
+        height: 6px;
+        background: #e0e0e0;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-left: 10px;
+    }
+    
+    .similarity-mini-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+    
+    .btn-confirm {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        color: white;
+        padding: 10px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-confirm:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(67, 233, 123, 0.4);
+    }
+    
+    .btn-reject {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 10px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-reject:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(245, 87, 108, 0.4);
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.8em;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-pending { background: #fff9c4; color: #f57f17; }
+    .status-confirmed { background: #c8e6c9; color: #2e7d32; }
+    .status-rejected { background: #ffcdd2; color: #c62828; }
+    
+    .metadata {
+        font-size: 0.85em;
+        color: #999;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #f0f0f0;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+    }
+    
+    .empty-state-icon {
+        font-size: 4em;
+        margin-bottom: 20px;
+        opacity: 0.3;
+    }
+    
+    .empty-state h2 {
+        color: #666;
+        margin-bottom: 10px;
+    }
+    
+    .empty-state p {
+        color: #999;
+        font-size: 1.1em;
+    }
+    
+    @media (max-width: 768px) {
+        .comparison-grid {
+            grid-template-columns: 1fr;
         }
         
         .filters {
-            background: #f8f9ff;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        
-        .filter-group {
-            display: flex;
             flex-direction: column;
-            gap: 5px;
+            align-items: stretch;
         }
         
-        .filter-label {
-            font-size: 0.85em;
-            color: #666;
-            font-weight: 600;
+        .stats-grid {
+            grid-template-columns: 1fr;
         }
-        
-        .filter-select, .filter-input {
-            padding: 10px 14px;
-            border: 2px solid #e0e3ff;
-            border-radius: 8px;
-            font-size: 1em;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .filter-select:focus, .filter-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .btn-filter {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 10px 24px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 20px;
-        }
-        
-        .btn-filter:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .duplicate-card {
-            background: white;
-            border: 2px solid #e0e3ff;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
-        }
-        
-        .duplicate-card:hover {
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
-            border-color: #667eea;
-        }
-        
-        .duplicate-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-        }
-        
-        .duplicate-type {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.85em;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .type-person {
-            background: #e3f2fd;
-            color: #1976d2;
-        }
-        
-        .type-baptism {
-            background: #f3e5f5;
-            color: #7b1fa2;
-        }
-        
-        .type-marriage {
-            background: #fce4ec;
-            color: #c2185b;
-        }
-        
-        .type-death {
-            background: #f1f8e9;
-            color: #558b2f;
-        }
-        
-        .score-badge {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 1.2em;
-            font-weight: 700;
-        }
-        
-        .score-bar {
-            width: 100px;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        
-        .score-fill {
-            height: 100%;
-            transition: width 0.3s ease;
-        }
-        
-        .score-high {
-            background: linear-gradient(90deg, #f5576c 0%, #ff6b7a 100%);
-        }
-        
-        .score-medium {
-            background: linear-gradient(90deg, #ffa726 0%, #ffb74d 100%);
-        }
-        
-        .score-low {
-            background: linear-gradient(90deg, #66bb6a 0%, #81c784 100%);
-        }
-        
-        .comparison-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .record-card {
-            background: #fafbff;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #e0e3ff;
-        }
-        
-        .record-title {
-            font-weight: 600;
-            color: #667eea;
-            margin-bottom: 12px;
-            font-size: 0.95em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .record-field {
-            margin-bottom: 8px;
-            font-size: 0.95em;
-        }
-        
-        .field-label {
-            color: #666;
-            font-weight: 600;
-            min-width: 120px;
-            display: inline-block;
-        }
-        
-        .field-value {
-            color: #333;
-        }
-        
-        .similarity-breakdown {
-            background: #f8f9ff;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        
-        .similarity-title {
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: #333;
-        }
-        
-        .similarity-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        .similarity-label {
-            color: #666;
-            font-size: 0.9em;
-        }
-        
-        .similarity-value {
-            font-weight: 700;
-            font-size: 0.95em;
-        }
-        
-        .similarity-mini-bar {
-            width: 80px;
-            height: 6px;
-            background: #e0e0e0;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-left: 10px;
-        }
-        
-        .similarity-mini-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-        }
-        
-        .btn-confirm {
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-            color: white;
-            padding: 10px 24px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-confirm:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(67, 233, 123, 0.4);
-        }
-        
-        .btn-reject {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            padding: 10px 24px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-reject:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(245, 87, 108, 0.4);
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.8em;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .status-pending {
-            background: #fff9c4;
-            color: #f57f17;
-        }
-        
-        .status-confirmed {
-            background: #c8e6c9;
-            color: #2e7d32;
-        }
-        
-        .status-rejected {
-            background: #ffcdd2;
-            color: #c62828;
-        }
-        
-        .metadata {
-            font-size: 0.85em;
-            color: #999;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #f0f0f0;
-        }
-        
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 30px;
-            flex-wrap: wrap;
-        }
-        
-        .pagination a, .pagination span {
-            padding: 10px 16px;
-            border: 2px solid #e0e3ff;
-            border-radius: 8px;
-            text-decoration: none;
-            color: #667eea;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        
-        .pagination a:hover {
-            background: #667eea;
-            color: white;
-            transform: translateY(-2px);
-        }
-        
-        .pagination .active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: #667eea;
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #999;
-        }
-        
-        .empty-state-icon {
-            font-size: 4em;
-            margin-bottom: 20px;
-            opacity: 0.3;
-        }
-        
-        .empty-state h2 {
-            color: #666;
-            margin-bottom: 10px;
-        }
-        
-        .empty-state p {
-            color: #999;
-            font-size: 1.1em;
-        }
-        
-        .error-message {
-            background: #ffebee;
-            color: #c62828;
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #c62828;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #999;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @media (max-width: 768px) {
-            .comparison-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .filters {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🔍 Duplicate Detection</h1>
-            <div class="nav-links">
-                <a href="/" class="btn-nav">🏠 Home</a>
-                <a href="/persons" class="btn-nav">👥 Persons</a>
-                <a href="/baptisms" class="btn-nav">👶 Baptisms</a>
-                <a href="/marriages" class="btn-nav">💒 Marriages</a>
-                <a href="/deaths" class="btn-nav">⚰️ Deaths</a>
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="error-message">
+    <strong>{{ _('Error') }}:</strong> {{ error }}
+</div>
+{% endif %}
+
+<!-- Statistics Dashboard -->
+<div class="stats-grid">
+    <div class="stat-card warning">
+        <h3>{{ _('Pending Review') }}</h3>
+        <div class="number">{{ stats.total_pending if stats else 0 }}</div>
+    </div>
+    <div class="stat-card success">
+        <h3>{{ _('Confirmed Duplicates') }}</h3>
+        <div class="number">{{ stats.total_confirmed if stats else 0 }}</div>
+    </div>
+    <div class="stat-card info">
+        <h3>{{ _('Rejected') }}</h3>
+        <div class="number">{{ stats.total_rejected if stats else 0 }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>{{ _('Total Detected') }}</h3>
+        <div class="number">{{ (stats.total_pending + stats.total_confirmed + stats.total_rejected) if stats else 0 }}</div>
+    </div>
+</div>
+
+<!-- Filters -->
+<form method="get" action="/duplicates">
+    <div class="filters">
+        <div class="filter-group">
+            <label class="filter-label">{{ _('Record Type') }}</label>
+            <select name="record_type" class="filter-select">
+                <option value="all" {% if filters.record_type == 'all' %}selected{% endif %}>{{ _('All Types') }}</option>
+                <option value="person" {% if filters.record_type == 'person' %}selected{% endif %}>{{ _('Persons') }} ({{ stats.by_type.person if stats else 0 }})</option>
+                <option value="baptism" {% if filters.record_type == 'baptism' %}selected{% endif %}>{{ _('Baptisms') }} ({{ stats.by_type.baptism if stats else 0 }})</option>
+                <option value="marriage" {% if filters.record_type == 'marriage' %}selected{% endif %}>{{ _('Marriages') }} ({{ stats.by_type.marriage if stats else 0 }})</option>
+                <option value="death" {% if filters.record_type == 'death' %}selected{% endif %}>{{ _('Deaths') }} ({{ stats.by_type.death if stats else 0 }})</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label">{{ _('Status') }}</label>
+            <select name="status" class="filter-select">
+                <option value="all" {% if filters.status == 'all' %}selected{% endif %}>{{ _('All Status') }}</option>
+                <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>{{ _('Pending') }}</option>
+                <option value="confirmed" {% if filters.status == 'confirmed' %}selected{% endif %}>{{ _('Confirmed') }}</option>
+                <option value="rejected" {% if filters.status == 'rejected' %}selected{% endif %}>{{ _('Rejected') }}</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label">{{ _('Minimum Score') }}</label>
+            <input type="number" name="min_score" class="filter-input" 
+                   step="0.05" min="0" max="1" 
+                   value="{{ filters.min_score if filters.min_score else 0 }}" 
+                   placeholder="0.0">
+        </div>
+
+        <div class="filter-group">
+            <button type="submit" class="btn-filter">{{ _('Apply Filters') }}</button>
+        </div>
+    </div>
+</form>
+
+<!-- Duplicate Candidates List -->
+{% if candidates %}
+    {% for candidate in candidates %}
+    <div class="duplicate-card">
+        <div class="duplicate-header">
+            <div>
+                <span class="duplicate-type type-{{ candidate.record_type }}">
+                    {{ _(candidate.record_type) }}
+                </span>
+                <span class="status-badge status-{{ candidate.status }}">
+                    {{ _(candidate.status) }}
+                </span>
+            </div>
+            <div class="score-badge">
+                <span>{{ (candidate.composite_score * 100) | round(1) }}%</span>
+                <div class="score-bar">
+                    <div class="score-fill {% if candidate.composite_score >= 0.9 %}score-high{% elif candidate.composite_score >= 0.75 %}score-medium{% else %}score-low{% endif %}" 
+                         style="width: {{ (candidate.composite_score * 100) }}%"></div>
+                </div>
             </div>
         </div>
 
-        {% if error %}
-        <div class="error-message">
-            <strong>Error:</strong> {{ error }}
+        <!-- Similarity Breakdown -->
+        <div class="similarity-breakdown">
+            <div class="similarity-title">{{ _('Similarity Breakdown') }}</div>
+            <div class="similarity-row">
+                <span class="similarity-label">{{ _('Vector Similarity') }} (40%)</span>
+                <div style="display: flex; align-items: center;">
+                    <span class="similarity-value">{{ (candidate.vector_similarity * 100) | round(1) }}%</span>
+                    <div class="similarity-mini-bar">
+                        <div class="similarity-mini-fill" style="width: {{ (candidate.vector_similarity * 100) }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="similarity-row">
+                <span class="similarity-label">{{ _('Phonetic Similarity') }} (30%)</span>
+                <div style="display: flex; align-items: center;">
+                    <span class="similarity-value">{{ (candidate.phonetic_similarity * 100) | round(1) if candidate.phonetic_similarity else 0 }}%</span>
+                    <div class="similarity-mini-bar">
+                        <div class="similarity-mini-fill" style="width: {{ (candidate.phonetic_similarity * 100) if candidate.phonetic_similarity else 0 }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="similarity-row">
+                <span class="similarity-label">{{ _('Date Similarity') }} (20%)</span>
+                <div style="display: flex; align-items: center;">
+                    <span class="similarity-value">{{ (candidate.date_similarity * 100) | round(1) if candidate.date_similarity else 0 }}%</span>
+                    <div class="similarity-mini-bar">
+                        <div class="similarity-mini-fill" style="width: {{ (candidate.date_similarity * 100) if candidate.date_similarity else 0 }}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="similarity-row">
+                <span class="similarity-label">{{ _('Location Similarity') }} (10%)</span>
+                <div style="display: flex; align-items: center;">
+                    <span class="similarity-value">{{ (candidate.location_similarity * 100) | round(1) if candidate.location_similarity else 0 }}%</span>
+                    <div class="similarity-mini-bar">
+                        <div class="similarity-mini-fill" style="width: {{ (candidate.location_similarity * 100) if candidate.location_similarity else 0 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Record Comparison -->
+        <div class="comparison-grid">
+            <div class="record-card">
+                <div class="record-title">{{ _('Record 1') }}</div>
+                {% if candidate.record1 %}
+                    {% if candidate.record_type == 'person' %}
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Name') }}:</span>
+                            <span class="field-value">{{ candidate.record1.name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Birth') }}:</span>
+                            <span class="field-value">{{ candidate.record1.birth_date or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Death') }}:</span>
+                            <span class="field-value">{{ candidate.record1.death_date or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Birth Place') }}:</span>
+                            <span class="field-value">{{ candidate.record1.birth_place or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Gender') }}:</span>
+                            <span class="field-value">{{ candidate.record1.gender or _('Unknown') }}</span>
+                        </div>
+                    {% elif candidate.record_type == 'baptism' %}
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Child') }}:</span>
+                            <span class="field-value">{{ candidate.record1.child_name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Date') }}:</span>
+                            <span class="field-value">{{ candidate.record1.baptism_date }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Father') }}:</span>
+                            <span class="field-value">{{ candidate.record1.father_surname or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Mother') }}:</span>
+                            <span class="field-value">{{ candidate.record1.mother_maiden_name or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Parish') }}:</span>
+                            <span class="field-value">{{ candidate.record1.parish or _('Unknown') }}</span>
+                        </div>
+                    {% elif candidate.record_type == 'marriage' %}
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Spouse 1') }}:</span>
+                            <span class="field-value">{{ candidate.record1.spouse1_name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Spouse 2') }}:</span>
+                            <span class="field-value">{{ candidate.record1.spouse2_name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Date') }}:</span>
+                            <span class="field-value">{{ candidate.record1.marriage_date }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Parish') }}:</span>
+                            <span class="field-value">{{ candidate.record1.parish or _('Unknown') }}</span>
+                        </div>
+                    {% elif candidate.record_type == 'death' %}
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Deceased') }}:</span>
+                            <span class="field-value">{{ candidate.record1.deceased_name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Date') }}:</span>
+                            <span class="field-value">{{ candidate.record1.death_date }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Age') }}:</span>
+                            <span class="field-value">{{ candidate.record1.age_years or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Parish') }}:</span>
+                            <span class="field-value">{{ candidate.record1.parish or _('Unknown') }}</span>
+                        </div>
+                    {% endif %}
+                    <div class="record-field">
+                        <span class="field-label">ID:</span>
+                        <span class="field-value" style="font-family: monospace; font-size: 0.85em;">{{ candidate.record1.id }}</span>
+                    </div>
+                {% else %}
+                    <p style="color: #999;">{{ _('Record not found') }}</p>
+                {% endif %}
+            </div>
+
+            <div class="record-card">
+                <div class="record-title">{{ _('Record 2') }}</div>
+                {% if candidate.record2 %}
+                    {% if candidate.record_type == 'person' %}
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Name') }}:</span>
+                            <span class="field-value">{{ candidate.record2.name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Birth') }}:</span>
+                            <span class="field-value">{{ candidate.record2.birth_date or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Death') }}:</span>
+                            <span class="field-value">{{ candidate.record2.death_date or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Birth Place') }}:</span>
+                            <span class="field-value">{{ candidate.record2.birth_place or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Gender') }}:</span>
+                            <span class="field-value">{{ candidate.record2.gender or _('Unknown') }}</span>
+                        </div>
+                    {% elif candidate.record_type == 'baptism' %}
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Child') }}:</span>
+                            <span class="field-value">{{ candidate.record2.child_name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Date') }}:</span>
+                            <span class="field-value">{{ candidate.record2.baptism_date }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Father') }}:</span>
+                            <span class="field-value">{{ candidate.record2.father_surname or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Mother') }}:</span>
+                            <span class="field-value">{{ candidate.record2.mother_maiden_name or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Parish') }}:</span>
+                            <span class="field-value">{{ candidate.record2.parish or _('Unknown') }}</span>
+                        </div>
+                    {% elif candidate.record_type == 'marriage' %}
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Spouse 1') }}:</span>
+                            <span class="field-value">{{ candidate.record2.spouse1_name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Spouse 2') }}:</span>
+                            <span class="field-value">{{ candidate.record2.spouse2_name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Date') }}:</span>
+                            <span class="field-value">{{ candidate.record2.marriage_date }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Parish') }}:</span>
+                            <span class="field-value">{{ candidate.record2.parish or _('Unknown') }}</span>
+                        </div>
+                    {% elif candidate.record_type == 'death' %}
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Deceased') }}:</span>
+                            <span class="field-value">{{ candidate.record2.deceased_name }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Date') }}:</span>
+                            <span class="field-value">{{ candidate.record2.death_date }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Age') }}:</span>
+                            <span class="field-value">{{ candidate.record2.age_years or _('Unknown') }}</span>
+                        </div>
+                        <div class="record-field">
+                            <span class="field-label">{{ _('Parish') }}:</span>
+                            <span class="field-value">{{ candidate.record2.parish or _('Unknown') }}</span>
+                        </div>
+                    {% endif %}
+                    <div class="record-field">
+                        <span class="field-label">ID:</span>
+                        <span class="field-value" style="font-family: monospace; font-size: 0.85em;">{{ candidate.record2.id }}</span>
+                    </div>
+                {% else %}
+                    <p style="color: #999;">{{ _('Record not found') }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        {% if candidate.status == 'pending' %}
+        <div class="action-buttons">
+            <button class="btn-reject" onclick="reviewDuplicate('{{ candidate.id }}', 'reject')">
+                ✗ {{ _('Not a Duplicate') }}
+            </button>
+            <button class="btn-confirm" onclick="reviewDuplicate('{{ candidate.id }}', 'confirm')">
+                ✓ {{ _('Confirm Duplicate') }}
+            </button>
         </div>
         {% endif %}
 
-        <!-- Statistics Dashboard -->
-        <div class="stats-grid">
-            <div class="stat-card warning">
-                <h3>Pending Review</h3>
-                <div class="number">{{ stats.total_pending if stats else 0 }}</div>
-            </div>
-            <div class="stat-card success">
-                <h3>Confirmed Duplicates</h3>
-                <div class="number">{{ stats.total_confirmed if stats else 0 }}</div>
-            </div>
-            <div class="stat-card info">
-                <h3>Rejected</h3>
-                <div class="number">{{ stats.total_rejected if stats else 0 }}</div>
-            </div>
-            <div class="stat-card">
-                <h3>Total Detected</h3>
-                <div class="number">{{ (stats.total_pending + stats.total_confirmed + stats.total_rejected) if stats else 0 }}</div>
-            </div>
-        </div>
-
-        <!-- Filters -->
-        <form method="get" action="/duplicates">
-            <div class="filters">
-                <div class="filter-group">
-                    <label class="filter-label">Record Type</label>
-                    <select name="record_type" class="filter-select">
-                        <option value="all" {% if filters.record_type == 'all' %}selected{% endif %}>All Types</option>
-                        <option value="person" {% if filters.record_type == 'person' %}selected{% endif %}>Persons ({{ stats.by_type.person if stats else 0 }})</option>
-                        <option value="baptism" {% if filters.record_type == 'baptism' %}selected{% endif %}>Baptisms ({{ stats.by_type.baptism if stats else 0 }})</option>
-                        <option value="marriage" {% if filters.record_type == 'marriage' %}selected{% endif %}>Marriages ({{ stats.by_type.marriage if stats else 0 }})</option>
-                        <option value="death" {% if filters.record_type == 'death' %}selected{% endif %}>Deaths ({{ stats.by_type.death if stats else 0 }})</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label">Status</label>
-                    <select name="status" class="filter-select">
-                        <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All Status</option>
-                        <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
-                        <option value="confirmed" {% if filters.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
-                        <option value="rejected" {% if filters.status == 'rejected' %}selected{% endif %}>Rejected</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label">Minimum Score</label>
-                    <input type="number" name="min_score" class="filter-input" 
-                           step="0.05" min="0" max="1" 
-                           value="{{ filters.min_score if filters.min_score else 0 }}" 
-                           placeholder="0.0">
-                </div>
-
-                <div class="filter-group">
-                    <button type="submit" class="btn-filter">Apply Filters</button>
-                </div>
-            </div>
-        </form>
-
-        <!-- Duplicate Candidates List -->
-        {% if candidates %}
-            {% for candidate in candidates %}
-            <div class="duplicate-card">
-                <div class="duplicate-header">
-                    <div>
-                        <span class="duplicate-type type-{{ candidate.record_type }}">
-                            {{ candidate.record_type }}
-                        </span>
-                        <span class="status-badge status-{{ candidate.status }}">
-                            {{ candidate.status }}
-                        </span>
-                    </div>
-                    <div class="score-badge">
-                        <span>{{ (candidate.composite_score * 100) | round(1) }}%</span>
-                        <div class="score-bar">
-                            <div class="score-fill {% if candidate.composite_score >= 0.9 %}score-high{% elif candidate.composite_score >= 0.75 %}score-medium{% else %}score-low{% endif %}" 
-                                 style="width: {{ (candidate.composite_score * 100) }}%"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Similarity Breakdown -->
-                <div class="similarity-breakdown">
-                    <div class="similarity-title">Similarity Breakdown</div>
-                    <div class="similarity-row">
-                        <span class="similarity-label">Vector Similarity (40%)</span>
-                        <div style="display: flex; align-items: center;">
-                            <span class="similarity-value">{{ (candidate.vector_similarity * 100) | round(1) }}%</span>
-                            <div class="similarity-mini-bar">
-                                <div class="similarity-mini-fill" style="width: {{ (candidate.vector_similarity * 100) }}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="similarity-row">
-                        <span class="similarity-label">Phonetic Similarity (30%)</span>
-                        <div style="display: flex; align-items: center;">
-                            <span class="similarity-value">{{ (candidate.phonetic_similarity * 100) | round(1) if candidate.phonetic_similarity else 0 }}%</span>
-                            <div class="similarity-mini-bar">
-                                <div class="similarity-mini-fill" style="width: {{ (candidate.phonetic_similarity * 100) if candidate.phonetic_similarity else 0 }}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="similarity-row">
-                        <span class="similarity-label">Date Similarity (20%)</span>
-                        <div style="display: flex; align-items: center;">
-                            <span class="similarity-value">{{ (candidate.date_similarity * 100) | round(1) if candidate.date_similarity else 0 }}%</span>
-                            <div class="similarity-mini-bar">
-                                <div class="similarity-mini-fill" style="width: {{ (candidate.date_similarity * 100) if candidate.date_similarity else 0 }}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="similarity-row">
-                        <span class="similarity-label">Location Similarity (10%)</span>
-                        <div style="display: flex; align-items: center;">
-                            <span class="similarity-value">{{ (candidate.location_similarity * 100) | round(1) if candidate.location_similarity else 0 }}%</span>
-                            <div class="similarity-mini-bar">
-                                <div class="similarity-mini-fill" style="width: {{ (candidate.location_similarity * 100) if candidate.location_similarity else 0 }}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Record Comparison -->
-                <div class="comparison-grid">
-                    <div class="record-card">
-                        <div class="record-title">Record 1</div>
-                        {% if candidate.record1 %}
-                            {% if candidate.record_type == 'person' %}
-                                <div class="record-field">
-                                    <span class="field-label">Name:</span>
-                                    <span class="field-value">{{ candidate.record1.name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Birth:</span>
-                                    <span class="field-value">{{ candidate.record1.birth_date or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Death:</span>
-                                    <span class="field-value">{{ candidate.record1.death_date or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Birth Place:</span>
-                                    <span class="field-value">{{ candidate.record1.birth_place or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Gender:</span>
-                                    <span class="field-value">{{ candidate.record1.gender or 'Unknown' }}</span>
-                                </div>
-                            {% elif candidate.record_type == 'baptism' %}
-                                <div class="record-field">
-                                    <span class="field-label">Child:</span>
-                                    <span class="field-value">{{ candidate.record1.child_name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Date:</span>
-                                    <span class="field-value">{{ candidate.record1.baptism_date }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Father:</span>
-                                    <span class="field-value">{{ candidate.record1.father_surname or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Mother:</span>
-                                    <span class="field-value">{{ candidate.record1.mother_maiden_name or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Parish:</span>
-                                    <span class="field-value">{{ candidate.record1.parish or 'Unknown' }}</span>
-                                </div>
-                            {% elif candidate.record_type == 'marriage' %}
-                                <div class="record-field">
-                                    <span class="field-label">Spouse 1:</span>
-                                    <span class="field-value">{{ candidate.record1.spouse1_name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Spouse 2:</span>
-                                    <span class="field-value">{{ candidate.record1.spouse2_name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Date:</span>
-                                    <span class="field-value">{{ candidate.record1.marriage_date }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Parish:</span>
-                                    <span class="field-value">{{ candidate.record1.parish or 'Unknown' }}</span>
-                                </div>
-                            {% elif candidate.record_type == 'death' %}
-                                <div class="record-field">
-                                    <span class="field-label">Deceased:</span>
-                                    <span class="field-value">{{ candidate.record1.deceased_name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Date:</span>
-                                    <span class="field-value">{{ candidate.record1.death_date }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Age:</span>
-                                    <span class="field-value">{{ candidate.record1.age_years or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Parish:</span>
-                                    <span class="field-value">{{ candidate.record1.parish or 'Unknown' }}</span>
-                                </div>
-                            {% endif %}
-                            <div class="record-field">
-                                <span class="field-label">ID:</span>
-                                <span class="field-value" style="font-family: monospace; font-size: 0.85em;">{{ candidate.record1.id }}</span>
-                            </div>
-                        {% else %}
-                            <p style="color: #999;">Record not found</p>
-                        {% endif %}
-                    </div>
-
-                    <div class="record-card">
-                        <div class="record-title">Record 2</div>
-                        {% if candidate.record2 %}
-                            {% if candidate.record_type == 'person' %}
-                                <div class="record-field">
-                                    <span class="field-label">Name:</span>
-                                    <span class="field-value">{{ candidate.record2.name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Birth:</span>
-                                    <span class="field-value">{{ candidate.record2.birth_date or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Death:</span>
-                                    <span class="field-value">{{ candidate.record2.death_date or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Birth Place:</span>
-                                    <span class="field-value">{{ candidate.record2.birth_place or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Gender:</span>
-                                    <span class="field-value">{{ candidate.record2.gender or 'Unknown' }}</span>
-                                </div>
-                            {% elif candidate.record_type == 'baptism' %}
-                                <div class="record-field">
-                                    <span class="field-label">Child:</span>
-                                    <span class="field-value">{{ candidate.record2.child_name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Date:</span>
-                                    <span class="field-value">{{ candidate.record2.baptism_date }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Father:</span>
-                                    <span class="field-value">{{ candidate.record2.father_surname or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Mother:</span>
-                                    <span class="field-value">{{ candidate.record2.mother_maiden_name or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Parish:</span>
-                                    <span class="field-value">{{ candidate.record2.parish or 'Unknown' }}</span>
-                                </div>
-                            {% elif candidate.record_type == 'marriage' %}
-                                <div class="record-field">
-                                    <span class="field-label">Spouse 1:</span>
-                                    <span class="field-value">{{ candidate.record2.spouse1_name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Spouse 2:</span>
-                                    <span class="field-value">{{ candidate.record2.spouse2_name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Date:</span>
-                                    <span class="field-value">{{ candidate.record2.marriage_date }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Parish:</span>
-                                    <span class="field-value">{{ candidate.record2.parish or 'Unknown' }}</span>
-                                </div>
-                            {% elif candidate.record_type == 'death' %}
-                                <div class="record-field">
-                                    <span class="field-label">Deceased:</span>
-                                    <span class="field-value">{{ candidate.record2.deceased_name }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Date:</span>
-                                    <span class="field-value">{{ candidate.record2.death_date }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Age:</span>
-                                    <span class="field-value">{{ candidate.record2.age_years or 'Unknown' }}</span>
-                                </div>
-                                <div class="record-field">
-                                    <span class="field-label">Parish:</span>
-                                    <span class="field-value">{{ candidate.record2.parish or 'Unknown' }}</span>
-                                </div>
-                            {% endif %}
-                            <div class="record-field">
-                                <span class="field-label">ID:</span>
-                                <span class="field-value" style="font-family: monospace; font-size: 0.85em;">{{ candidate.record2.id }}</span>
-                            </div>
-                        {% else %}
-                            <p style="color: #999;">Record not found</p>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                {% if candidate.status == 'pending' %}
-                <div class="action-buttons">
-                    <button class="btn-reject" onclick="reviewDuplicate('{{ candidate.id }}', 'reject')">
-                        ✗ Not a Duplicate
-                    </button>
-                    <button class="btn-confirm" onclick="reviewDuplicate('{{ candidate.id }}', 'confirm')">
-                        ✓ Confirm Duplicate
-                    </button>
-                </div>
-                {% endif %}
-
-                <!-- Metadata -->
-                <div class="metadata">
-                    Detected: {{ candidate.detected_at.strftime('%Y-%m-%d %H:%M') if candidate.detected_at else 'Unknown' }} 
-                    | Method: {{ candidate.detection_method or 'Unknown' }}
-                    {% if candidate.reviewed_by %}
-                    | Reviewed by: {{ candidate.reviewed_by }} on {{ candidate.reviewed_at.strftime('%Y-%m-%d %H:%M') if candidate.reviewed_at else 'Unknown' }}
-                    {% endif %}
-                    {% if candidate.review_notes %}
-                    <br>Notes: {{ candidate.review_notes }}
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-
-            <!-- Pagination -->
-            {% if pagination and pagination.pages > 1 %}
-            <div class="pagination">
-                {% if pagination.has_prev %}
-                    <a href="?page=1&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">« First</a>
-                    <a href="?page={{ pagination.prev_num }}&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">‹ Prev</a>
-                {% endif %}
-
-                {% for page_num in range(max(1, pagination.page - 2), min(pagination.pages + 1, pagination.page + 3)) %}
-                    {% if page_num == pagination.page %}
-                        <span class="active">{{ page_num }}</span>
-                    {% else %}
-                        <a href="?page={{ page_num }}&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">{{ page_num }}</a>
-                    {% endif %}
-                {% endfor %}
-
-                {% if pagination.has_next %}
-                    <a href="?page={{ pagination.next_num }}&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">Next ›</a>
-                    <a href="?page={{ pagination.pages }}&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">Last »</a>
-                {% endif %}
-            </div>
+        <!-- Metadata -->
+        <div class="metadata">
+            {{ _('Detected') }}: {{ candidate.detected_at or _('Unknown') }}
+            | {{ _('Method') }}: {{ candidate.detection_method or _('Unknown') }}
+            {% if candidate.reviewed_by %}
+            | {{ _('Reviewed by') }}: {{ candidate.reviewed_by }} {{ _('on') }} {{ candidate.reviewed_at or _('Unknown') }}
             {% endif %}
-        {% else %}
-            <div class="empty-state">
-                <div class="empty-state-icon">🔍</div>
-                <h2>No Duplicate Candidates Found</h2>
-                <p>Try adjusting your filters or import GEDCOM files to detect duplicates.</p>
-            </div>
+            {% if candidate.review_notes %}
+            <br>{{ _('Notes') }}: {{ candidate.review_notes }}
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Pagination -->
+    {% if pagination and pagination.pages > 1 %}
+    <div class="pagination">
+        {% if pagination.has_prev %}
+            <a href="?page=1&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">« {{ _('First') }}</a>
+            <a href="?page={{ pagination.prev_num }}&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">‹ {{ _('Prev') }}</a>
+        {% endif %}
+
+        {% for page_num in range(max(1, pagination.page - 2), min(pagination.pages + 1, pagination.page + 3)) %}
+            {% if page_num == pagination.page %}
+                <span class="active">{{ page_num }}</span>
+            {% else %}
+                <a href="?page={{ page_num }}&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">{{ page_num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if pagination.has_next %}
+            <a href="?page={{ pagination.next_num }}&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">{{ _('Next') }} ›</a>
+            <a href="?page={{ pagination.pages }}&record_type={{ filters.record_type }}&status={{ filters.status }}&min_score={{ filters.min_score }}">{{ _('Last') }} »</a>
         {% endif %}
     </div>
+    {% endif %}
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <h2>{{ _('No Duplicate Candidates Found') }}</h2>
+        <p>{{ _('Try adjusting your filters or import GEDCOM files to detect duplicates.') }}</p>
+    </div>
+{% endif %}
 
-    <script>
-        function reviewDuplicate(candidateId, action) {
-            const notes = prompt(action === 'confirm' ? 
-                'Confirming duplicate. Add notes (optional):' : 
-                'Rejecting duplicate. Add notes (optional):');
-            
-            if (notes === null) {
-                return; // User cancelled
-            }
-
-            const button = event.target;
-            button.disabled = true;
-            button.textContent = 'Processing...';
-
-            fetch(`/api/duplicates/${candidateId}/review`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: action,
-                    notes: notes,
-                    reviewer: 'user'
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`Duplicate ${action}ed successfully!`);
-                    location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Unknown error'));
-                    button.disabled = false;
-                    button.textContent = action === 'confirm' ? '✓ Confirm Duplicate' : '✗ Not a Duplicate';
-                }
-            })
-            .catch(error => {
-                alert('Network error: ' + error.message);
-                button.disabled = false;
-                button.textContent = action === 'confirm' ? '✓ Confirm Duplicate' : '✗ Not a Duplicate';
-            });
+<script>
+    function reviewDuplicate(candidateId, action) {
+        const notes = prompt(action === 'confirm' ?
+            '{{ _("Confirming duplicate. Add notes - optional") }}' :
+            '{{ _("Rejecting duplicate. Add notes - optional") }}');
+        
+        if (notes === null) {
+            return; // User cancelled
         }
-    </script>
-</body>
-</html>
+
+        const button = event.target;
+        button.disabled = true;
+        button.textContent = '{{ _("Processing...") }}';
+
+        fetch(`/api/duplicates/${candidateId}/review`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: action,
+                notes: notes,
+                reviewer: 'user'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const message = action === 'confirm' ? '{{ _("Duplicate confirmed successfully!") }}' : '{{ _("Duplicate rejected successfully!") }}';
+                alert(message);
+                location.reload();
+            } else {
+                alert('{{ _("Error") }}: ' + (data.error || '{{ _("Unknown error") }}'));
+                button.disabled = false;
+                button.textContent = action === 'confirm' ? '✓ {{ _("Confirm Duplicate") }}' : '✗ {{ _("Not a Duplicate") }}';
+            }
+        })
+        .catch(error => {
+            alert('{{ _("Network error") }}: ' + error.message);
+            button.disabled = false;
+            button.textContent = action === 'confirm' ? '✓ {{ _("Confirm Duplicate") }}' : '✗ {{ _("Not a Duplicate") }}';
+        });
+    }
+</script>
+{% endblock %}

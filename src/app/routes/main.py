@@ -2,7 +2,7 @@ import os
 import json
 import logging
 from datetime import datetime
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, session, redirect, url_for
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
 from sqlalchemy.orm import joinedload, selectinload
@@ -711,7 +711,7 @@ def reset_database():
 
 
 @bp.route("/graph")
-def graph_visualizer():
+def graph():
     """Display the graph visualizer page."""
     return render_template("graph.html")
 
@@ -1238,10 +1238,10 @@ def duplicates():
                 'date_similarity': candidate.date_similarity,
                 'location_similarity': candidate.location_similarity,
                 'status': candidate.status,
-                'detected_at': candidate.detected_at,
+                'detected_at': candidate.detected_at.strftime('%Y-%m-%d %H:%M') if candidate.detected_at else None,
                 'detection_method': candidate.detection_method,
                 'reviewed_by': candidate.reviewed_by,
-                'reviewed_at': candidate.reviewed_at,
+                'reviewed_at': candidate.reviewed_at.strftime('%Y-%m-%d %H:%M') if candidate.reviewed_at else None,
                 'review_notes': candidate.review_notes,
                 'record1': None,
                 'record2': None
@@ -1536,3 +1536,16 @@ def review_duplicate(candidate_id):
         logger.error(f"Error reviewing duplicate {candidate_id}: {e}", exc_info=True)
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/set-language/<language>")
+def set_language(language):
+    """Set user's preferred language in session."""
+    if language in ['pl', 'en']:
+        session['language'] = language
+        logger.info(f"Language set to: {language}")
+    else:
+        logger.warning(f"Invalid language requested: {language}")
+    
+    # Redirect back to the referrer or home page
+    return redirect(request.referrer or url_for('main.index'))

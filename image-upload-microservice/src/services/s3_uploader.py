@@ -20,7 +20,7 @@ from tenacity import (
 )
 
 try:
-    from utils.logger import get_logger
+    from ..utils.logger import get_logger
     logger = get_logger(__name__)
 except ImportError:
     # Fallback for testing

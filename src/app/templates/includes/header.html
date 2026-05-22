@@ -1,0 +1,50 @@
+<header class="app-header">
+    <div class="header-content">
+        <div class="header-left">
+            <h1 class="app-title">
+                🌳 {{ _('Korzen') }}
+            </h1>
+        </div>
+        
+        <div class="header-right">
+            <!-- Navigation -->
+            <nav class="main-nav">
+                <a href="{{ url_for('main.index') }}" class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}">
+                    🏠 {{ _('Home') }}
+                </a>
+                <a href="{{ url_for('main.list_persons') }}" class="nav-link {% if request.endpoint == 'main.list_persons' %}active{% endif %}">
+                    👥 {{ _('Persons') }}
+                </a>
+                <a href="{{ url_for('main.list_baptisms') }}" class="nav-link {% if request.endpoint == 'main.list_baptisms' %}active{% endif %}">
+                    ⛪ {{ _('Baptisms') }}
+                </a>
+                <a href="{{ url_for('main.list_marriages') }}" class="nav-link {% if request.endpoint == 'main.list_marriages' %}active{% endif %}">
+                    💒 {{ _('Marriages') }}
+                </a>
+                <a href="{{ url_for('main.list_deaths') }}" class="nav-link {% if request.endpoint == 'main.list_deaths' %}active{% endif %}">
+                    🕊️ {{ _('Deaths') }}
+                </a>
+                <a href="{{ url_for('main.duplicates') }}" class="nav-link {% if request.endpoint == 'main.duplicates' %}active{% endif %}">
+                    🔍 {{ _('Duplicates') }}
+                </a>
+                <a href="{{ url_for('main.graph') }}" class="nav-link {% if request.endpoint == 'main.graph' %}active{% endif %}">
+                    🌳 {{ _('Graph') }}
+                </a>
+            </nav>
+            
+            <!-- Language Switcher -->
+            <div class="language-switcher">
+                <a href="{{ url_for('main.set_language', language='pl') }}" 
+                   class="lang-link {% if get_locale() == 'pl' %}active{% endif %}"
+                   title="{{ _('Polish') }}">
+                    🇵🇱
+                </a>
+                <a href="{{ url_for('main.set_language', language='en') }}" 
+                   class="lang-link {% if get_locale() == 'en' %}active{% endif %}"
+                   title="{{ _('English') }}">
+                    🇬🇧
+                </a>
+            </div>
+        </div>
+    </div>
+</header>
