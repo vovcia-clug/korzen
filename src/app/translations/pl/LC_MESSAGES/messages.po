@@ -1,0 +1,1251 @@
+# Polish translations for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-05-22 12:22+0200\n"
+"PO-Revision-Date: 2026-05-22 12:02+0200\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: pl\n"
+"Language-Team: pl <LL@li.org>\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && "
+"(n%100<10 || n%100>=20) ? 1 : 2);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../src/app/templates/baptisms.html:3
+#: ../../src/app/templates/baptisms.html:270
+#: ../../src/app/templates/duplicates.html:307
+#: ../../src/app/templates/includes/header.html:19
+msgid "Baptisms"
+msgstr "Chrzty"
+
+#: ../../src/app/templates/baptisms.html:275
+#: ../../src/app/templates/deaths.html:282
+#: ../../src/app/templates/duplicates.html:275
+#: ../../src/app/templates/duplicates.html:669
+#: ../../src/app/templates/marriages.html:267
+msgid "Error"
+msgstr "Błąd"
+
+#: ../../src/app/templates/baptisms.html:281
+#: ../../src/app/templates/deaths.html:288
+#: ../../src/app/templates/marriages.html:273
+msgid "Sort by"
+msgstr "Sortuj według"
+
+#: ../../src/app/templates/baptisms.html:283
+#: ../../src/app/templates/baptisms.html:335
+msgid "Baptism Date"
+msgstr "Data chrztu"
+
+#: ../../src/app/templates/baptisms.html:284
+#: ../../src/app/templates/graph.html:108
+#: ../../src/app/templates/persons.html:370
+#: ../../src/app/templates/persons.html:416
+msgid "Birth Date"
+msgstr "Data urodzenia"
+
+#: ../../src/app/templates/baptisms.html:285
+#: ../../src/app/templates/baptisms.html:336
+msgid "Child Name"
+msgstr "Imię dziecka"
+
+#: ../../src/app/templates/baptisms.html:286
+#: ../../src/app/templates/baptisms.html:340
+#: ../../src/app/templates/deaths.html:294
+#: ../../src/app/templates/deaths.html:349
+#: ../../src/app/templates/duplicates.html:444
+#: ../../src/app/templates/duplicates.html:461
+#: ../../src/app/templates/duplicates.html:478
+#: ../../src/app/templates/duplicates.html:533
+#: ../../src/app/templates/duplicates.html:550
+#: ../../src/app/templates/duplicates.html:567
+#: ../../src/app/templates/marriages.html:278
+#: ../../src/app/templates/marriages.html:326
+#: ../../src/app/templates/persons.html:420
+msgid "Parish"
+msgstr "Parafia"
+
+#: ../../src/app/templates/baptisms.html:287
+#: ../../src/app/templates/baptisms.html:341
+#: ../../src/app/templates/deaths.html:295
+#: ../../src/app/templates/deaths.html:350
+#: ../../src/app/templates/marriages.html:279
+#: ../../src/app/templates/marriages.html:327
+msgid "Village"
+msgstr "Wieś"
+
+#: ../../src/app/templates/baptisms.html:291
+#: ../../src/app/templates/deaths.html:299
+#: ../../src/app/templates/index.html:497
+#: ../../src/app/templates/marriages.html:283
+#: ../../src/app/templates/persons.html:375
+msgid "Ascending"
+msgstr "Rosnąco"
+
+#: ../../src/app/templates/baptisms.html:293
+#: ../../src/app/templates/deaths.html:301
+#: ../../src/app/templates/index.html:499
+#: ../../src/app/templates/marriages.html:285
+#: ../../src/app/templates/persons.html:377
+msgid "Descending"
+msgstr "Malejąco"
+
+#: ../../src/app/templates/baptisms.html:299
+msgid "Search by child name, parents, parish, or village..."
+msgstr "Szukaj po imieniu dziecka, rodzicach, parafii lub wsi..."
+
+#: ../../src/app/templates/baptisms.html:301
+#: ../../src/app/templates/persons.html:385
+msgid "All Genders"
+msgstr "Wszystkie płcie"
+
+#: ../../src/app/templates/baptisms.html:302
+#: ../../src/app/templates/baptisms.html:362
+#: ../../src/app/templates/graph.html:77 ../../src/app/templates/mi.html:70
+#: ../../src/app/templates/persons.html:386
+#: ../../src/app/templates/persons.html:438
+msgid "Male"
+msgstr "Mężczyzna"
+
+#: ../../src/app/templates/baptisms.html:303
+#: ../../src/app/templates/baptisms.html:364
+#: ../../src/app/templates/graph.html:81 ../../src/app/templates/mi.html:74
+#: ../../src/app/templates/persons.html:387
+#: ../../src/app/templates/persons.html:440
+msgid "Female"
+msgstr "Kobieta"
+
+#: ../../src/app/templates/baptisms.html:304
+#: ../../src/app/templates/baptisms.html:366
+#: ../../src/app/templates/duplicates.html:412
+#: ../../src/app/templates/duplicates.html:416
+#: ../../src/app/templates/duplicates.html:420
+#: ../../src/app/templates/duplicates.html:424
+#: ../../src/app/templates/duplicates.html:437
+#: ../../src/app/templates/duplicates.html:441
+#: ../../src/app/templates/duplicates.html:445
+#: ../../src/app/templates/duplicates.html:462
+#: ../../src/app/templates/duplicates.html:475
+#: ../../src/app/templates/duplicates.html:479
+#: ../../src/app/templates/duplicates.html:501
+#: ../../src/app/templates/duplicates.html:505
+#: ../../src/app/templates/duplicates.html:509
+#: ../../src/app/templates/duplicates.html:513
+#: ../../src/app/templates/duplicates.html:526
+#: ../../src/app/templates/duplicates.html:530
+#: ../../src/app/templates/duplicates.html:534
+#: ../../src/app/templates/duplicates.html:551
+#: ../../src/app/templates/duplicates.html:564
+#: ../../src/app/templates/duplicates.html:568
+#: ../../src/app/templates/duplicates.html:595
+#: ../../src/app/templates/duplicates.html:596
+#: ../../src/app/templates/duplicates.html:598
+#: ../../src/app/templates/graph.html:85 ../../src/app/templates/mi.html:78
+#: ../../src/app/templates/persons.html:388
+#: ../../src/app/templates/persons.html:442
+#: ../../src/app/templates/persons.html:514
+msgid "Unknown"
+msgstr "Nieznany"
+
+#: ../../src/app/templates/baptisms.html:307
+#: ../../src/app/templates/duplicates.html:316
+#: ../../src/app/templates/marriages.html:293
+msgid "All Status"
+msgstr "Wszystkie statusy"
+
+#: ../../src/app/templates/baptisms.html:308
+#: ../../src/app/templates/baptisms.html:387
+msgid "Legitimate"
+msgstr "Ślubne"
+
+#: ../../src/app/templates/baptisms.html:309
+#: ../../src/app/templates/baptisms.html:389
+msgid "Illegitimate"
+msgstr "Nieślubne"
+
+#: ../../src/app/templates/baptisms.html:315
+msgid "Total Baptisms"
+msgstr "Łącznie chrztów"
+
+#: ../../src/app/templates/baptisms.html:319
+#: ../../src/app/templates/deaths.html:329
+#: ../../src/app/templates/marriages.html:307
+#: ../../src/app/templates/persons.html:398
+msgid "Displayed (Filtered)"
+msgstr "Wyświetlone (Filtrowane)"
+
+#: ../../src/app/templates/baptisms.html:324
+#: ../../src/app/templates/deaths.html:334
+#: ../../src/app/templates/marriages.html:312
+#: ../../src/app/templates/persons.html:403
+msgid "Current Page"
+msgstr "Bieżąca strona"
+
+#: ../../src/app/templates/baptisms.html:337
+#: ../../src/app/templates/duplicates.html:423
+#: ../../src/app/templates/duplicates.html:512
+#: ../../src/app/templates/graph.html:107
+#: ../../src/app/templates/persons.html:415
+msgid "Gender"
+msgstr "Płeć"
+
+#: ../../src/app/templates/baptisms.html:338
+#: ../../src/app/templates/duplicates.html:436
+#: ../../src/app/templates/duplicates.html:525
+msgid "Father"
+msgstr "Ojciec"
+
+#: ../../src/app/templates/baptisms.html:339
+#: ../../src/app/templates/duplicates.html:440
+#: ../../src/app/templates/duplicates.html:529
+msgid "Mother"
+msgstr "Matka"
+
+#: ../../src/app/templates/baptisms.html:342
+#: ../../src/app/templates/duplicates.html:314
+#: ../../src/app/templates/index.html:493
+msgid "Status"
+msgstr "Status"
+
+#: ../../src/app/templates/baptisms.html:406
+msgid "No Baptism Records Found"
+msgstr "Nie znaleziono rekordów chrztu"
+
+#: ../../src/app/templates/baptisms.html:407
+msgid "Upload and parse a GEDCOM file to see baptism records in the database."
+msgstr ""
+"Prześlij i sparsuj plik GEDCOM, aby zobaczyć rekordy chrztu w bazie "
+"danych."
+
+#: ../../src/app/templates/base.html:6
+msgid "Korzen - Genealogy Application"
+msgstr "Korzen - Aplikacja genealogiczna"
+
+#: ../../src/app/templates/deaths.html:3
+#: ../../src/app/templates/deaths.html:277
+#: ../../src/app/templates/duplicates.html:309
+#: ../../src/app/templates/includes/header.html:25
+msgid "Deaths"
+msgstr "Zgony"
+
+#: ../../src/app/templates/deaths.html:290
+#: ../../src/app/templates/deaths.html:345
+#: ../../src/app/templates/graph.html:109
+#: ../../src/app/templates/persons.html:417
+msgid "Death Date"
+msgstr "Data śmierci"
+
+#: ../../src/app/templates/deaths.html:291
+msgid "Burial Date"
+msgstr "Data pogrzebu"
+
+#: ../../src/app/templates/deaths.html:292
+msgid "Surname"
+msgstr "Nazwisko"
+
+#: ../../src/app/templates/deaths.html:293
+#: ../../src/app/templates/deaths.html:347
+#: ../../src/app/templates/duplicates.html:474
+#: ../../src/app/templates/duplicates.html:563
+msgid "Age"
+msgstr "Wiek"
+
+#: ../../src/app/templates/deaths.html:307
+msgid "Search by deceased name, parish, village, or cemetery..."
+msgstr "Szukaj po imieniu zmarłego, parafii, wsi lub cmentarzu..."
+
+#: ../../src/app/templates/deaths.html:309
+msgid "All Marital Status"
+msgstr "Wszystkie stany cywilne"
+
+#: ../../src/app/templates/deaths.html:310
+msgid "Married (Conjugatus)"
+msgstr "Żonaty (Conjugatus)"
+
+#: ../../src/app/templates/deaths.html:311
+msgid "Married (Conjugata)"
+msgstr "Zamężna (Conjugata)"
+
+#: ../../src/app/templates/deaths.html:312
+#: ../../src/app/templates/marriages.html:296
+msgid "Widower (Viduus)"
+msgstr "Wdowiec (Viduus)"
+
+#: ../../src/app/templates/deaths.html:313
+#: ../../src/app/templates/marriages.html:297
+msgid "Widow (Vidua)"
+msgstr "Wdowa (Vidua)"
+
+#: ../../src/app/templates/deaths.html:314
+msgid "Unmarried (Virgo)"
+msgstr "Niezamężna (Virgo)"
+
+#: ../../src/app/templates/deaths.html:317
+msgid "All Sacraments"
+msgstr "Wszystkie sakramenty"
+
+#: ../../src/app/templates/deaths.html:318
+msgid "Received"
+msgstr "Otrzymane"
+
+#: ../../src/app/templates/deaths.html:319
+msgid "Not Received"
+msgstr "Nie otrzymane"
+
+#: ../../src/app/templates/deaths.html:325
+msgid "Total Deaths"
+msgstr "Łącznie zgonów"
+
+#: ../../src/app/templates/deaths.html:346
+msgid "Deceased Name"
+msgstr "Imię i nazwisko zmarłego"
+
+#: ../../src/app/templates/deaths.html:348
+msgid "Marital Status"
+msgstr "Stan cywilny"
+
+#: ../../src/app/templates/deaths.html:351
+msgid "Sacraments"
+msgstr "Sakramenty"
+
+#: ../../src/app/templates/deaths.html:375
+#: ../../src/app/templates/marriages.html:371
+#: ../../src/app/templates/persons.html:433
+#: ../../src/app/templates/persons.html:624
+msgid "née"
+msgstr "z domu"
+
+#: ../../src/app/templates/deaths.html:380
+#: ../../src/app/templates/marriages.html:362
+#: ../../src/app/templates/marriages.html:389
+#: ../../src/app/templates/persons.html:469
+#: ../../src/app/templates/persons.html:474
+#: ../../src/app/templates/persons.html:562
+msgid "years"
+msgstr "lat"
+
+#: ../../src/app/templates/deaths.html:390
+msgid "Married (M)"
+msgstr "Żonaty"
+
+#: ../../src/app/templates/deaths.html:392
+msgid "Married (F)"
+msgstr "Zamężna"
+
+#: ../../src/app/templates/deaths.html:394
+#: ../../src/app/templates/marriages.html:356
+msgid "Widower"
+msgstr "Wdowiec"
+
+#: ../../src/app/templates/deaths.html:396
+#: ../../src/app/templates/marriages.html:383
+msgid "Widow"
+msgstr "Wdowa"
+
+#: ../../src/app/templates/deaths.html:398
+msgid "Unmarried"
+msgstr "Niezamężna/Nieżonaty"
+
+#: ../../src/app/templates/deaths.html:410
+msgid "Yes"
+msgstr "Tak"
+
+#: ../../src/app/templates/deaths.html:412
+msgid "No"
+msgstr "Nie"
+
+#: ../../src/app/templates/deaths.html:429
+msgid "No Death Records Found"
+msgstr "Nie znaleziono rekordów zgonu"
+
+#: ../../src/app/templates/deaths.html:430
+msgid "Upload and parse a GEDCOM file to see death records in the database."
+msgstr "Prześlij i sparsuj plik GEDCOM, aby zobaczyć rekordy zgonu w bazie danych."
+
+#: ../../src/app/templates/duplicates.html:3
+msgid "Duplicate Detection"
+msgstr "Wykrywanie duplikatów"
+
+#: ../../src/app/templates/duplicates.html:282
+msgid "Pending Review"
+msgstr "Oczekujące na przegląd"
+
+#: ../../src/app/templates/duplicates.html:286
+msgid "Confirmed Duplicates"
+msgstr "Potwierdzone duplikaty"
+
+#: ../../src/app/templates/duplicates.html:290
+#: ../../src/app/templates/duplicates.html:319
+msgid "Rejected"
+msgstr "Odrzucone"
+
+#: ../../src/app/templates/duplicates.html:294
+msgid "Total Detected"
+msgstr "Łącznie wykrytych"
+
+#: ../../src/app/templates/duplicates.html:303
+msgid "Record Type"
+msgstr "Typ rekordu"
+
+#: ../../src/app/templates/duplicates.html:305
+msgid "All Types"
+msgstr "Wszystkie typy"
+
+#: ../../src/app/templates/duplicates.html:306
+#: ../../src/app/templates/includes/header.html:16
+#: ../../src/app/templates/persons.html:355
+msgid "Persons"
+msgstr "Osoby"
+
+#: ../../src/app/templates/duplicates.html:308
+#: ../../src/app/templates/includes/header.html:22
+#: ../../src/app/templates/marriages.html:3
+#: ../../src/app/templates/marriages.html:262
+msgid "Marriages"
+msgstr "Śluby"
+
+#: ../../src/app/templates/duplicates.html:317
+msgid "Pending"
+msgstr "Oczekujące"
+
+#: ../../src/app/templates/duplicates.html:318
+msgid "Confirmed"
+msgstr "Potwierdzone"
+
+#: ../../src/app/templates/duplicates.html:324
+msgid "Minimum Score"
+msgstr "Minimalny wynik"
+
+#: ../../src/app/templates/duplicates.html:332
+msgid "Apply Filters"
+msgstr "Zastosuj filtry"
+
+#: ../../src/app/templates/duplicates.html:361
+msgid "Similarity Breakdown"
+msgstr "Rozkład podobieństwa"
+
+#: ../../src/app/templates/duplicates.html:363
+msgid "Vector Similarity"
+msgstr "Podobieństwo wektorowe"
+
+#: ../../src/app/templates/duplicates.html:372
+msgid "Phonetic Similarity"
+msgstr "Podobieństwo fonetyczne"
+
+#: ../../src/app/templates/duplicates.html:381
+msgid "Date Similarity"
+msgstr "Podobieństwo dat"
+
+#: ../../src/app/templates/duplicates.html:390
+msgid "Location Similarity"
+msgstr "Podobieństwo lokalizacji"
+
+#: ../../src/app/templates/duplicates.html:403
+msgid "Record 1"
+msgstr "Rekord 1"
+
+#: ../../src/app/templates/duplicates.html:407
+#: ../../src/app/templates/duplicates.html:496
+#: ../../src/app/templates/persons.html:414
+msgid "Name"
+msgstr "Imię i nazwisko"
+
+#: ../../src/app/templates/duplicates.html:411
+#: ../../src/app/templates/duplicates.html:500
+msgid "Birth"
+msgstr "Urodzenie"
+
+#: ../../src/app/templates/duplicates.html:415
+#: ../../src/app/templates/duplicates.html:504
+msgid "Death"
+msgstr "Zgon"
+
+#: ../../src/app/templates/duplicates.html:419
+#: ../../src/app/templates/duplicates.html:508
+#: ../../src/app/templates/graph.html:110
+#: ../../src/app/templates/persons.html:371
+msgid "Birth Place"
+msgstr "Miejsce urodzenia"
+
+#: ../../src/app/templates/duplicates.html:428
+#: ../../src/app/templates/duplicates.html:517
+#: ../../src/app/templates/persons.html:647
+msgid "Child"
+msgstr "Dziecko"
+
+#: ../../src/app/templates/duplicates.html:432
+#: ../../src/app/templates/duplicates.html:457
+#: ../../src/app/templates/duplicates.html:470
+#: ../../src/app/templates/duplicates.html:521
+#: ../../src/app/templates/duplicates.html:546
+#: ../../src/app/templates/duplicates.html:559
+#: ../../src/app/templates/marriages.html:323
+msgid "Date"
+msgstr "Data"
+
+#: ../../src/app/templates/duplicates.html:449
+#: ../../src/app/templates/duplicates.html:538
+msgid "Spouse 1"
+msgstr "Małżonek 1"
+
+#: ../../src/app/templates/duplicates.html:453
+#: ../../src/app/templates/duplicates.html:542
+msgid "Spouse 2"
+msgstr "Małżonek 2"
+
+#: ../../src/app/templates/duplicates.html:466
+#: ../../src/app/templates/duplicates.html:555
+#: ../../src/app/templates/persons.html:476
+msgid "Deceased"
+msgstr "Zmarły"
+
+#: ../../src/app/templates/duplicates.html:487
+#: ../../src/app/templates/duplicates.html:576
+msgid "Record not found"
+msgstr "Nie znaleziono rekordu"
+
+#: ../../src/app/templates/duplicates.html:492
+msgid "Record 2"
+msgstr "Rekord 2"
+
+#: ../../src/app/templates/duplicates.html:585
+#: ../../src/app/templates/duplicates.html:671
+#: ../../src/app/templates/duplicates.html:677
+msgid "Not a Duplicate"
+msgstr "Nie jest duplikatem"
+
+#: ../../src/app/templates/duplicates.html:588
+#: ../../src/app/templates/duplicates.html:671
+#: ../../src/app/templates/duplicates.html:677
+msgid "Confirm Duplicate"
+msgstr "Potwierdź duplikat"
+
+#: ../../src/app/templates/duplicates.html:595
+msgid "Detected"
+msgstr "Wykryto"
+
+#: ../../src/app/templates/duplicates.html:596
+msgid "Method"
+msgstr "Metoda"
+
+#: ../../src/app/templates/duplicates.html:598
+msgid "Reviewed by"
+msgstr "Przejrzane przez"
+
+#: ../../src/app/templates/duplicates.html:598
+msgid "on"
+msgstr "dnia"
+
+#: ../../src/app/templates/duplicates.html:601
+msgid "Notes"
+msgstr "Notatki"
+
+#: ../../src/app/templates/duplicates.html:611
+#: ../../src/app/templates/includes/pagination.html:8
+#: ../../src/app/templates/index.html:543
+msgid "First"
+msgstr "Pierwsza"
+
+#: ../../src/app/templates/duplicates.html:612
+msgid "Prev"
+msgstr "Poprz."
+
+#: ../../src/app/templates/duplicates.html:624
+#: ../../src/app/templates/includes/pagination.html:24
+#: ../../src/app/templates/index.html:557
+msgid "Next"
+msgstr "Następna"
+
+#: ../../src/app/templates/duplicates.html:625
+#: ../../src/app/templates/includes/pagination.html:30
+#: ../../src/app/templates/index.html:562
+msgid "Last"
+msgstr "Ostatnia"
+
+#: ../../src/app/templates/duplicates.html:632
+msgid "No Duplicate Candidates Found"
+msgstr "Nie znaleziono kandydatów na duplikaty"
+
+#: ../../src/app/templates/duplicates.html:633
+msgid "Try adjusting your filters or import GEDCOM files to detect duplicates."
+msgstr ""
+"Spróbuj dostosować filtry lub zaimportować pliki GEDCOM, aby wykryć "
+"duplikaty."
+
+#: ../../src/app/templates/duplicates.html:640
+msgid "Confirming duplicate. Add notes - optional"
+msgstr "Potwierdzanie duplikatu. Dodaj notatki - opcjonalnie"
+
+#: ../../src/app/templates/duplicates.html:641
+msgid "Rejecting duplicate. Add notes - optional"
+msgstr "Odrzucanie duplikatu. Dodaj notatki - opcjonalnie"
+
+#: ../../src/app/templates/duplicates.html:649
+msgid "Processing..."
+msgstr "Przetwarzanie..."
+
+#: ../../src/app/templates/duplicates.html:665
+msgid "Duplicate confirmed successfully!"
+msgstr "Duplikat potwierdzony pomyślnie!"
+
+#: ../../src/app/templates/duplicates.html:665
+msgid "Duplicate rejected successfully!"
+msgstr "Duplikat odrzucony pomyślnie!"
+
+#: ../../src/app/templates/duplicates.html:669
+msgid "Unknown error"
+msgstr "Nieznany błąd"
+
+#: ../../src/app/templates/duplicates.html:675
+msgid "Network error"
+msgstr "Błąd sieci"
+
+#: ../../src/app/templates/graph.html:3 ../../src/app/templates/mi.html:3
+msgid "Family Tree Visualizer"
+msgstr "Wizualizator drzewa genealogicznego"
+
+#: ../../src/app/templates/graph.html:17 ../../src/app/templates/mi.html:16
+msgid "Person Limit"
+msgstr "Limit osób"
+
+#: ../../src/app/templates/graph.html:21 ../../src/app/templates/mi.html:20
+msgid "Generations"
+msgstr "Pokolenia"
+
+#: ../../src/app/templates/graph.html:22 ../../src/app/templates/mi.html:21
+msgid "Number of descendant generations to show"
+msgstr "Liczba pokoleń potomków do pokazania"
+
+#: ../../src/app/templates/graph.html:24 ../../src/app/templates/mi.html:23
+msgid "Load Family Tree"
+msgstr "Załaduj drzewo genealogiczne"
+
+#: ../../src/app/templates/graph.html:25 ../../src/app/templates/mi.html:24
+msgid "Reset View"
+msgstr "Resetuj widok"
+
+#: ../../src/app/templates/graph.html:26 ../../src/app/templates/mi.html:25
+msgid "Clear Ancestor"
+msgstr "Wyczyść przodka"
+
+#: ../../src/app/templates/graph.html:28 ../../src/app/templates/mi.html:27
+msgid "View Mode"
+msgstr "Tryb widoku"
+
+#: ../../src/app/templates/graph.html:31 ../../src/app/templates/mi.html:30
+msgid "Tree View"
+msgstr "Widok drzewa"
+
+#: ../../src/app/templates/graph.html:34 ../../src/app/templates/mi.html:33
+msgid "Family Clusters"
+msgstr "Klastry rodzinne"
+
+#: ../../src/app/templates/graph.html:41 ../../src/app/templates/graph.html:47
+#: ../../src/app/templates/mi.html:40
+msgid "Hide father-to-child edges"
+msgstr "Ukryj krawędzie ojciec-dziecko"
+
+#: ../../src/app/templates/graph.html:52 ../../src/app/templates/mi.html:45
+msgid "People"
+msgstr "Osoby"
+
+#: ../../src/app/templates/graph.html:56 ../../src/app/templates/mi.html:49
+msgid "Ancestor"
+msgstr "Przodek"
+
+#: ../../src/app/templates/graph.html:57 ../../src/app/templates/mi.html:50
+msgid "None"
+msgstr "Brak"
+
+#: ../../src/app/templates/graph.html:64 ../../src/app/templates/graph.html:112
+#: ../../src/app/templates/mi.html:57
+msgid "Loading graph data"
+msgstr "Ładowanie danych grafu"
+
+#: ../../src/app/templates/graph.html:69 ../../src/app/templates/mi.html:62
+msgid "Node Details"
+msgstr "Szczegóły węzła"
+
+#: ../../src/app/templates/graph.html:74 ../../src/app/templates/mi.html:67
+msgid "Family Tree Legend"
+msgstr "Legenda drzewa genealogicznego"
+
+#: ../../src/app/templates/graph.html:89 ../../src/app/templates/mi.html:82
+msgid "Parent → Child"
+msgstr "Rodzic → Dziecko"
+
+#: ../../src/app/templates/graph.html:93 ../../src/app/templates/mi.html:86
+msgid "Marriage 💑 (grouped together)"
+msgstr "Małżeństwo 💑 (zgrupowane razem)"
+
+#: ../../src/app/templates/graph.html:101
+msgid "Born"
+msgstr "Urodzony"
+
+#: ../../src/app/templates/graph.html:102
+msgid "Died"
+msgstr "Zmarł"
+
+#: ../../src/app/templates/graph.html:103
+msgid "Place"
+msgstr "Miejsce"
+
+#: ../../src/app/templates/graph.html:104
+#: ../../src/app/templates/persons.html:419
+msgid "Occupation"
+msgstr "Zawód"
+
+#: ../../src/app/templates/graph.html:105
+msgid "Source"
+msgstr "Źródło"
+
+#: ../../src/app/templates/graph.html:106
+msgid "Double-click to set as ancestor"
+msgstr "Kliknij dwukrotnie, aby ustawić jako przodka"
+
+#: ../../src/app/templates/graph.html:111
+msgid "Relationships"
+msgstr "Relacje"
+
+#: ../../src/app/templates/graph.html:113
+msgid "Error loading graph"
+msgstr "Błąd ładowania grafu"
+
+#: ../../src/app/templates/index.html:3
+msgid "Korzen - GEDCOM Upload"
+msgstr "Korzen - Przesyłanie GEDCOM"
+
+#: ../../src/app/templates/includes/header.html:5
+#: ../../src/app/templates/index.html:453
+msgid "Korzen"
+msgstr "Korzen"
+
+#: ../../src/app/templates/index.html:454
+msgid "Upload your GEDCOM file to begin processing genealogical data"
+msgstr "Prześlij plik GEDCOM, aby rozpocząć przetwarzanie danych genealogicznych"
+
+#: ../../src/app/templates/index.html:458
+#: ../../src/app/templates/index.html:589
+#: ../../src/app/templates/index.html:823
+msgid "Reset Database"
+msgstr "Resetuj bazę danych"
+
+#: ../../src/app/templates/index.html:468
+msgid "Click to select or drag & drop"
+msgstr "Kliknij, aby wybrać lub przeciągnij i upuść"
+
+#: ../../src/app/templates/index.html:469
+msgid "GEDCOM files (.ged) - Max 16MB"
+msgstr "Pliki GEDCOM (.ged) - Maks. 16MB"
+
+#: ../../src/app/templates/index.html:480
+#: ../../src/app/templates/index.html:697
+msgid "Upload File"
+msgstr "Prześlij plik"
+
+#: ../../src/app/templates/index.html:486
+#: ../../src/app/templates/index.html:568
+msgid "Uploaded Files"
+msgstr "Przesłane pliki"
+
+#: ../../src/app/templates/index.html:488
+#: ../../src/app/templates/persons.html:366
+msgid "Sort by:"
+msgstr "Sortuj według:"
+
+#: ../../src/app/templates/index.html:490
+msgid "Upload Date"
+msgstr "Data przesłania"
+
+#: ../../src/app/templates/index.html:491
+msgid "Filename"
+msgstr "Nazwa pliku"
+
+#: ../../src/app/templates/index.html:492
+msgid "File Size"
+msgstr "Rozmiar pliku"
+
+#: ../../src/app/templates/index.html:505
+#, python-format
+msgid "Showing %(count)s of %(total)s files (Page %(page)s of %(pages)s)"
+msgstr ""
+
+#: ../../src/app/templates/index.html:517
+#: ../../src/app/templates/index.html:758
+#: ../../src/app/templates/index.html:763
+msgid "Parse GEDCOM"
+msgstr "Parsuj GEDCOM"
+
+#: ../../src/app/templates/index.html:543
+msgid "First page"
+msgstr "Pierwsza strona"
+
+#: ../../src/app/templates/index.html:548
+msgid "Previous page"
+msgstr "Poprzednia strona"
+
+#: ../../src/app/templates/includes/pagination.html:14
+#: ../../src/app/templates/index.html:548
+msgid "Previous"
+msgstr "Poprzednia"
+
+#: ../../src/app/templates/includes/pagination.html:18
+#: ../../src/app/templates/index.html:551
+#, python-format
+msgid "Page %(current)s of %(total)s"
+msgstr ""
+
+#: ../../src/app/templates/index.html:557
+msgid "Next page"
+msgstr "Następna strona"
+
+#: ../../src/app/templates/index.html:562
+msgid "Last page"
+msgstr "Ostatnia strona"
+
+#: ../../src/app/templates/index.html:569
+msgid "No files uploaded yet. Upload your first GEDCOM file above!"
+msgstr ""
+"Nie przesłano jeszcze żadnych plików. Prześlij swój pierwszy plik GEDCOM "
+"powyżej!"
+
+#: ../../src/app/templates/index.html:577
+msgid "Confirm Database Reset"
+msgstr "Potwierdź reset bazy danych"
+
+#: ../../src/app/templates/index.html:579
+msgid "Warning:"
+msgstr "Ostrzeżenie:"
+
+#: ../../src/app/templates/index.html:579
+msgid "This action will permanently delete all data from the database, including:"
+msgstr "Ta akcja trwale usunie wszystkie dane z bazy danych, w tym:"
+
+#: ../../src/app/templates/index.html:581
+msgid "All uploaded files"
+msgstr "Wszystkie przesłane pliki"
+
+#: ../../src/app/templates/index.html:582
+msgid "All persons"
+msgstr "Wszystkie osoby"
+
+#: ../../src/app/templates/index.html:583
+msgid "All baptisms, marriages, and deaths"
+msgstr "Wszystkie chrzty, śluby i zgony"
+
+#: ../../src/app/templates/index.html:585
+msgid "This action cannot be undone!"
+msgstr "Tej akcji nie można cofnąć!"
+
+#: ../../src/app/templates/index.html:588
+msgid "Cancel"
+msgstr "Anuluj"
+
+#: ../../src/app/templates/index.html:641
+msgid "Selected:"
+msgstr "Wybrano:"
+
+#: ../../src/app/templates/index.html:654
+msgid "Please select a file first"
+msgstr "Najpierw wybierz plik"
+
+#: ../../src/app/templates/index.html:661
+msgid "Please select a valid GEDCOM file (.ged or .gedcom)"
+msgstr "Wybierz prawidłowy plik GEDCOM (.ged lub .gedcom)"
+
+#: ../../src/app/templates/index.html:669
+msgid "Uploading..."
+msgstr "Przesyłanie..."
+
+#: ../../src/app/templates/index.html:691
+msgid "Upload failed"
+msgstr "Przesyłanie nie powiodło się"
+
+#: ../../src/app/templates/index.html:694
+#: ../../src/app/templates/index.html:761
+#: ../../src/app/templates/index.html:820
+#: ../../src/app/templates/persons.html:360
+msgid "Error:"
+msgstr "Błąd:"
+
+#: ../../src/app/templates/index.html:705
+msgid "Parsing..."
+msgstr "Parsowanie..."
+
+#: ../../src/app/templates/index.html:717
+msgid "Import Statistics:"
+msgstr "Statystyki importu:"
+
+#: ../../src/app/templates/index.html:718
+#: ../../src/app/templates/index.html:743
+msgid "Persons:"
+msgstr "Osoby:"
+
+#: ../../src/app/templates/index.html:719
+#: ../../src/app/templates/persons.html:489
+msgid "Baptisms:"
+msgstr "Chrzty:"
+
+#: ../../src/app/templates/index.html:720
+#: ../../src/app/templates/persons.html:489
+msgid "Marriages:"
+msgstr "Śluby:"
+
+#: ../../src/app/templates/index.html:721
+#: ../../src/app/templates/persons.html:489
+msgid "Deaths:"
+msgstr "Zgony:"
+
+#: ../../src/app/templates/index.html:726
+msgid "AGE Graph Import:"
+msgstr "Import grafu AGE:"
+
+#: ../../src/app/templates/index.html:727
+msgid "Time:"
+msgstr "Czas:"
+
+#: ../../src/app/templates/index.html:728
+msgid "Vertices created:"
+msgstr "Utworzone wierzchołki:"
+
+#: ../../src/app/templates/index.html:729
+msgid "Edges created:"
+msgstr "Utworzone krawędzie:"
+
+#: ../../src/app/templates/index.html:732
+msgid "Errors:"
+msgstr "Błędy:"
+
+#: ../../src/app/templates/index.html:735
+msgid "Warnings:"
+msgstr "Ostrzeżenia:"
+
+#: ../../src/app/templates/index.html:742
+msgid "Total in Graph:"
+msgstr "Łącznie w grafie:"
+
+#: ../../src/app/templates/index.html:744
+msgid "Events:"
+msgstr "Wydarzenia:"
+
+#: ../../src/app/templates/index.html:745
+msgid "Parent-child edges:"
+msgstr "Krawędzie rodzic-dziecko:"
+
+#: ../../src/app/templates/index.html:746
+msgid "Marriage edges:"
+msgstr "Krawędzie małżeństwa:"
+
+#: ../../src/app/templates/index.html:756
+msgid "Parsing failed"
+msgstr "Parsowanie nie powiodło się"
+
+#: ../../src/app/templates/index.html:797
+msgid "Resetting..."
+msgstr "Resetowanie..."
+
+#: ../../src/app/templates/index.html:816
+msgid "Reset failed"
+msgstr "Reset nie powiódł się"
+
+#: ../../src/app/templates/marriages.html:275
+msgid "Marriage Date"
+msgstr "Data ślubu"
+
+#: ../../src/app/templates/marriages.html:276
+msgid "Groom Surname"
+msgstr "Nazwisko pana młodego"
+
+#: ../../src/app/templates/marriages.html:277
+msgid "Bride Surname"
+msgstr "Nazwisko panny młodej"
+
+#: ../../src/app/templates/marriages.html:291
+msgid "Search by spouse names, parish, or village..."
+msgstr "Szukaj po imionach małżonków, parafii lub wsi..."
+
+#: ../../src/app/templates/marriages.html:294
+msgid "Bachelor (Juvenis)"
+msgstr "Kawaler (Juvenis)"
+
+#: ../../src/app/templates/marriages.html:295
+msgid "Spinster (Virgo)"
+msgstr "Panna (Virgo)"
+
+#: ../../src/app/templates/marriages.html:303
+msgid "Total Marriages"
+msgstr "Łącznie ślubów"
+
+#: ../../src/app/templates/marriages.html:324
+msgid "Marriage"
+msgstr "Ślub"
+
+#: ../../src/app/templates/marriages.html:325
+msgid "Details"
+msgstr "Szczegóły"
+
+#: ../../src/app/templates/marriages.html:354
+msgid "Bachelor"
+msgstr "Kawaler"
+
+#: ../../src/app/templates/marriages.html:365
+msgid "married to"
+msgstr "poślubił(a)"
+
+#: ../../src/app/templates/marriages.html:381
+msgid "Spinster"
+msgstr "Panna"
+
+#: ../../src/app/templates/marriages.html:397
+msgid "Groom's father"
+msgstr "Ojciec pana młodego"
+
+#: ../../src/app/templates/marriages.html:400
+msgid "Groom's mother"
+msgstr "Matka pana młodego"
+
+#: ../../src/app/templates/marriages.html:403
+msgid "Bride's father"
+msgstr "Ojciec panny młodej"
+
+#: ../../src/app/templates/marriages.html:406
+msgid "Bride's mother"
+msgstr "Matka panny młodej"
+
+#: ../../src/app/templates/marriages.html:409
+msgid "Banns"
+msgstr "Zapowiedzi"
+
+#: ../../src/app/templates/marriages.html:412
+msgid "Witnesses"
+msgstr "Świadkowie"
+
+#: ../../src/app/templates/marriages.html:439
+msgid "No Marriage Records Found"
+msgstr "Nie znaleziono rekordów ślubu"
+
+#: ../../src/app/templates/marriages.html:440
+msgid "Upload and parse a GEDCOM file to see marriage records in the database."
+msgstr "Prześlij i sparsuj plik GEDCOM, aby zobaczyć rekordy ślubu w bazie danych."
+
+#: ../../src/app/templates/persons.html:3
+msgid "Persons - Korzen"
+msgstr "Osoby - Korzen"
+
+#: ../../src/app/templates/persons.html:368
+msgid "Last Name"
+msgstr "Nazwisko"
+
+#: ../../src/app/templates/persons.html:369
+msgid "First Name"
+msgstr "Imię"
+
+#: ../../src/app/templates/persons.html:383
+msgid "Search by name, place, or occupation..."
+msgstr "Szukaj po imieniu, miejscu lub zawodzie..."
+
+#: ../../src/app/templates/persons.html:394
+msgid "Total Persons"
+msgstr "Łącznie osób"
+
+#: ../../src/app/templates/persons.html:418
+msgid "Age/Status"
+msgstr "Wiek/Status"
+
+#: ../../src/app/templates/persons.html:421
+msgid "Records"
+msgstr "Rekordy"
+
+#: ../../src/app/templates/persons.html:501
+msgid "Basic Information"
+msgstr "Podstawowe informacje"
+
+#: ../../src/app/templates/persons.html:503
+msgid "Full Name:"
+msgstr "Pełne imię i nazwisko:"
+
+#: ../../src/app/templates/persons.html:508
+msgid "Maiden Name:"
+msgstr "Nazwisko panieńskie:"
+
+#: ../../src/app/templates/persons.html:513
+msgid "Gender:"
+msgstr "Płeć:"
+
+#: ../../src/app/templates/persons.html:518
+msgid "Occupation:"
+msgstr "Zawód:"
+
+#: ../../src/app/templates/persons.html:525
+msgid "Birth Information"
+msgstr "Informacje o urodzeniu"
+
+#: ../../src/app/templates/persons.html:527
+msgid "Birth Date:"
+msgstr "Data urodzenia:"
+
+#: ../../src/app/templates/persons.html:531
+#: ../../src/app/templates/persons.html:548
+msgid "estimated"
+msgstr "szacowana"
+
+#: ../../src/app/templates/persons.html:536
+msgid "Birth Place:"
+msgstr "Miejsce urodzenia:"
+
+#: ../../src/app/templates/persons.html:542
+msgid "Death Information"
+msgstr "Informacje o śmierci"
+
+#: ../../src/app/templates/persons.html:544
+msgid "Death Date:"
+msgstr "Data śmierci:"
+
+#: ../../src/app/templates/persons.html:553
+msgid "Death Place:"
+msgstr "Miejsce śmierci:"
+
+#: ../../src/app/templates/persons.html:558
+msgid "Lifespan:"
+msgstr "Długość życia:"
+
+#: ../../src/app/templates/persons.html:569
+msgid "Location Information"
+msgstr "Informacje o lokalizacji"
+
+#: ../../src/app/templates/persons.html:571
+msgid "Parish:"
+msgstr "Parafia:"
+
+#: ../../src/app/templates/persons.html:575
+msgid "Residence:"
+msgstr "Miejsce zamieszkania:"
+
+#: ../../src/app/templates/persons.html:580
+msgid "House Number:"
+msgstr "Numer domu:"
+
+#: ../../src/app/templates/persons.html:588
+msgid "Additional Information"
+msgstr "Dodatkowe informacje"
+
+#: ../../src/app/templates/persons.html:591
+msgid "GEDCOM ID:"
+msgstr "ID GEDCOM:"
+
+#: ../../src/app/templates/persons.html:597
+msgid "Notes:"
+msgstr "Notatki:"
+
+#: ../../src/app/templates/persons.html:606
+msgid "Parents"
+msgstr "Rodzice"
+
+#: ../../src/app/templates/persons.html:609
+msgid "Father:"
+msgstr "Ojciec:"
+
+#: ../../src/app/templates/persons.html:613
+#: ../../src/app/templates/persons.html:627
+#: ../../src/app/templates/persons.html:651
+msgid "b."
+msgstr "ur."
+
+#: ../../src/app/templates/persons.html:620
+msgid "Mother:"
+msgstr "Matka:"
+
+#: ../../src/app/templates/persons.html:640
+msgid "Children"
+msgstr "Dzieci"
+
+#: ../../src/app/templates/persons.html:642
+msgid "Number of Children:"
+msgstr "Liczba dzieci:"
+
+#: ../../src/app/templates/persons.html:659
+#, python-format
+msgid "... and %(count)s more"
+msgstr ""
+
+#: ../../src/app/templates/persons.html:667
+msgid "Related Records"
+msgstr "Powiązane rekordy"
+
+#: ../../src/app/templates/persons.html:672
+msgid "Baptism Records:"
+msgstr "Rekordy chrztu:"
+
+#: ../../src/app/templates/persons.html:676
+msgid "Marriage Records:"
+msgstr "Rekordy ślubu:"
+
+#: ../../src/app/templates/persons.html:680
+msgid "Death Records:"
+msgstr "Rekordy zgonu:"
+
+#: ../../src/app/templates/persons.html:684
+msgid "As Father:"
+msgstr "Jako ojciec:"
+
+#: ../../src/app/templates/persons.html:688
+msgid "As Mother:"
+msgstr "Jako matka:"
+
+#: ../../src/app/templates/persons.html:708
+msgid "No Persons Found"
+msgstr "Nie znaleziono osób"
+
+#: ../../src/app/templates/persons.html:709
+msgid "Upload and parse a GEDCOM file to see persons in the database."
+msgstr "Prześlij i sparsuj plik GEDCOM, aby zobaczyć osoby w bazie danych."
+
+#: ../../src/app/templates/includes/footer.html:4
+msgid "Korzen Genealogy Application"
+msgstr "Aplikacja genealogiczna Korzen"
+
+#: ../../src/app/templates/includes/footer.html:7
+msgid "About"
+msgstr "O aplikacji"
+
+#: ../../src/app/templates/includes/footer.html:8
+msgid "Help"
+msgstr "Pomoc"
+
+#: ../../src/app/templates/includes/footer.html:9
+msgid "Privacy"
+msgstr "Prywatność"
+
+#: ../../src/app/templates/includes/header.html:13
+msgid "Home"
+msgstr "Strona główna"
+
+#: ../../src/app/templates/includes/header.html:28
+msgid "Duplicates"
+msgstr "Duplikaty"
+
+#: ../../src/app/templates/includes/header.html:31
+msgid "Graph"
+msgstr "Graf"
+
+#: ../../src/app/templates/includes/header.html:39
+msgid "Polish"
+msgstr "Polski"
+
+#: ../../src/app/templates/includes/header.html:44
+msgid "English"
+msgstr "Angielski"
+
+#: ../../src/app/templates/includes/pagination.html:35
+#, python-format
+msgid "Showing %(start)s to %(end)s of %(total)s items"
+msgstr ""
+
