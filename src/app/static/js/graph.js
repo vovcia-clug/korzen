@@ -84,16 +84,24 @@ function getGraphOptions() {
             }
         },
         physics: {
-            enabled: false  // Disable physics for pure hierarchical layout
+            enabled: true,
+            hierarchicalRepulsion: {
+                centralGravity: 0.0,
+                springLength: 100,
+                springConstant: 0.01,
+                nodeDistance: 150,
+                damping: 0.09
+            },
+            solver: 'hierarchicalRepulsion'
         },
         layout: {
             hierarchical: {
                 enabled: true,
                 direction: 'UD',  // Up-Down: older nodes at top, newer at bottom
-                sortMethod: 'hubsize',
-                nodeSpacing: 200,
-                levelSeparation: 200,
-                treeSpacing: 250,
+                sortMethod: 'directed', // Use 'directed' to respect levels
+                nodeSpacing: 150,
+                levelSeparation: 150,
+                treeSpacing: 200,
                 blockShifting: true,
                 edgeMinimization: true,
                 parentCentralization: true
@@ -108,106 +116,112 @@ function getGraphOptions() {
     };
 }
 
-// Calculate hierarchical levels based on birth dates with spouse grouping
+// Calculate hierarchical levels based on parent-child relationships
 function calculateHierarchicalLevels(nodes, edges) {
     const levels = new Map();
-    const marriages = new Map(); // Track marriage relationships
+    const marriages = new Map();
+    const children = new Map();
+    const parents = new Map();
     
-    // Identify marriage relationships
+    // Initialize maps
+    nodes.forEach(node => {
+        marriages.set(node.id, new Set());
+        children.set(node.id, new Set());
+        parents.set(node.id, new Set());
+        levels.set(node.id, 0); // Default level
+    });
+    
+    // Build relationships
     edges.forEach(edge => {
         if (edge.type === 'MARRIED_TO') {
-            if (!marriages.has(edge.from)) {
-                marriages.set(edge.from, new Set());
+            if (marriages.has(edge.from) && marriages.has(edge.to)) {
+                marriages.get(edge.from).add(edge.to);
+                marriages.get(edge.to).add(edge.from);
             }
-            if (!marriages.has(edge.to)) {
-                marriages.set(edge.to, new Set());
+        } else if (edge.type === 'PARENT_OF') {
+            if (children.has(edge.from) && parents.has(edge.to)) {
+                children.get(edge.from).add(edge.to);
+                parents.get(edge.to).add(edge.from);
             }
-            marriages.get(edge.from).add(edge.to);
-            marriages.get(edge.to).add(edge.from);
         }
     });
     
-    // Extract birth years and calculate levels
-    const birthYears = new Map();
-    let minYear = Infinity;
-    let maxYear = -Infinity;
+    // Group spouses together
+    const spouseGroups = [];
+    const visitedSpouses = new Set();
     
     nodes.forEach(node => {
-        if (node.type === 'Person' && node.birth_date) {
-            const year = parseInt(node.birth_date.split('-')[0]);
-            if (!isNaN(year)) {
-                birthYears.set(node.id, year);
-                minYear = Math.min(minYear, year);
-                maxYear = Math.max(maxYear, year);
+        if (!visitedSpouses.has(node.id)) {
+            const group = new Set([node.id]);
+            const queue = [node.id];
+            visitedSpouses.add(node.id);
+            
+            while (queue.length > 0) {
+                const curr = queue.shift();
+                marriages.get(curr).forEach(spouse => {
+                    if (!visitedSpouses.has(spouse)) {
+                        visitedSpouses.add(spouse);
+                        group.add(spouse);
+                        queue.push(spouse);
+                    }
+                });
             }
+            spouseGroups.push(group);
         }
     });
     
-    // If we have birth years, use them to calculate levels
-    if (minYear !== Infinity && maxYear !== -Infinity) {
-        // Group years into levels (e.g., every 25-30 years is a generation)
-        const yearsPerLevel = 25;
-        
-        // First pass: assign levels based on birth years
-        nodes.forEach(node => {
-            if (birthYears.has(node.id)) {
-                const year = birthYears.get(node.id);
-                // Calculate level: older = lower level number (top of graph)
-                const level = Math.floor((year - minYear) / yearsPerLevel);
-                levels.set(node.id, level);
-            } else {
-                // Nodes without birth dates go to level 0
-                levels.set(node.id, 0);
-            }
+    // Map node to its spouse group
+    const nodeToGroup = new Map();
+    spouseGroups.forEach((group, index) => {
+        group.forEach(nodeId => {
+            nodeToGroup.set(nodeId, index);
         });
-        
-        // Second pass: adjust spouse levels to match
-        const processed = new Set();
+    });
+    
+    // Calculate levels iteratively
+    let changed = true;
+    let iterations = 0;
+    const MAX_ITERATIONS = 100;
+    
+    while (changed && iterations < MAX_ITERATIONS) {
+        changed = false;
+        iterations++;
         
         nodes.forEach(node => {
-            if (processed.has(node.id)) return;
+            const nodeId = node.id;
+            let maxParentLevel = -1;
             
-            // Get all spouses for this person
-            const spouseGroup = [node.id];
-            const toCheck = [node.id];
-            const groupProcessed = new Set([node.id]);
-            
-            while (toCheck.length > 0) {
-                const currentId = toCheck.shift();
-                if (marriages.has(currentId)) {
-                    marriages.get(currentId).forEach(spouseId => {
-                        if (!groupProcessed.has(spouseId)) {
-                            spouseGroup.push(spouseId);
-                            toCheck.push(spouseId);
-                            groupProcessed.add(spouseId);
-                        }
-                    });
-                }
-            }
-            
-            // Find the average level for the spouse group
-            let totalLevel = 0;
-            let count = 0;
-            spouseGroup.forEach(id => {
-                if (levels.has(id)) {
-                    totalLevel += levels.get(id);
-                    count++;
+            parents.get(nodeId).forEach(parentId => {
+                if (levels.has(parentId)) {
+                    maxParentLevel = Math.max(maxParentLevel, levels.get(parentId));
                 }
             });
             
-            if (count > 0) {
-                const avgLevel = Math.round(totalLevel / count);
-                // Set all spouses to the same level
-                spouseGroup.forEach(id => {
-                    levels.set(id, avgLevel);
-                    processed.add(id);
+            let expectedLevel = maxParentLevel === -1 ? 0 : maxParentLevel + 1;
+            
+            // All nodes in the same spouse group must have the same level
+            const groupId = nodeToGroup.get(nodeId);
+            const group = spouseGroups[groupId];
+            
+            let maxGroupLevel = expectedLevel;
+            group.forEach(memberId => {
+                maxGroupLevel = Math.max(maxGroupLevel, levels.get(memberId));
+                
+                // Also check parents of other group members
+                parents.get(memberId).forEach(parentId => {
+                    if (levels.has(parentId)) {
+                        maxGroupLevel = Math.max(maxGroupLevel, levels.get(parentId) + 1);
+                    }
                 });
-            }
-        });
-    } else {
-        // Fallback: all nodes at level 0
-        nodes.forEach(node => {
-            levels.set(node.id, 0);
+            });
+            
+            // Update level for all members of the group if needed
+            group.forEach(memberId => {
+                if (levels.get(memberId) !== maxGroupLevel) {
+                    levels.set(memberId, maxGroupLevel);
+                    changed = true;
+                }
+            });
         });
     }
     
