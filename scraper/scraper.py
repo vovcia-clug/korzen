@@ -16,7 +16,7 @@ from webdriver_manager.core.os_manager import ChromeType
 COLLECTION_URL = "https://skanoteka.genealodzy.pl/id5545"
 BASE_URL = "https://skanoteka.genealodzy.pl"
 DOWNLOAD_FOLDER = "/app/watched-images"
-MAX_IMAGES_PER_UNIT = 999  # Maximum images to download per unit
+MAX_IMAGES_PER_UNIT = 1000  # Maximum images to download per unit
 
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)

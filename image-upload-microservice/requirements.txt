@@ -28,6 +28,3 @@ requests>=2.31.0
 
 # HTML parsing for metadata extraction
 beautifulsoup4>=4.12.0
-
-# Perceptual image hashing for duplicate detection
-imagehash>=4.3.1

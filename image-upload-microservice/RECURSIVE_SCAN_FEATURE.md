@@ -1,19 +1,19 @@
-# Recursive Scan and Duplicate Detection Features
+# Recursive Scan Feature
 
 ## Overview
 
-The image upload microservice has been enhanced with the following features:
+The image upload microservice includes the following features:
 
 1. **Recursive Directory Scanning**: Descends into subdirectories to find all image files
 2. **Initial Startup Scan**: Scans all existing files on startup (not just new files)
 3. **File Hashing**: Calculates SHA-256 hash for each file
-4. **S3 Duplicate Detection**: Checks if file already exists in S3 before uploading
+4. **Directory Structure Preservation**: Maintains original directory structure in S3 keys
 
-## New Features
+## Features
 
 ### 1. Recursive Directory Scanning
 
-The service now recursively scans subdirectories when `WATCH_RECURSIVE=true` (default is now `true`).
+The service recursively scans subdirectories when `WATCH_RECURSIVE=true` (default is `true`).
 
 **Configuration:**
 ```bash
@@ -24,10 +24,11 @@ WATCH_RECURSIVE=true  # Enable recursive subdirectory monitoring (default: true)
 - Monitors all subdirectories within the watch directory
 - Detects new files in any subdirectory
 - Processes files regardless of directory depth
+- Preserves directory structure in S3 uploads
 
 ### 2. Initial Startup Scan
 
-On startup, the service now scans all existing files in the watch directory (and subdirectories if recursive mode is enabled).
+On startup, the service scans all existing files in the watch directory (and subdirectories if recursive mode is enabled).
 
 **Benefits:**
 - Processes files that were added while the service was offline
@@ -46,7 +47,7 @@ INFO - initial_scan_completed - files_found=42
 Each file is automatically hashed using SHA-256 algorithm during validation.
 
 **Implementation:**
-- Hash is calculated during image validation in [`ImageDetector`](src/services/image_detector.py:178)
+- Hash is calculated during image validation in [`ImageDetector`](src/services/image_detector.py)
 - Hash is stored in file metadata
 - Hash is attached to S3 object metadata (key: `file-hash`)
 
@@ -60,134 +61,90 @@ Each file is automatically hashed using SHA-256 algorithm during validation.
 }
 ```
 
-### 4. S3 Duplicate Detection
+### 4. Directory Structure Preservation
 
-Before uploading, the service checks if a file with the same hash already exists in S3.
+The service preserves the original directory structure when uploading to S3.
 
-**Two-Level Duplicate Detection:**
+**Implementation:**
+- The [`S3Uploader.generate_s3_key()`](src/services/s3_uploader.py) method accepts a `base_directory` parameter
+- Calculates relative path from base directory
+- Includes directory structure in S3 key
 
-1. **In-Memory Check**: Fast check against recently processed files in current session
-2. **S3 Check**: Queries S3 bucket for existing objects with matching hash
-
-**Implementation Details:**
-
-The [`S3Uploader.object_exists_by_hash()`](src/services/s3_uploader.py:277) method:
-- Lists objects in the S3 bucket with the configured prefix
-- Checks the `file-hash` metadata of each object
-- Returns S3 URI if duplicate found, `None` otherwise
-
-The [`UploadOrchestrator`](src/services/upload_orchestrator.py:122) uses duplicate detection:
-- First checks in-memory hash set
-- Then checks S3 if not found in memory
-- Skips upload if duplicate detected
-- Still performs post-upload action (archive/delete) if configured
-
-**Log Messages:**
+**Example:**
 ```
-INFO - file_duplicate_skipped_memory - file=/path/to/image.jpg - hash=abc123...
-INFO - file_duplicate_skipped_s3 - file=/path/to/image2.jpg - hash=abc123... - existing_s3_uri=s3://bucket/path/file.jpg
+Local file:  /watched-images/2024/january/scan001.jpg
+S3 key:      uploads/2024/january/uuid-scan001.jpg
 ```
-
-## Performance Considerations
-
-### S3 Duplicate Check Performance
-
-The S3 duplicate check uses pagination to handle large buckets:
-- Iterates through all objects in the bucket prefix
-- Fetches metadata for each object (head_object)
-- May be slow for buckets with millions of objects
-
-**Optimization Recommendations:**
-
-1. **Use specific S3 prefix**: Configure `S3_PREFIX` to narrow search scope
-2. **Consider alternative indexing**: For very large deployments, consider using:
-   - DynamoDB table mapping hash → S3 URI
-   - ElastiCache/Redis for faster lookups
-   - Lambda function triggered on S3 PUT to build index
-
-### Initial Scan Performance
-
-For directories with thousands of files:
-- Files are processed synchronously during startup
-- Service becomes ready after scan completes
-- Consider processing in background thread for large directories
 
 ## Configuration
 
 ### Environment Variables
 
 ```bash
-# Directory watching
+# Enable recursive directory monitoring (default: true)
+WATCH_RECURSIVE=true
+
+# Watch directory path
 WATCH_DIRECTORY=/app/watched-images
-WATCH_RECURSIVE=true  # NEW DEFAULT: true (was false)
 
 # S3 configuration
 S3_BUCKET=my-genealogy-images
-S3_PREFIX=uploads/  # Used to scope duplicate detection
+S3_PREFIX=uploads/
 
-# Post-upload actions
-POST_UPLOAD_ACTION=keep  # keep|archive|delete
-ARCHIVE_DIRECTORY=/app/archived  # Required if action=archive
+# Post-upload action
+POST_UPLOAD_ACTION=keep  # or 'archive' or 'delete'
+ARCHIVE_DIRECTORY=/app/processed-images
 ```
 
-## Example Use Cases
+## Use Cases
 
-### Use Case 1: Catch-Up Mode
-You have 1000 historical images in a directory. Start the service and it will:
-1. Scan all 1000 files on startup
-2. Hash each file
-3. Check S3 for duplicates
-4. Upload only new files
-5. Begin monitoring for new files
+### Use Case 1: Batch Upload Existing Files
 
-### Use Case 2: Multiple Sources
-You have multiple directories with potentially duplicate images:
-1. Point service at first directory
-2. All unique images uploaded
-3. Point service at second directory
-4. Duplicate images automatically skipped based on hash
-5. Only new images uploaded
+You have a directory with thousands of existing images that need to be uploaded:
 
-### Use Case 3: Nested Directory Structure
-Your image archive has this structure:
+1. Configure the service with your directory
+2. Start the service
+3. Service automatically scans and uploads all files
+4. Monitor progress via logs
+
+### Use Case 2: Organized Directory Structure
+
+You have images organized in subdirectories by date, location, or category:
+
 ```
-genealogy/
-  ├── parish_a/
-  │   ├── 1800/
-  │   ├── 1801/
-  ├── parish_b/
-  │   ├── 1800/
-  │   └── 1801/
+watched-images/
+├── 2024/
+│   ├── january/
+│   │   ├── scan001.jpg
+│   │   └── scan002.jpg
+│   └── february/
+│       └── scan003.jpg
+└── 2025/
+    └── march/
+        └── scan004.jpg
 ```
 
-With `WATCH_RECURSIVE=true`, all files in all subdirectories are:
-- Discovered on startup
-- Monitored for changes
-- Uploaded to S3 with hash-based deduplication
+The service will:
+1. Recursively scan all subdirectories
+2. Upload each file to S3
+3. Preserve the directory structure in S3 keys
+4. Send SQS notifications for each file
 
-## API Changes
+### Use Case 3: Continuous Monitoring
 
-### S3Uploader
+The service continuously monitors for new files:
 
-New method:
-```python
-def object_exists_by_hash(self, file_hash: str) -> Optional[str]:
-    """Check if an object with the given hash exists in S3.
-    
-    Returns S3 URI if found, None otherwise.
-    """
-```
+1. Service runs in background
+2. New files added to any subdirectory are detected
+3. Files are automatically uploaded
+4. Directory structure is preserved
 
-### UploadOrchestrator
+## Implementation Details
 
-Enhanced duplicate detection in `process_file()`:
-- Checks in-memory hash set
-- Calls `s3_uploader.object_exists_by_hash()`
-- Skips upload if duplicate found in either location
+### Initial Scan Logic
 
-### Main Entry Point
+Located in [`src/main.py`](src/main.py):
 
-New function:
 ```python
 def scan_existing_files(
     directory: Path,
@@ -196,84 +153,108 @@ def scan_existing_files(
     recursive: bool = False
 ) -> int:
     """Scan directory for existing files and process them."""
+    # Recursively or non-recursively scan directory
+    # Process each valid image file
+    # Return count of files found
 ```
 
-## Migration Guide
+### Directory Structure Preservation
 
-### Updating from Previous Version
+Located in [`src/services/s3_uploader.py`](src/services/s3_uploader.py):
 
-1. **No breaking changes**: Service remains backward compatible
-2. **New default behavior**: `WATCH_RECURSIVE` now defaults to `true`
-3. **Initial scan**: Service will scan existing files on first startup with new version
+```python
+def generate_s3_key(self, file_path: Path, base_directory: Optional[Path] = None) -> str:
+    """Generate S3 object key for file, preserving directory structure."""
+    # Calculate relative path from base_directory
+    # Generate unique filename with UUID
+    # Combine prefix + relative path + unique filename
+```
 
-### Recommended Steps
+### Recursive Watching
 
-1. Update environment variables if needed:
-   ```bash
-   # Explicitly set if you don't want recursive scanning
-   WATCH_RECURSIVE=false
-   ```
+Located in [`src/services/directory_watcher.py`](src/services/directory_watcher.py):
 
-2. Review S3 prefix configuration:
-   ```bash
-   # Set specific prefix to scope duplicate detection
-   S3_PREFIX=uploads/genealogy/
-   ```
+The `DirectoryWatcher` uses `watchdog.observers.Observer` with recursive flag to monitor subdirectories.
 
-3. Monitor initial startup:
-   ```bash
-   docker-compose logs -f image-upload-microservice
-   # Watch for "initial_scan_completed" message
-   ```
+## Performance Considerations
 
-4. Verify duplicate detection:
-   - Check logs for "file_duplicate_skipped_s3" messages
-   - Confirm no duplicate uploads in S3 bucket
+### Large Directory Scans
+
+For directories with many files:
+
+1. **Startup Time**: Initial scan may take time for large directories
+2. **Memory Usage**: File list is processed iteratively (not loaded all at once)
+3. **Logging**: Progress is logged for monitoring
+
+**Recommendations:**
+- Use `LOG_LEVEL=INFO` to track progress
+- Monitor memory usage for very large directories
+- Consider batch processing for millions of files
+
+### Recursive Watching
+
+Recursive watching has minimal overhead:
+- `watchdog` library efficiently monitors subdirectories
+- Event filtering reduces unnecessary processing
+- Debouncing prevents duplicate events
 
 ## Troubleshooting
 
-### Initial Scan Takes Too Long
+### Files Not Being Detected
 
-**Problem**: Service takes minutes to start with large directories
-
-**Solutions:**
-- Reduce `WATCH_DIRECTORY` scope
-- Process subdirectories separately
-- Consider background scan implementation
-
-### S3 Duplicate Check Slow
-
-**Problem**: Upload pipeline slow due to S3 checks
+**Problem**: Files in subdirectories are not processed
 
 **Solutions:**
-- Set more specific `S3_PREFIX`
-- Implement external hash index (DynamoDB/Redis)
-- Adjust S3 pagination settings
+1. Verify `WATCH_RECURSIVE=true` is set
+2. Check file extensions are in `SUPPORTED_EXTENSIONS`
+3. Ensure subdirectories are readable
+4. Check logs for validation errors
 
-### False Duplicate Detection
+### Initial Scan Taking Too Long
 
-**Problem**: Different files marked as duplicates
+**Problem**: Startup scan is slow for large directories
 
-**Solution**: This shouldn't happen with SHA-256, but check:
-- S3 metadata is being written correctly
-- Hash calculation is deterministic
-- No hash collisions (extremely unlikely with SHA-256)
+**Solutions:**
+1. This is expected for large directories
+2. Monitor progress via logs
+3. Consider splitting into smaller directories
+4. Ensure adequate system resources
 
-## Future Enhancements
+### Directory Structure Not Preserved
 
-Potential improvements for future versions:
+**Problem**: S3 keys don't reflect directory structure
 
-1. **Background Initial Scan**: Scan in background thread, start watching immediately
-2. **Hash Index Service**: Separate service for fast hash lookups
-3. **Progress Reporting**: API endpoint showing scan/upload progress
-4. **Batch Processing**: Process initial scan in batches with rate limiting
-5. **Smart Retry**: Retry failed S3 checks with exponential backoff
-6. **Metrics**: Prometheus metrics for scan performance and duplicate rate
+**Solutions:**
+1. Verify the upload logic is passing `base_directory` parameter
+2. Check S3 keys in logs
+3. Review S3 bucket contents
 
-## Related Files
+## Statistics
+
+The service tracks processing statistics:
+
+```python
+{
+    "files_processed": 100,
+    "files_uploaded": 98,
+    "files_failed": 2,
+    "validation_failures": 1,
+    "upload_failures": 0,
+    "notification_failures": 0,
+    "metadata_extracted": 85,
+}
+```
+
+Access statistics via logs:
+```
+INFO - periodic_statistics - files_processed=100 - files_uploaded=98 - ...
+```
+
+## Related Documentation
 
 - [`src/main.py`](src/main.py) - Entry point with initial scan
-- [`src/services/s3_uploader.py`](src/services/s3_uploader.py) - S3 duplicate detection
-- [`src/services/upload_orchestrator.py`](src/services/upload_orchestrator.py) - Duplicate checking logic
-- [`src/services/image_detector.py`](src/services/image_detector.py) - File hashing
-- [`src/config.py`](src/config.py) - Configuration with new defaults
+- [`src/services/s3_uploader.py`](src/services/s3_uploader.py) - S3 upload with directory preservation
+- [`src/services/upload_orchestrator.py`](src/services/upload_orchestrator.py) - Upload workflow coordination
+- [`src/services/directory_watcher.py`](src/services/directory_watcher.py) - Recursive directory monitoring
+- [`README.md`](README.md) - User documentation
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) - Technical architecture

@@ -1,13 +1,13 @@
 """S3 upload service.
 
 This module handles uploading image files to AWS S3 with multipart support,
-metadata attachment, and retry logic.
+metadata attachment, and retry logic. Uploads preserve the original directory structure.
 """
 
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 import boto3
 from botocore.config import Config as BotoConfig
@@ -86,32 +86,37 @@ class S3Uploader:
             multipart_threshold_mb=multipart_threshold_mb,
         )
 
-    def generate_s3_key(self, file_path: Path, preserve_structure: bool = False) -> str:
-        """Generate S3 object key for file.
+    def generate_s3_key(self, file_path: Path, base_directory: Optional[Path] = None) -> str:
+        """Generate S3 object key for file, preserving directory structure.
         
         Args:
             file_path: Path to the file
-            preserve_structure: Preserve directory structure in key
+            base_directory: Base directory to calculate relative path from (preserves structure)
             
         Returns:
             S3 object key
         """
-        # Generate timestamp-based path
-        now = datetime.now(timezone.utc)
-        date_path = now.strftime("%Y/%m/%d")
-
-        # Generate unique filename (UUID only, no original filename)
+        # Generate unique filename (UUID + original extension)
         unique_id = str(uuid.uuid4())
-        file_extension = file_path.suffix  # Preserve file extension
+        file_extension = file_path.suffix
         unique_filename = f"{unique_id}{file_extension}"
 
-        # Construct full key
-        if preserve_structure:
-            # Include parent directory structure
-            relative_path = file_path.parent.name
-            s3_key = f"{self.prefix}{date_path}/{relative_path}/{unique_filename}"
+        # Preserve directory structure if base_directory is provided
+        if base_directory:
+            try:
+                # Get relative path from base directory
+                relative_path = file_path.relative_to(base_directory)
+                # Use parent directory structure
+                if relative_path.parent != Path('.'):
+                    s3_key = f"{self.prefix}{relative_path.parent}/{unique_filename}"
+                else:
+                    s3_key = f"{self.prefix}{unique_filename}"
+            except ValueError:
+                # File is not relative to base_directory, use simple structure
+                s3_key = f"{self.prefix}{unique_filename}"
         else:
-            s3_key = f"{self.prefix}{date_path}/{unique_filename}"
+            # No base directory specified, use simple structure
+            s3_key = f"{self.prefix}{unique_filename}"
 
         return s3_key
 
@@ -126,6 +131,7 @@ class S3Uploader:
         file_path: Path,
         metadata: Optional[Dict] = None,
         s3_key: Optional[str] = None,
+        base_directory: Optional[Path] = None,
     ) -> str:
         """Upload file to S3 with retry logic.
         
@@ -133,6 +139,7 @@ class S3Uploader:
             file_path: Path to file to upload
             metadata: Additional metadata to attach
             s3_key: Custom S3 key (generated if not provided)
+            base_directory: Base directory for preserving structure
             
         Returns:
             S3 URI of uploaded object (s3://bucket/key)
@@ -145,7 +152,7 @@ class S3Uploader:
 
         # Generate S3 key if not provided
         if s3_key is None:
-            s3_key = self.generate_s3_key(file_path)
+            s3_key = self.generate_s3_key(file_path, base_directory)
 
         # Get file size
         file_size = file_path.stat().st_size
@@ -266,14 +273,6 @@ class S3Uploader:
                 s3_metadata["file-hash"] = hash_value
                 s3_metadata["hash-algorithm"] = hash_algo
 
-        # Add perceptual hashes if available
-        if "perceptual_hash" in metadata and metadata["perceptual_hash"]:
-            s3_metadata["perceptual-hash"] = str(metadata["perceptual_hash"])
-        if "average_hash" in metadata and metadata["average_hash"]:
-            s3_metadata["average-hash"] = str(metadata["average_hash"])
-        if "difference_hash" in metadata and metadata["difference_hash"]:
-            s3_metadata["difference-hash"] = str(metadata["difference_hash"])
-
         # Add dimensions if available
         if "image_dimensions" in metadata:
             dims = metadata["image_dimensions"]
@@ -299,208 +298,6 @@ class S3Uploader:
                 s3_metadata["skanoteka-source-url"] = str(skanoteka["source_url"])
 
         return s3_metadata
-
-    def object_exists_by_hash(self, file_hash: str) -> Optional[str]:
-        """Check if an object with the given hash already exists in S3.
-        
-        Args:
-            file_hash: SHA256 hash of the file
-            
-        Returns:
-            S3 URI if object exists, None otherwise
-        """
-        try:
-            # List objects with the hash in metadata
-            paginator = self.s3_client.get_paginator('list_objects_v2')
-            pages = paginator.paginate(Bucket=self.bucket, Prefix=self.prefix)
-            
-            for page in pages:
-                if 'Contents' not in page:
-                    continue
-                    
-                for obj in page['Contents']:
-                    # Get object metadata to check hash
-                    try:
-                        response = self.s3_client.head_object(
-                            Bucket=self.bucket,
-                            Key=obj['Key']
-                        )
-                        metadata = response.get('Metadata', {})
-                        object_hash = metadata.get('file-hash', '')
-                        
-                        if object_hash == file_hash:
-                            s3_uri = f"s3://{self.bucket}/{obj['Key']}"
-                            logger.info(
-                                "object_found_by_hash",
-                                hash=file_hash,
-                                s3_uri=s3_uri,
-                            )
-                            return s3_uri
-                    except ClientError:
-                        # Skip objects we can't access
-                        continue
-                        
-            return None
-            
-        except ClientError as e:
-            logger.warning(
-                "hash_check_failed",
-                hash=file_hash,
-                error=str(e),
-            )
-            return None
-
-    def find_duplicate_by_perceptual_hash(
-        self,
-        perceptual_hash: str,
-        similarity_threshold: int = 5,
-    ) -> Optional[Tuple[str, Dict[str, str], int]]:
-        """Find duplicate image by perceptual hash.
-        
-        Args:
-            perceptual_hash: Perceptual hash to search for
-            similarity_threshold: Maximum Hamming distance for duplicates
-            
-        Returns:
-            Tuple of (s3_uri, metadata, distance) if duplicate found, None otherwise
-        """
-        try:
-            import imagehash
-            
-            target_hash = imagehash.hex_to_hash(perceptual_hash)
-            
-            # List objects and check perceptual hashes
-            paginator = self.s3_client.get_paginator('list_objects_v2')
-            pages = paginator.paginate(Bucket=self.bucket, Prefix=self.prefix)
-            
-            best_match = None
-            best_distance = float('inf')
-            best_metadata = {}
-            
-            for page in pages:
-                if 'Contents' not in page:
-                    continue
-                    
-                for obj in page['Contents']:
-                    try:
-                        response = self.s3_client.head_object(
-                            Bucket=self.bucket,
-                            Key=obj['Key']
-                        )
-                        metadata = response.get('Metadata', {})
-                        existing_phash = metadata.get('perceptual-hash', '')
-                        
-                        if existing_phash:
-                            existing_hash = imagehash.hex_to_hash(existing_phash)
-                            distance = target_hash - existing_hash
-                            
-                            if distance <= similarity_threshold and distance < best_distance:
-                                best_match = f"s3://{self.bucket}/{obj['Key']}"
-                                best_distance = distance
-                                best_metadata = metadata
-                                
-                    except ClientError:
-                        continue
-            
-            if best_match:
-                logger.info(
-                    "duplicate_found_by_perceptual_hash",
-                    perceptual_hash=perceptual_hash,
-                    match_uri=best_match,
-                    distance=best_distance,
-                )
-                return best_match, best_metadata, int(best_distance)
-            
-            return None
-            
-        except Exception as e:
-            logger.error(
-                "perceptual_hash_search_failed",
-                perceptual_hash=perceptual_hash,
-                error=str(e),
-                exc_info=True,
-            )
-            return None
-
-    def enrich_metadata(
-        self,
-        s3_uri: str,
-        new_metadata: Dict[str, str],
-        overwrite: bool = False,
-    ) -> bool:
-        """Enrich existing S3 object metadata.
-        
-        Only adds metadata that doesn't already exist (unless overwrite=True).
-        
-        Args:
-            s3_uri: S3 URI of the object (s3://bucket/key)
-            new_metadata: New metadata to add
-            overwrite: If True, overwrite existing metadata
-            
-        Returns:
-            True if metadata was enriched, False otherwise
-        """
-        try:
-            # Parse S3 URI
-            if not s3_uri.startswith("s3://"):
-                logger.error("invalid_s3_uri", uri=s3_uri)
-                return False
-            
-            parts = s3_uri[5:].split("/", 1)
-            if len(parts) != 2:
-                logger.error("invalid_s3_uri_format", uri=s3_uri)
-                return False
-            
-            bucket, key = parts
-            
-            # Get existing metadata
-            response = self.s3_client.head_object(Bucket=bucket, Key=key)
-            existing_metadata = response.get('Metadata', {})
-            
-            # Determine which metadata to add
-            metadata_to_add = {}
-            for k, v in new_metadata.items():
-                if overwrite or k not in existing_metadata or not existing_metadata[k]:
-                    metadata_to_add[k] = v
-            
-            if not metadata_to_add:
-                logger.info(
-                    "no_metadata_enrichment_needed",
-                    s3_uri=s3_uri,
-                )
-                return False
-            
-            # Merge metadata
-            enriched_metadata = {**existing_metadata, **metadata_to_add}
-            
-            # Copy object to itself with new metadata
-            copy_source = {'Bucket': bucket, 'Key': key}
-            self.s3_client.copy_object(
-                CopySource=copy_source,
-                Bucket=bucket,
-                Key=key,
-                Metadata=enriched_metadata,
-                MetadataDirective='REPLACE',
-                ServerSideEncryption=self.server_side_encryption,
-                StorageClass=self.storage_class,
-            )
-            
-            logger.info(
-                "metadata_enriched",
-                s3_uri=s3_uri,
-                added_keys=list(metadata_to_add.keys()),
-            )
-            
-            return True
-            
-        except ClientError as e:
-            logger.error(
-                "metadata_enrichment_failed",
-                s3_uri=s3_uri,
-                error=str(e),
-                exc_info=True,
-            )
-            return False
 
     def verify_bucket_access(self) -> bool:
         """Verify that the S3 bucket is accessible.

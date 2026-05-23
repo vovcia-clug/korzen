@@ -4,7 +4,7 @@
 
 ## 📋 Overview
 
-The Image Upload Microservice serves as the entry point for an automated image processing pipeline. It continuously watches a specified directory for new image files, validates them, uploads to S3, and notifies downstream services (like the OCR microservice) through SQS messages.
+The Image Upload Microservice serves as the entry point for an automated image processing pipeline. It continuously watches a specified directory for new image files, validates them, uploads to S3 with preserved directory structure, and notifies downstream services (like the OCR microservice) through SQS messages.
 
 ### Architecture
 
@@ -37,8 +37,8 @@ The Image Upload Microservice serves as the entry point for an automated image p
 - **🔍 Automatic File Detection**: Real-time monitoring using the `watchdog` library
 - **📂 Recursive Directory Scanning**: Automatically descends into subdirectories to find all images
 - **🚀 Initial Startup Scan**: Processes all existing files on startup, not just new ones
+- **📁 Directory Structure Preservation**: Maintains original directory structure in S3 keys
 - **#️⃣ File Hashing**: SHA-256 hash calculation for every file
-- **🔁 Duplicate Detection**: Checks S3 before upload to avoid re-uploading existing files
 - **✅ Multi-Format Support**: JPEG, PNG, GIF, BMP, TIFF, WebP, and more
 - **🛡️ Robust Validation**: Multi-layer validation (extension, MIME type, image headers)
 - **☁️ AWS S3 Integration**: Efficient uploads with multipart support for large files
@@ -51,8 +51,8 @@ The Image Upload Microservice serves as the entry point for an automated image p
 - **🏛️ Skanoteka Metadata Extraction**: Automatic extraction of genealogical archive metadata from Skanoteka URLs
 
 > **🆕 New in Latest Version**:
-> - Recursive scanning, initial directory scan on startup, file hashing, and S3 duplicate detection. See [RECURSIVE_SCAN_FEATURE.md](RECURSIVE_SCAN_FEATURE.md) for details.
-> - **Skanoteka metadata integration**: Automatically extracts and attaches metadata (place, unit, years, page) from Skanoteka genealogical archives. See [METADATA_INTEGRATION.md](METADATA_INTEGRATION.md) for details.
+> - Simplified service focused on reliable uploads with directory structure preservation
+> - Skanoteka metadata integration for genealogical archives. See [METADATA_INTEGRATION.md](METADATA_INTEGRATION.md) for details.
 
 ## 📦 Prerequisites
 
@@ -162,6 +162,7 @@ The Image Upload Microservice serves as the entry point for an automated image p
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `MAX_CONCURRENT_UPLOADS` | Parallel uploads | `3` |
 | `MAX_RETRIES` | Retry attempts | `3` |
+| `ENABLE_METADATA_EXTRACTION` | Enable Skanoteka metadata | `true` |
 
 See [`.env.example`](.env.example:1) for complete configuration options.
 
@@ -255,7 +256,7 @@ See [`USAGE.md`](USAGE.md:1) for detailed deployment instructions.
 2. The service automatically:
    - Detects the new file
    - Validates it's a valid image
-   - Uploads to S3 with metadata
+   - Uploads to S3 with metadata (preserving directory structure)
    - Sends SQS notification
    - Archives/deletes based on configuration
 
@@ -285,7 +286,7 @@ This service sends SQS messages in the format expected by the [OCR microservice]
 
 ```json
 {
-  "s3_uri": "s3://bucket-name/uploads/2026/05/17/uuid_image.jpg",
+  "s3_uri": "s3://bucket-name/uploads/subdirectory/uuid_image.jpg",
   "metadata": {
     "original_filename": "image.jpg",
     "upload_timestamp": "2026-05-17T23:01:00.123Z",
@@ -328,7 +329,7 @@ Structured JSON logging for easy parsing:
   "level": "INFO",
   "event": "upload_completed",
   "file_path": "/watched-images/scan_001.jpg",
-  "s3_key": "uploads/2026/05/17/uuid_scan_001.jpg",
+  "s3_key": "uploads/subdirectory/uuid_scan_001.jpg",
   "file_size": 2457600,
   "upload_duration_ms": 1234
 }
@@ -469,7 +470,7 @@ Attach this policy to your IAM user or role:
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md:1)** - Detailed technical architecture and design
 - **[`USAGE.md`](USAGE.md:1)** - Step-by-step usage guide and examples
 - **[`METADATA_INTEGRATION.md`](METADATA_INTEGRATION.md:1)** - Skanoteka metadata extraction integration
-- **[`RECURSIVE_SCAN_FEATURE.md`](RECURSIVE_SCAN_FEATURE.md:1)** - Recursive scanning and duplicate detection
+- **[`RECURSIVE_SCAN_FEATURE.md`](RECURSIVE_SCAN_FEATURE.md:1)** - Recursive scanning feature details
 - **[`../ocr-microservice/README.md`](../ocr-microservice/README.md:1)** - Downstream OCR service documentation
 
 ## 🧪 Testing
@@ -600,6 +601,7 @@ image-upload-microservice/
 │   │   ├── image_detector.py        # Image validation
 │   │   ├── s3_uploader.py           # S3 uploads
 │   │   ├── sqs_notifier.py          # SQS notifications
+│   │   ├── metadata_extractor.py    # Skanoteka metadata extraction
 │   │   └── upload_orchestrator.py   # Workflow coordination
 │   └── utils/
 │       └── logger.py                # Logging configuration
@@ -643,6 +645,7 @@ For issues, questions, or feature requests:
 - ✅ Directory monitoring with watchdog
 - ✅ Multi-format image validation
 - ✅ S3 uploads with multipart support
+- ✅ Directory structure preservation in S3 keys
 - ✅ SQS notification publishing
 - ✅ Retry logic with exponential backoff
 - ✅ Docker containerization
@@ -650,6 +653,7 @@ For issues, questions, or feature requests:
 - ✅ Comprehensive configuration
 - ✅ Health checks
 - ✅ Post-upload actions (keep/archive/delete)
+- ✅ Skanoteka metadata extraction
 
 ---
 
