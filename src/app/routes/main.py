@@ -854,8 +854,8 @@ def get_graph_data():
                                     logger.warning(f"Could not parse related source data: {e}")
                             
                             if 'event_type' in props:
-                                node_type = 'Event'
-                                label = f"{props.get('event_type', 'Event')} - {props.get('date', '')}"
+                                # Skip Event nodes (death, baptism events) - we don't want them as separate nodes
+                                continue
                             elif 'first_name' in props or 'last_name' in props:
                                 node_type = 'Person'
                                 label = f"{props.get('first_name', '')} {props.get('last_name', '')}".strip() or 'Unknown'
@@ -863,6 +863,9 @@ def get_graph_data():
                                 node_type = 'Source'
                                 label = props.get('source_name', 'Unknown Source')
                                 source_name = props.get('source_name')
+                            else:
+                                # Skip unknown node types
+                                continue
                             
                             nodes[node_id] = {
                                 'id': node_id,
@@ -871,8 +874,6 @@ def get_graph_data():
                                 'gender': props.get('gender'),
                                 'birth_date': props.get('birth_date'),
                                 'death_date': props.get('death_date'),
-                                'event_type': props.get('event_type'),
-                                'date': props.get('date'),
                                 'place': props.get('place'),
                                 'source': source_name
                             }
@@ -906,6 +907,11 @@ def get_graph_data():
                         from_id = person_props.get('uuid')
                         to_id = related_props.get('uuid')
                         rel_type = relationship.get('label', 'RELATED_TO')
+                        
+                        # Skip edges to Event nodes (BAPTIZED_IN, DIED_IN)
+                        # We only want PARENT_OF, MARRIED_TO, and FROM_SOURCE edges
+                        if rel_type in ['BAPTIZED_IN', 'DIED_IN']:
+                            continue
                         
                         if from_id and to_id:
                             edge = {
@@ -1247,10 +1253,16 @@ def duplicates():
                 'record2': None
             }
             
+            # Track if both records exist (for filtering orphaned candidates)
+            record1_exists = False
+            record2_exists = False
+            
             # Fetch actual records based on type
             if candidate.record_type == 'person':
                 record1 = db.session.get(Person, candidate.record1_id)
                 record2 = db.session.get(Person, candidate.record2_id)
+                record1_exists = record1 is not None
+                record2_exists = record2 is not None
                 if record1:
                     enriched['record1'] = {
                         'id': str(record1.id),
@@ -1275,6 +1287,8 @@ def duplicates():
             elif candidate.record_type == 'baptism':
                 record1 = db.session.get(BaptismRecord, candidate.record1_id)
                 record2 = db.session.get(BaptismRecord, candidate.record2_id)
+                record1_exists = record1 is not None
+                record2_exists = record2 is not None
                 if record1:
                     enriched['record1'] = {
                         'id': str(record1.id),
@@ -1297,6 +1311,8 @@ def duplicates():
             elif candidate.record_type == 'marriage':
                 record1 = db.session.get(MarriageRecord, candidate.record1_id)
                 record2 = db.session.get(MarriageRecord, candidate.record2_id)
+                record1_exists = record1 is not None
+                record2_exists = record2 is not None
                 if record1:
                     enriched['record1'] = {
                         'id': str(record1.id),
@@ -1317,6 +1333,8 @@ def duplicates():
             elif candidate.record_type == 'death':
                 record1 = db.session.get(DeathRecord, candidate.record1_id)
                 record2 = db.session.get(DeathRecord, candidate.record2_id)
+                record1_exists = record1 is not None
+                record2_exists = record2 is not None
                 if record1:
                     enriched['record1'] = {
                         'id': str(record1.id),
@@ -1334,7 +1352,16 @@ def duplicates():
                         'age_years': record2.age_years
                     }
             
-            enriched_candidates.append(enriched)
+            # Only include candidates where both records exist (skip orphaned entries)
+            if record1_exists and record2_exists:
+                enriched_candidates.append(enriched)
+            else:
+                # Log orphaned candidate for debugging
+                logger.warning(
+                    f"Skipping orphaned duplicate candidate {candidate.id}: "
+                    f"record_type={candidate.record_type}, "
+                    f"record1_exists={record1_exists}, record2_exists={record2_exists}"
+                )
         
         # Get statistics
         stats = {

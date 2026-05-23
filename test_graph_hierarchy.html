@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Graph Hierarchy - Kennedy Family</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        pre {
+            background: #fff;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Graph Hierarchy Test - Kennedy Family</h1>
+    <div id="results"></div>
+
+    <script>
+        // Copy the calculateHierarchicalLevels function from graph.js
+        function calculateHierarchicalLevels(nodes, edges) {
+            const nodeMap = new Map();
+            const levels = new Map();
+            const marriages = new Map(); // Track marriage relationships
+            
+            // Build node map
+            nodes.forEach(node => {
+                nodeMap.set(node.id, node);
+            });
+            
+            // Identify marriage relationships and build spouse groups
+            edges.forEach(edge => {
+                if (edge.type === 'MARRIED_TO') {
+                    // Store both directions for easy lookup
+                    if (!marriages.has(edge.from)) {
+                        marriages.set(edge.from, new Set());
+                    }
+                    if (!marriages.has(edge.to)) {
+                        marriages.set(edge.to, new Set());
+                    }
+                    marriages.get(edge.from).add(edge.to);
+                    marriages.get(edge.to).add(edge.from);
+                }
+            });
+            
+            // Build parent-child relationships for easier lookup
+            const childrenMap = new Map(); // parent -> [children]
+            const parentsMap = new Map(); // child -> [parents]
+            
+            edges.forEach(edge => {
+                if (edge.type === 'PARENT_OF') {
+                    // PARENT_OF goes from parent to child
+                    if (!childrenMap.has(edge.from)) {
+                        childrenMap.set(edge.from, []);
+                    }
+                    childrenMap.get(edge.from).push(edge.to);
+                    
+                    if (!parentsMap.has(edge.to)) {
+                        parentsMap.set(edge.to, []);
+                    }
+                    parentsMap.get(edge.to).push(edge.from);
+                }
+            });
+            
+            // Find root nodes (nodes with no parents)
+            const roots = nodes.filter(node => !parentsMap.has(node.id));
+            
+            // Helper function to get all spouses of a person
+            function getAllSpouses(personId) {
+                const spouses = new Set();
+                if (marriages.has(personId)) {
+                    marriages.get(personId).forEach(spouseId => {
+                        spouses.add(spouseId);
+                    });
+                }
+                return Array.from(spouses);
+            }
+            
+            // Helper function to set level for a person and all their spouses
+            function setLevelWithSpouses(personId, targetLevel) {
+                const toProcess = [personId];
+                const processed = new Set();
+                let finalLevel = targetLevel;
+                
+                while (toProcess.length > 0) {
+                    const currentId = toProcess.shift();
+                    
+                    if (processed.has(currentId)) {
+                        continue;
+                    }
+                    
+                    processed.add(currentId);
+                    
+                    // Set or update level
+                    const existingLevel = levels.get(currentId);
+                    if (existingLevel === undefined) {
+                        levels.set(currentId, finalLevel);
+                    } else if (existingLevel !== finalLevel) {
+                        // Conflict: keep minimum level (closer to ancestors)
+                        finalLevel = Math.min(existingLevel, finalLevel);
+                        levels.set(currentId, finalLevel);
+                    }
+                    
+                    // Add all spouses to process at same level
+                    const spouses = getAllSpouses(currentId);
+                    spouses.forEach(spouseId => {
+                        if (!processed.has(spouseId)) {
+                            toProcess.push(spouseId);
+                        }
+                    });
+                }
+                
+                return finalLevel; // Return the final level used
+            }
+            
+            // BFS to assign levels
+            const queue = [];
+            const processed = new Set();
+            
+            // Start with root nodes at level 0
+            roots.forEach(root => {
+                queue.push({ id: root.id, level: 0 });
+            });
+            
+            // If no roots found (circular relationships), start with first node
+            if (queue.length === 0 && nodes.length > 0) {
+                queue.push({ id: nodes[0].id, level: 0 });
+            }
+            
+            while (queue.length > 0) {
+                const { id, level } = queue.shift();
+                
+                // Skip if already processed
+                if (processed.has(id)) {
+                    continue;
+                }
+                
+                // Set level for this person and all spouses
+                const finalLevel = setLevelWithSpouses(id, level);
+                
+                // Mark person as processed
+                processed.add(id);
+                
+                // Mark all spouses as processed
+                const spouses = getAllSpouses(id);
+                spouses.forEach(spouseId => {
+                    processed.add(spouseId);
+                });
+                
+                // Add children to queue at next level
+                // Check children of both the person and their spouses
+                const peopleToCheckChildren = [id, ...spouses];
+                
+                peopleToCheckChildren.forEach(personId => {
+                    if (childrenMap.has(personId)) {
+                        childrenMap.get(personId).forEach(childId => {
+                            if (!processed.has(childId)) {
+                                queue.push({ id: childId, level: finalLevel + 1 });
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Assign levels to any remaining unprocessed nodes (disconnected components)
+            nodes.forEach(node => {
+                if (!levels.has(node.id)) {
+                    levels.set(node.id, 0);
+                }
+            });
+            
+            return levels;
+        }
+
+        // Test data - Kennedy family simplified
+        const testNodes = [
+            // Generation 0 (ancestors)
+            { id: 'patrick', label: 'Patrick Kennedy' },
+            { id: 'bridget', label: 'Bridget Murphy' },
+            
+            // Generation 1
+            { id: 'patrick_j', label: 'Patrick Joseph Kennedy' },
+            { id: 'mary_augusta', label: 'Mary Augusta Hickey' },
+            
+            // Generation 2
+            { id: 'joseph_sr', label: 'Joseph Patrick Kennedy Sr' },
+            { id: 'rose', label: 'Rose Elizabeth Fitzgerald' },
+            
+            // Generation 3 (JFK's generation)
+            { id: 'jfk', label: 'John F. Kennedy' },
+            { id: 'jackie', label: 'Jacqueline Bouvier' },
+            { id: 'robert', label: 'Robert F. Kennedy' },
+            { id: 'ethel', label: 'Ethel Skakel' },
+            { id: 'ted', label: 'Edward Kennedy' },
+            { id: 'joan', label: 'Virginia Joan Bennett' },
+            
+            // Generation 4 (children)
+            { id: 'caroline', label: 'Caroline Kennedy' },
+            { id: 'john_jr', label: 'John F. Kennedy Jr' },
+            { id: 'kathleen_rfk', label: 'Kathleen Kennedy (RFK daughter)' },
+            { id: 'joseph_ii', label: 'Joseph P. Kennedy II' }
+        ];
+
+        const testEdges = [
+            // Generation 0 marriage
+            { from: 'patrick', to: 'bridget', type: 'MARRIED_TO' },
+            
+            // Generation 0 -> 1
+            { from: 'patrick', to: 'patrick_j', type: 'PARENT_OF' },
+            { from: 'bridget', to: 'patrick_j', type: 'PARENT_OF' },
+            
+            // Generation 1 marriage
+            { from: 'patrick_j', to: 'mary_augusta', type: 'MARRIED_TO' },
+            
+            // Generation 1 -> 2
+            { from: 'patrick_j', to: 'joseph_sr', type: 'PARENT_OF' },
+            { from: 'mary_augusta', to: 'joseph_sr', type: 'PARENT_OF' },
+            
+            // Generation 2 marriage
+            { from: 'joseph_sr', to: 'rose', type: 'MARRIED_TO' },
+            
+            // Generation 2 -> 3
+            { from: 'joseph_sr', to: 'jfk', type: 'PARENT_OF' },
+            { from: 'rose', to: 'jfk', type: 'PARENT_OF' },
+            { from: 'joseph_sr', to: 'robert', type: 'PARENT_OF' },
+            { from: 'rose', to: 'robert', type: 'PARENT_OF' },
+            { from: 'joseph_sr', to: 'ted', type: 'PARENT_OF' },
+            { from: 'rose', to: 'ted', type: 'PARENT_OF' },
+            
+            // Generation 3 marriages
+            { from: 'jfk', to: 'jackie', type: 'MARRIED_TO' },
+            { from: 'robert', to: 'ethel', type: 'MARRIED_TO' },
+            { from: 'ted', to: 'joan', type: 'MARRIED_TO' },
+            
+            // Generation 3 -> 4
+            { from: 'jfk', to: 'caroline', type: 'PARENT_OF' },
+            { from: 'jackie', to: 'caroline', type: 'PARENT_OF' },
+            { from: 'jfk', to: 'john_jr', type: 'PARENT_OF' },
+            { from: 'jackie', to: 'john_jr', type: 'PARENT_OF' },
+            { from: 'robert', to: 'kathleen_rfk', type: 'PARENT_OF' },
+            { from: 'ethel', to: 'kathleen_rfk', type: 'PARENT_OF' },
+            { from: 'robert', to: 'joseph_ii', type: 'PARENT_OF' },
+            { from: 'ethel', to: 'joseph_ii', type: 'PARENT_OF' }
+        ];
+
+        // Run the test
+        function runTests() {
+            const resultsDiv = document.getElementById('results');
+            let html = '';
+
+            // Calculate levels
+            const levels = calculateHierarchicalLevels(testNodes, testEdges);
+
+            // Test 1: Check that spouses are at the same level
+            html += '<div class="test-section">';
+            html += '<h2>Test 1: Spouses at Same Level</h2>';
+            
+            const spousePairs = [
+                ['patrick', 'bridget'],
+                ['patrick_j', 'mary_augusta'],
+                ['joseph_sr', 'rose'],
+                ['jfk', 'jackie'],
+                ['robert', 'ethel'],
+                ['ted', 'joan']
+            ];
+
+            let allSpousesPass = true;
+            spousePairs.forEach(([p1, p2]) => {
+                const level1 = levels.get(p1);
+                const level2 = levels.get(p2);
+                const pass = level1 === level2;
+                allSpousesPass = allSpousesPass && pass;
+                
+                const node1 = testNodes.find(n => n.id === p1);
+                const node2 = testNodes.find(n => n.id === p2);
+                
+                html += `<div class="test-result ${pass ? 'pass' : 'fail'}">`;
+                html += `${node1.label} (level ${level1}) and ${node2.label} (level ${level2}): ${pass ? '✓ PASS' : '✗ FAIL'}`;
+                html += '</div>';
+            });
+
+            html += `<div class="test-result ${allSpousesPass ? 'pass' : 'fail'}">`;
+            html += `<strong>Overall: ${allSpousesPass ? '✓ ALL SPOUSE TESTS PASSED' : '✗ SOME SPOUSE TESTS FAILED'}</strong>`;
+            html += '</div>';
+            html += '</div>';
+
+            // Test 2: Check that ancestors are at lower levels than descendants
+            html += '<div class="test-section">';
+            html += '<h2>Test 2: Ancestors at Lower Levels than Descendants</h2>';
+            
+            const generationTests = [
+                { parent: 'patrick', child: 'patrick_j', desc: 'Patrick → Patrick Joseph' },
+                { parent: 'patrick_j', child: 'joseph_sr', desc: 'Patrick Joseph → Joseph Sr' },
+                { parent: 'joseph_sr', child: 'jfk', desc: 'Joseph Sr → JFK' },
+                { parent: 'jfk', child: 'caroline', desc: 'JFK → Caroline' }
+            ];
+
+            let allGenerationPass = true;
+            generationTests.forEach(({ parent, child, desc }) => {
+                const parentLevel = levels.get(parent);
+                const childLevel = levels.get(child);
+                const pass = parentLevel < childLevel;
+                allGenerationPass = allGenerationPass && pass;
+                
+                html += `<div class="test-result ${pass ? 'pass' : 'fail'}">`;
+                html += `${desc}: Parent level ${parentLevel} < Child level ${childLevel}: ${pass ? '✓ PASS' : '✗ FAIL'}`;
+                html += '</div>';
+            });
+
+            html += `<div class="test-result ${allGenerationPass ? 'pass' : 'fail'}">`;
+            html += `<strong>Overall: ${allGenerationPass ? '✓ ALL GENERATION TESTS PASSED' : '✗ SOME GENERATION TESTS FAILED'}</strong>`;
+            html += '</div>';
+            html += '</div>';
+
+            // Display all levels in a table
+            html += '<div class="test-section">';
+            html += '<h2>All Person Levels</h2>';
+            html += '<table>';
+            html += '<tr><th>Level</th><th>Person</th></tr>';
+            
+            // Group by level
+            const levelGroups = new Map();
+            testNodes.forEach(node => {
+                const level = levels.get(node.id);
+                if (!levelGroups.has(level)) {
+                    levelGroups.set(level, []);
+                }
+                levelGroups.get(level).push(node.label);
+            });
+
+            // Sort by level and display
+            const sortedLevels = Array.from(levelGroups.keys()).sort((a, b) => a - b);
+            sortedLevels.forEach(level => {
+                const people = levelGroups.get(level);
+                html += `<tr><td><strong>${level}</strong></td><td>${people.join(', ')}</td></tr>`;
+            });
+            
+            html += '</table>';
+            html += '</div>';
+
+            // Summary
+            html += '<div class="test-section">';
+            html += '<h2>Summary</h2>';
+            const allPass = allSpousesPass && allGenerationPass;
+            html += `<div class="test-result ${allPass ? 'pass' : 'fail'}">`;
+            html += `<strong>${allPass ? '✓ ALL TESTS PASSED' : '✗ SOME TESTS FAILED'}</strong>`;
+            html += '</div>';
+            html += '<div class="info">';
+            html += '<p><strong>Expected behavior:</strong></p>';
+            html += '<ul>';
+            html += '<li>Spouses should be at the same level (horizontal alignment)</li>';
+            html += '<li>Ancestors should be at lower level numbers (0, 1, 2...)</li>';
+            html += '<li>Descendants should be at higher level numbers</li>';
+            html += '<li>Each generation should increment the level by 1</li>';
+            html += '</ul>';
+            html += '</div>';
+            html += '</div>';
+
+            resultsDiv.innerHTML = html;
+        }
+
+        // Run tests on page load
+        runTests();
+    </script>
+</body>
+</html>

@@ -98,6 +98,66 @@ class DuplicateDetector:
         self.embedding_generator = EmbeddingGenerator()
         logger.info(f"DuplicateDetector initialized with threshold={threshold}")
     
+    def _should_skip_person_duplicate_detection(self, person: Person) -> bool:
+        """
+        Determine if a person should be skipped for duplicate detection.
+        
+        Persons with only a single name (first name) and no other identifying
+        information are too generic to reliably detect duplicates. This method
+        identifies such records to prevent false positive matches.
+        
+        A person is skipped if they have:
+        - Only a first name (no last name or maiden name)
+        - No birth date or death date
+        - No birth place, death place, parish, or residence
+        - No parent relationships (father_id or mother_id)
+        
+        This prevents common names like "Jan" or "Maria" without additional
+        context from generating numerous false duplicate candidates.
+        
+        Args:
+            person: Person entity to evaluate
+        
+        Returns:
+            True if duplicate detection should be skipped, False otherwise
+        
+        Example:
+            >>> person = Person(first_name="Jan")  # Only first name, no other data
+            >>> detector._should_skip_person_duplicate_detection(person)
+            True
+            >>>
+            >>> person2 = Person(first_name="Jan", last_name="Kowalski")
+            >>> detector._should_skip_person_duplicate_detection(person2)
+            False
+        """
+        # Check if person has a surname (last name or maiden name)
+        has_surname = bool(person.last_name or person.maiden_name)
+        
+        # Check if person has any date information
+        has_dates = bool(person.birth_date or person.death_date)
+        
+        # Check if person has any location information
+        has_locations = bool(
+            person.birth_place or
+            person.death_place or
+            person.parish or
+            person.residence
+        )
+        
+        # Check if person has parent relationships
+        has_parents = bool(person.father_id or person.mother_id)
+        
+        # Skip if person only has a first name without any other identifying information
+        # This indicates a record that is too generic for reliable duplicate detection
+        if person.first_name and not has_surname and not has_dates and not has_locations and not has_parents:
+            logger.info(
+                f"Skipping duplicate detection for person {person.id}: "
+                f"only has first name '{person.first_name}' without surname or other identifying information"
+            )
+            return True
+        
+        return False
+    
     def detect_person_duplicates(
         self, 
         person: Person, 
@@ -136,6 +196,12 @@ class DuplicateDetector:
             ...     print(f"  Phonetic: {breakdown['phonetic_sim']:.2f}")
         """
         try:
+            # Skip duplicate detection for persons with only a single name
+            # and no other identifying information (too generic for reliable matching)
+            if self._should_skip_person_duplicate_detection(person):
+                logger.info(f"Skipped duplicate detection for person {person.id} (insufficient identifying information)")
+                return []
+            
             # Check if person has embedding
             if person.embedding is None:
                 logger.warning(f"Person {person.id} has no embedding, cannot detect duplicates")

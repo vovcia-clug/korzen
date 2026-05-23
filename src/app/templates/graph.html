@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+H{% extends "base.html" %}
 
 {% block title %}{{ _('Family Tree Visualizer') }} - Korzen{% endblock %}
 
@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/graph.css') }}">
 {% endblock %}
 
-{% block extra_head %}
+{% block head_extra %}
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
 {% endblock %}
@@ -25,26 +25,9 @@
     <button class="btn-primary" id="resetBtn" onclick="resetView()">{{ _('Reset View') }}</button>
     <button class="btn-primary" id="clearRootBtn" onclick="clearRoot()" style="display: none;">{{ _('Clear Ancestor') }}</button>
     <div class="control-group">
-        <label>{{ _('View Mode') }}:</label>
-        <div class="mode-toggle">
-            <button class="btn-mode active" id="modeHierarchical" onclick="switchMode('hierarchical')">
-                📊 {{ _('Tree View') }}
-            </button>
-            <button class="btn-mode" id="modeClusters" onclick="switchMode('clusters')">
-                🌐 {{ _('Family Clusters') }}
-            </button>
-        </div>
-    </div>
-    <div class="control-group" id="treeOptions" style="display: none;">
         <label>
-            <input type="checkbox" id="hideFatherEdgesTree" checked onchange="toggleFatherEdgesTree()">
-            {{ _('Hide father-to-child edges') }}
-        </label>
-    </div>
-    <div class="control-group" id="clusterOptions" style="display: none;">
-        <label>
-            <input type="checkbox" id="hideFatherEdges" checked onchange="toggleFatherEdges()">
-            {{ _('Hide father-to-child edges') }}
+            <input type="checkbox" id="hideSourceEdges" checked onchange="toggleSourceEdges()">
+            {{ _('Hide edges to source records') }}
         </label>
     </div>
     <div class="stats">
@@ -92,8 +75,30 @@
             <div style="width: 30px; height: 3px; background: #c2185b; margin-right: 10px;"></div>
             <span>{{ _('Marriage 💑 (grouped together)') }}</span>
         </div>
+        <div class="legend-item">
+            <div style="width: 30px; height: 3px; background: #ff9800; margin-right: 10px;"></div>
+            <span>{{ _('Source Record') }}</span>
+        </div>
     </div>
 </div>
 
+<script>
+// Pass translations to JavaScript
+window.graphTranslations = {
+    born: "{{ _('Born') }}",
+    died: "{{ _('Died') }}",
+    place: "{{ _('Place') }}",
+    occupation: "{{ _('Occupation') }}",
+    source: "{{ _('Source') }}",
+    doubleClickToSetAsAncestor: "{{ _('Double-click to set as ancestor') }}",
+    gender: "{{ _('Gender') }}",
+    birthDate: "{{ _('Birth Date') }}",
+    deathDate: "{{ _('Death Date') }}",
+    birthPlace: "{{ _('Birth Place') }}",
+    relationships: "{{ _('Relationships') }}",
+    loadingGraphData: "{{ _('Loading graph data') }}",
+    errorLoadingGraph: "{{ _('Error loading graph') }}"
+};
+</script>
 <script src="{{ url_for('static', filename='js/graph.js') }}"></script>
 {% endblock %}
