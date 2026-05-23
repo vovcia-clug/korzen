@@ -243,11 +243,11 @@ AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 
 # S3 Configuration
-AWS_S3_BUCKET=my-church-records-images
-S3_PREFIX=uploads/
+S3_INPUT_BUCKET=my-church-records-images
+S3_INPUT_PREFIX=uploads/
 
 # SQS Configuration
-AWS_SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/123456789012/ocr-processing-queue
+IMAGE_UPLOAD_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/123456789012/image-upload-queue
 
 # Directory Configuration
 WATCH_DIRECTORY=/app/watched-images
@@ -767,8 +767,8 @@ echo "Processing rate: ${RATE} files/second"
 **Setup:**
 ```bash
 # .env configuration
-AWS_S3_BUCKET=church-records-archive
-S3_PREFIX=historical-documents/
+S3_INPUT_BUCKET=church-records-archive
+S3_INPUT_PREFIX=historical-documents/
 WATCH_DIRECTORY=/app/watched-images
 WATCH_RECURSIVE=true
 POST_UPLOAD_ACTION=archive
@@ -816,8 +816,8 @@ MIN_IMAGE_SIZE_BYTES=102400  # 100KB minimum (avoid incomplete scans)
 **Setup:**
 ```bash
 # .env configuration
-AWS_S3_BUCKET=migration-bucket
-S3_PREFIX=legacy-records/
+S3_INPUT_BUCKET=migration-bucket
+S3_INPUT_PREFIX=legacy-records/
 POST_UPLOAD_ACTION=archive
 MAX_CONCURRENT_UPLOADS=10  # Higher parallelism for batch
 LOG_LEVEL=INFO
@@ -1019,11 +1019,11 @@ Save as `ecs-task-definition.json`:
     ],
     "secrets": [
       {
-        "name": "AWS_S3_BUCKET",
+        "name": "S3_INPUT_BUCKET",
         "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT:secret:image-upload/s3-bucket"
       },
       {
-        "name": "AWS_SQS_QUEUE_URL",
+        "name": "IMAGE_UPLOAD_QUEUE_URL",
         "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT:secret:image-upload/sqs-queue-url"
       }
     ],

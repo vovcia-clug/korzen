@@ -18,15 +18,17 @@ Skanoteka (https://skanoteka.genealodzy.pl) is a Polish genealogical archive con
 ### Components Added
 
 1. **MetadataExtractor Service** (`src/services/metadata_extractor.py`)
-   - Extracts metadata from Skanoteka URLs
-   - Supports companion metadata files (.txt, .url)
-   - Validates Skanoteka URLs
+   - Extracts metadata from companion JSON files created by the scraper
+   - Supports only `.json` metadata files (scraped metadata)
+   - No network requests needed - metadata already extracted by scraper
+   - Validates JSON contains expected Skanoteka fields
    - Handles extraction errors gracefully
 
 2. **Modified UploadOrchestrator** (`src/services/upload_orchestrator.py`)
    - Integrates metadata extraction into upload workflow
    - Adds metadata extraction statistics
    - Configurable via `enable_metadata_extraction` parameter
+   - Handles companion JSON files during post-upload actions (archive/delete)
 
 3. **Enhanced S3Uploader** (`src/services/s3_uploader.py`)
    - Stores Skanoteka metadata as S3 object metadata
@@ -45,14 +47,13 @@ Skanoteka (https://skanoteka.genealodzy.pl) is a Polish genealogical archive con
 │                                                                       │
 │  1. Image File Detected                                              │
 │     └─> image.jpg                                                    │
-│         └─> image.txt (companion file with Skanoteka URL)           │
+│         └─> image.json (companion file with scraped metadata)       │
 │                                                                       │
 │  2. MetadataExtractor                                                │
-│     ├─> Read companion file                                          │
-│     ├─> Extract Skanoteka URL                                        │
-│     ├─> Fetch page from Skanoteka                                    │
-│     ├─> Parse sidebar metadata                                       │
-│     └─> Return: {place, unit, years, page, source_url}             │
+│     ├─> Check for companion .json file                              │
+│     │   └─> If found: Parse JSON directly (no network request)      │
+│     │   └─> If not found: No metadata extracted                     │
+│     └─> Return: {place, unit, years, page}                          │
 │                                                                       │
 │  3. UploadOrchestrator                                               │
 │     ├─> Validate image                                               │

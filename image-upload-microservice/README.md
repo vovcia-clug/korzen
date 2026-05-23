@@ -49,10 +49,12 @@ The Image Upload Microservice serves as the entry point for an automated image p
 - **🐳 Docker Ready**: Full containerization with Docker and Docker Compose
 - **⚙️ Highly Configurable**: Comprehensive environment-based configuration
 - **🏛️ Skanoteka Metadata Extraction**: Automatic extraction of genealogical archive metadata from Skanoteka URLs
+- **📄 JSON Metadata Support**: Direct parsing of JSON metadata files created by the scraper (no network requests needed)
 
 > **🆕 New in Latest Version**:
 > - Simplified service focused on reliable uploads with directory structure preservation
 > - Skanoteka metadata integration for genealogical archives. See [METADATA_INTEGRATION.md](METADATA_INTEGRATION.md) for details.
+> - **JSON metadata file support** for scraper integration. See [JSON_METADATA_SUPPORT.md](JSON_METADATA_SUPPORT.md) for details.
 
 ## 📦 Prerequisites
 
@@ -138,8 +140,8 @@ The Image Upload Microservice serves as the entry point for an automated image p
 | `AWS_REGION` | AWS region for S3/SQS | `us-east-1` |
 | `AWS_ACCESS_KEY_ID` | AWS access key† | `AKIAIOSFODNN7EXAMPLE` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key† | `wJalrXUtnFEMI/K7MDENG/...` |
-| `AWS_S3_BUCKET` | Target S3 bucket | `my-images-bucket` |
-| `AWS_SQS_QUEUE_URL` | SQS queue URL | `https://sqs.us-east-1.amazonaws.com/...` |
+| `S3_INPUT_BUCKET` | Target S3 bucket | `my-images-bucket` |
+| `IMAGE_UPLOAD_QUEUE_URL` | SQS queue URL | `https://sqs.us-east-1.amazonaws.com/...` |
 | `WATCH_DIRECTORY` | Directory to monitor | `/app/watched-images` |
 
 **†** Optional when using IAM roles (recommended for ECS/EC2)
@@ -148,7 +150,7 @@ The Image Upload Microservice serves as the entry point for an automated image p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `S3_PREFIX` | S3 object key prefix | `uploads/` |
+| `S3_INPUT_PREFIX` | S3 object key prefix | `uploads/` |
 | `S3_SERVER_SIDE_ENCRYPTION` | Encryption algorithm | `AES256` |
 | `S3_STORAGE_CLASS` | S3 storage class | `STANDARD` |
 | `MULTIPART_THRESHOLD_MB` | Multipart upload threshold | `5` |
@@ -438,7 +440,7 @@ Attach this policy to your IAM user or role:
 **Problem**: Files upload successfully but no SQS messages
 
 **Solutions**:
-- Verify `AWS_SQS_QUEUE_URL` is correct
+- Verify `IMAGE_UPLOAD_QUEUE_URL` is correct
 - Check IAM permissions for SQS SendMessage
 - Verify queue exists and is accessible
 - Check for errors in logs around `notification_sent`
@@ -465,12 +467,33 @@ Attach this policy to your IAM user or role:
 | `QueueDoesNotExist` | Invalid queue URL | Fix SQS queue URL |
 | `File too large` | Exceeds max size | Reduce file size or increase limit |
 
+## 🔧 Message Recovery
+
+If SQS messages were lost due to queue issues, network failures, or service crashes, use the recovery script to rescan S3 and resend messages:
+
+```bash
+# Quick start - dry run first
+python recover_lost_messages.py --dry-run --limit 10
+
+# Send messages for specific date
+python recover_lost_messages.py --start-date 2026-05-22 --end-date 2026-05-22
+
+# Full recovery
+python recover_lost_messages.py
+```
+
+**Documentation**:
+- **[`RECOVERY_QUICKSTART.md`](RECOVERY_QUICKSTART.md:1)** - Quick start guide for message recovery
+- **[`RECOVERY_SCRIPT.md`](RECOVERY_SCRIPT.md:1)** - Complete recovery script documentation
+
 ## 📚 Additional Documentation
 
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md:1)** - Detailed technical architecture and design
 - **[`USAGE.md`](USAGE.md:1)** - Step-by-step usage guide and examples
 - **[`METADATA_INTEGRATION.md`](METADATA_INTEGRATION.md:1)** - Skanoteka metadata extraction integration
 - **[`RECURSIVE_SCAN_FEATURE.md`](RECURSIVE_SCAN_FEATURE.md:1)** - Recursive scanning feature details
+- **[`RECOVERY_QUICKSTART.md`](RECOVERY_QUICKSTART.md:1)** - Message recovery quick start
+- **[`RECOVERY_SCRIPT.md`](RECOVERY_SCRIPT.md:1)** - Message recovery detailed guide
 - **[`../ocr-microservice/README.md`](../ocr-microservice/README.md:1)** - Downstream OCR service documentation
 
 ## 🧪 Testing

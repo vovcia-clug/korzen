@@ -72,7 +72,7 @@ def verify_aws_connectivity(config: Config, s3_uploader: S3Uploader, sqs_notifie
     if not s3_uploader.verify_bucket_access():
         logger.error(
             "s3_bucket_not_accessible",
-            bucket=config.s3_bucket,
+            bucket=config.s3_input_bucket,
         )
         return False
 
@@ -80,7 +80,7 @@ def verify_aws_connectivity(config: Config, s3_uploader: S3Uploader, sqs_notifie
     if not sqs_notifier.verify_queue_access():
         logger.error(
             "sqs_queue_not_accessible",
-            queue_url=config.sqs_queue_url,
+            queue_url=config.image_upload_queue_url,
         )
         return False
 
@@ -176,7 +176,7 @@ def main() -> None:
         "service_starting",
         version="1.0.0",
         watch_directory=str(config.watch_directory),
-        s3_bucket=config.s3_bucket,
+        s3_bucket=config.s3_input_bucket,
         post_upload_action=config.post_upload_action,
     )
 
@@ -198,8 +198,8 @@ def main() -> None:
 
         # S3 uploader
         s3_uploader = S3Uploader(
-            bucket=config.s3_bucket,
-            prefix=config.s3_prefix,
+            bucket=config.s3_input_bucket,
+            prefix=config.s3_input_prefix,
             region=config.aws_region,
             server_side_encryption=config.s3_server_side_encryption,
             storage_class=config.s3_storage_class,
@@ -211,7 +211,7 @@ def main() -> None:
 
         # SQS notifier
         sqs_notifier = SQSNotifier(
-            queue_url=config.sqs_queue_url,
+            queue_url=config.image_upload_queue_url,
             region=config.aws_region,
             batch_size=config.sqs_batch_size,
             max_retries=config.max_retries,
@@ -231,7 +231,7 @@ def main() -> None:
             sqs_notifier=sqs_notifier,
             post_upload_action=config.post_upload_action,
             archive_directory=config.archive_directory,
-            enable_metadata_extraction=config.enable_metadata_extraction,
+            base_directory=config.watch_directory,
         )
 
         # Directory watcher

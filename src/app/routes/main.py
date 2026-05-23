@@ -11,7 +11,6 @@ from ..extensions import db
 from ..models import UploadedFile, Person, BaptismRecord, MarriageRecord, DeathRecord, SocialStatus, DuplicateCandidate, DuplicateResolution
 from ..gedcom_parser import GedcomParser
 from ..services.age_graph_importer import AgeGraphImporter
-from ..langfuse_config import trace_request, trace_function
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,6 @@ def get_sort_column(model, sort_by, default_column):
 
 
 @bp.route("/")
-@trace_request(trace_name="index-page", capture_output=False)
 def index():
     """Main page with upload form."""
     try:
@@ -84,7 +82,6 @@ def index():
 
 
 @bp.route("/upload", methods=["POST"])
-@trace_request(trace_name="upload-gedcom-file")
 def upload_file():
     """Handle GEDCOM file upload and automatic parsing."""
     if "file" not in request.files:
@@ -168,7 +165,6 @@ def upload_file():
 
 
 @bp.route("/parse/<file_id>", methods=["POST"])
-@trace_request(trace_name="parse-gedcom")
 def parse_gedcom(file_id):
     """Parse an uploaded GEDCOM file and import data into the database."""
     try:
@@ -252,7 +248,6 @@ def list_uploaded_files():
 
 
 @bp.route("/persons")
-@trace_request(trace_name="list-persons", capture_output=False)
 def list_persons():
     """Display list of all persons in the database."""
     try:
@@ -309,7 +304,6 @@ def list_persons():
 
 
 @bp.route("/api/persons", methods=["GET"])
-@trace_request(trace_name="api-list-persons")
 def api_list_persons():
     """API endpoint to get list of all persons with their details."""
     try:
@@ -387,7 +381,6 @@ def api_list_persons():
 
 
 @bp.route("/api/persons/<person_id>/details", methods=["GET"])
-@trace_request(trace_name="get-person-details")
 def get_person_details(person_id):
     """
     API endpoint to fetch complete person details with all relationships.
@@ -718,14 +711,12 @@ def reset_database():
 
 
 @bp.route("/graph")
-@trace_request(trace_name="graph-page", capture_output=False)
 def graph():
     """Display the graph visualizer page."""
     return render_template("graph.html")
 
 
 @bp.route("/api/graph/data", methods=["GET"])
-@trace_request(trace_name="get-graph-data")
 def get_graph_data():
     """
     API endpoint to fetch graph data for family tree visualization.
@@ -1204,7 +1195,6 @@ def api_list_deaths():
 
 
 @bp.route("/duplicates")
-@trace_request(trace_name="duplicates-page", capture_output=False)
 def duplicates():
     """View duplicate candidates for review."""
     try:
@@ -1419,7 +1409,6 @@ def duplicates():
 
 
 @bp.route("/api/duplicates/<candidate_id>/review", methods=["POST"])
-@trace_request(trace_name="review-duplicate")
 def review_duplicate(candidate_id):
     """Review a duplicate candidate (confirm or reject)."""
     try:

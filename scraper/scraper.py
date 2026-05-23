@@ -13,7 +13,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
 # --- CONFIGURATION ---
-COLLECTION_URL = "https://skanoteka.genealodzy.pl/id5545"
+COLLECTION_URL = "https://metryki.genealodzy.pl/id1784"
 BASE_URL = "https://skanoteka.genealodzy.pl"
 DOWNLOAD_FOLDER = "/app/watched-images"
 MAX_IMAGES_PER_UNIT = 1000  # Maximum images to download per unit

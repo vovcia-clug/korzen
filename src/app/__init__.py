@@ -18,7 +18,6 @@ from .models import (
 )
 from .routes import health, main
 from .services.age_initializer import initialize_age_database
-from .langfuse_config import init_langfuse
 
 
 def initialize_pgvector_extension(app):
@@ -88,9 +87,6 @@ def create_app() -> Flask:
     
     app = Flask(__name__)
     app.config.from_object(Config)
-
-    # Initialize Langfuse tracing (must be done after config is loaded)
-    init_langfuse(app)
 
     db.init_app(app)
     

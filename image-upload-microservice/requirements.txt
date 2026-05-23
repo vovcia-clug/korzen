@@ -22,9 +22,3 @@ pydantic-settings>=2.0.0
 
 # Environment variable management
 python-dotenv>=1.0.0
-
-# HTTP requests for metadata extraction
-requests>=2.31.0
-
-# HTML parsing for metadata extraction
-beautifulsoup4>=4.12.0

@@ -43,11 +43,11 @@ class Config(BaseModel):
     )
 
     # === S3 Configuration ===
-    s3_bucket: str = Field(
+    s3_input_bucket: str = Field(
         description="Target S3 bucket name"
     )
-    s3_prefix: str = Field(
-        default="uploads/",
+    s3_input_prefix: str = Field(
+        default="",
         description="Object key prefix"
     )
     s3_server_side_encryption: str = Field(
@@ -66,7 +66,7 @@ class Config(BaseModel):
     )
 
     # === SQS Configuration ===
-    sqs_queue_url: str = Field(
+    image_upload_queue_url: str = Field(
         description="Target SQS queue URL"
     )
     sqs_batch_size: int = Field(
@@ -144,12 +144,6 @@ class Config(BaseModel):
         description="Maximum backoff delay"
     )
 
-    # === Metadata Extraction Configuration ===
-    enable_metadata_extraction: bool = Field(
-        default=True,
-        description="Enable Skanoteka metadata extraction"
-    )
-
     model_config = {"arbitrary_types_allowed": True}
 
     @field_validator("watch_directory", mode="before")
@@ -222,14 +216,14 @@ class Config(BaseModel):
             aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
             
             # S3 Configuration
-            s3_bucket=os.getenv("AWS_S3_BUCKET", os.getenv("S3_BUCKET", "")),
-            s3_prefix=os.getenv("S3_PREFIX", "uploads/"),
+            s3_input_bucket=os.getenv("S3_INPUT_BUCKET", ""),
+            s3_input_prefix=os.getenv("S3_INPUT_PREFIX", ""),
             s3_server_side_encryption=os.getenv("S3_SERVER_SIDE_ENCRYPTION", "AES256"),
             s3_storage_class=os.getenv("S3_STORAGE_CLASS", "STANDARD"),
             multipart_threshold_mb=int(os.getenv("MULTIPART_THRESHOLD_MB", "5")),
             
             # SQS Configuration
-            sqs_queue_url=os.getenv("AWS_SQS_QUEUE_URL", os.getenv("SQS_QUEUE_URL", "")),
+            image_upload_queue_url=os.getenv("IMAGE_UPLOAD_QUEUE_URL", ""),
             sqs_batch_size=int(os.getenv("SQS_BATCH_SIZE", "10")),
             
             # Image Detection
@@ -254,7 +248,4 @@ class Config(BaseModel):
             max_retries=int(os.getenv("MAX_RETRIES", "3")),
             retry_backoff_base=float(os.getenv("RETRY_BACKOFF_BASE", "2.0")),
             retry_backoff_max=float(os.getenv("RETRY_BACKOFF_MAX", "60.0")),
-            
-            # Metadata Extraction Configuration
-            enable_metadata_extraction=os.getenv("ENABLE_METADATA_EXTRACTION", "true").lower() == "true",
         )

@@ -6,6 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: image-upload-microservice
+    env_file:
+      - .env
     restart: unless-stopped
     
     environment:
@@ -15,14 +17,14 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       
       # S3 Configuration
-      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
-      - S3_PREFIX=${S3_PREFIX:-skanoteka/}
+      - S3_INPUT_BUCKET=${S3_INPUT_BUCKET}
+      - S3_INPUT_PREFIX=${S3_INPUT_PREFIX:-skanoteka/}
       - S3_SERVER_SIDE_ENCRYPTION=${S3_SERVER_SIDE_ENCRYPTION:-AES256}
       - S3_STORAGE_CLASS=${S3_STORAGE_CLASS:-STANDARD}
       - MULTIPART_THRESHOLD_MB=${MULTIPART_THRESHOLD_MB:-5}
       
       # SQS Configuration
-      - AWS_SQS_QUEUE_URL=${AWS_SQS_QUEUE_URL}
+      - IMAGE_UPLOAD_QUEUE_URL=${IMAGE_UPLOAD_QUEUE_URL}
       - SQS_BATCH_SIZE=${SQS_BATCH_SIZE:-10}
       
       # Directory Watching

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  ocr-image-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ocr-image-service
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      # Mount source code for development (optional)
+      - ./src:/app/src
+      # Mount temp directory
+      - ocr-temp:/tmp/ocr-processing
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Health check (optional)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  ocr-temp:
+    driver: local

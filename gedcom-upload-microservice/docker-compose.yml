@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  gedcom-upload:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gedcom-upload-microservice
+    env_file:
+      - .env
+    environment:
+      # Override with Docker-specific settings if needed
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - TEMP_DIR=/tmp/gedcom-upload
+    volumes:
+      # Mount source code for development (comment out for production)
+      - ./src:/app/src
+      # Mount temp directory
+      - gedcom-upload-temp:/tmp/gedcom-upload
+    restart: unless-stopped
+    networks:
+      - gedcom-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  gedcom-upload-temp:
+    driver: local
+
+networks:
+  gedcom-network:
+    driver: bridge

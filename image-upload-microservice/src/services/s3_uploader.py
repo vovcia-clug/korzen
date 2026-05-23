@@ -4,7 +4,6 @@ This module handles uploading image files to AWS S3 with multipart support,
 metadata attachment, and retry logic. Uploads preserve the original directory structure.
 """
 
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
@@ -34,7 +33,7 @@ class S3Uploader:
     def __init__(
         self,
         bucket: str,
-        prefix: str = "uploads/",
+        prefix: str = "",
         region: str = "us-east-1",
         server_side_encryption: str = "AES256",
         storage_class: str = "STANDARD",
@@ -47,7 +46,7 @@ class S3Uploader:
         
         Args:
             bucket: Target S3 bucket name
-            prefix: Object key prefix (default: "uploads/")
+            prefix: Object key prefix (default: "")
             region: AWS region
             server_side_encryption: Encryption algorithm (AES256, aws:kms)
             storage_class: S3 storage class
@@ -57,7 +56,8 @@ class S3Uploader:
             aws_secret_access_key: AWS secret key (optional if using IAM roles)
         """
         self.bucket = bucket
-        self.prefix = prefix.rstrip("/") + "/" if prefix else ""
+        # Only add trailing slash if prefix is not empty
+        self.prefix = (prefix.rstrip("/") + "/") if prefix else ""
         self.server_side_encryption = server_side_encryption
         self.storage_class = storage_class
         self.multipart_threshold_bytes = multipart_threshold_mb * 1024 * 1024
@@ -87,7 +87,7 @@ class S3Uploader:
         )
 
     def generate_s3_key(self, file_path: Path, base_directory: Optional[Path] = None) -> str:
-        """Generate S3 object key for file, preserving directory structure.
+        """Generate S3 object key for file, preserving original filename and directory structure.
         
         Args:
             file_path: Path to the file
@@ -96,27 +96,19 @@ class S3Uploader:
         Returns:
             S3 object key
         """
-        # Generate unique filename (UUID + original extension)
-        unique_id = str(uuid.uuid4())
-        file_extension = file_path.suffix
-        unique_filename = f"{unique_id}{file_extension}"
-
         # Preserve directory structure if base_directory is provided
         if base_directory:
             try:
-                # Get relative path from base directory
+                # Get relative path from base directory (includes filename)
                 relative_path = file_path.relative_to(base_directory)
-                # Use parent directory structure
-                if relative_path.parent != Path('.'):
-                    s3_key = f"{self.prefix}{relative_path.parent}/{unique_filename}"
-                else:
-                    s3_key = f"{self.prefix}{unique_filename}"
+                # Preserve complete path including original filename
+                s3_key = f"{self.prefix}{relative_path}"
             except ValueError:
-                # File is not relative to base_directory, use simple structure
-                s3_key = f"{self.prefix}{unique_filename}"
+                # File is not relative to base_directory, use just the filename
+                s3_key = f"{self.prefix}{file_path.name}"
         else:
-            # No base directory specified, use simple structure
-            s3_key = f"{self.prefix}{unique_filename}"
+            # No base directory specified, use just the filename
+            s3_key = f"{self.prefix}{file_path.name}"
 
         return s3_key
 
@@ -226,6 +218,107 @@ class S3Uploader:
             )
             raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=60),
+        retry=retry_if_exception_type((ClientError, ConnectionError)),
+        reraise=True,
+    )
+    def upload_json_file(
+        self,
+        json_file_path: Path,
+        image_s3_key: str,
+    ) -> str:
+        """Upload companion JSON metadata file to S3.
+        
+        The JSON file is uploaded to the same location as the image file,
+        with the same key but .json extension.
+        
+        Args:
+            json_file_path: Path to JSON file to upload
+            image_s3_key: S3 key of the associated image file
+            
+        Returns:
+            S3 URI of uploaded JSON file (s3://bucket/key)
+            
+        Raises:
+            ClientError: If upload fails after retries
+        """
+        if not json_file_path.exists():
+            raise FileNotFoundError(f"JSON file not found: {json_file_path}")
+
+        # Generate JSON S3 key based on image key
+        # Replace image extension with .json
+        json_s3_key = str(Path(image_s3_key).with_suffix(".json"))
+
+        # Get file size
+        file_size = json_file_path.stat().st_size
+
+        logger.info(
+            "json_upload_started",
+            json_file=str(json_file_path),
+            json_s3_key=json_s3_key,
+            image_s3_key=image_s3_key,
+            file_size=file_size,
+        )
+
+        try:
+            # Prepare upload parameters for JSON
+            extra_args = {
+                "Metadata": {
+                    "original-filename": json_file_path.name,
+                    "upload-timestamp": datetime.now(timezone.utc).isoformat(),
+                    "upload-service": "image-upload-microservice",
+                    "associated-image-key": image_s3_key,
+                },
+                "ContentType": "application/json",
+                "ServerSideEncryption": self.server_side_encryption,
+                "StorageClass": self.storage_class,
+            }
+
+            # Upload JSON file
+            with open(json_file_path, "rb") as f:
+                self.s3_client.put_object(
+                    Bucket=self.bucket,
+                    Key=json_s3_key,
+                    Body=f,
+                    **extra_args,
+                )
+
+            json_s3_uri = f"s3://{self.bucket}/{json_s3_key}"
+
+            logger.info(
+                "json_upload_completed",
+                json_file=str(json_file_path),
+                json_s3_uri=json_s3_uri,
+                image_s3_key=image_s3_key,
+                file_size=file_size,
+            )
+
+            return json_s3_uri
+
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            logger.error(
+                "json_upload_failed",
+                json_file=str(json_file_path),
+                json_s3_key=json_s3_key,
+                error_code=error_code,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
+        except Exception as e:
+            logger.error(
+                "json_upload_error",
+                json_file=str(json_file_path),
+                json_s3_key=json_s3_key,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
     def _upload_with_multipart(
         self,
         file_path: Path,
@@ -283,19 +376,9 @@ class S3Uploader:
         if "image_format" in metadata:
             s3_metadata["image-format"] = str(metadata["image_format"])
         
-        # Add Skanoteka metadata if available
-        if "skanoteka" in metadata and isinstance(metadata["skanoteka"], dict):
-            skanoteka = metadata["skanoteka"]
-            if skanoteka.get("place"):
-                s3_metadata["skanoteka-place"] = str(skanoteka["place"])
-            if skanoteka.get("unit"):
-                s3_metadata["skanoteka-unit"] = str(skanoteka["unit"])
-            if skanoteka.get("years"):
-                s3_metadata["skanoteka-years"] = str(skanoteka["years"])
-            if skanoteka.get("page"):
-                s3_metadata["skanoteka-page"] = str(skanoteka["page"])
-            if skanoteka.get("source_url"):
-                s3_metadata["skanoteka-source-url"] = str(skanoteka["source_url"])
+        # Add JSON metadata S3 URI if available
+        if "json_metadata_s3_uri" in metadata:
+            s3_metadata["json-metadata-uri"] = str(metadata["json_metadata_s3_uri"])
 
         return s3_metadata
 

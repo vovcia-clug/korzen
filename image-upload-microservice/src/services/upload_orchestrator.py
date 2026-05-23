@@ -13,7 +13,7 @@ from typing import Dict, Optional
 from .image_detector import ImageDetector
 from .s3_uploader import S3Uploader
 from .sqs_notifier import SQSNotifier
-from .metadata_extractor import MetadataExtractor
+from .metadata_extractor import MetadataHandler
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -49,7 +49,7 @@ class UploadOrchestrator:
         sqs_notifier: SQSNotifier,
         post_upload_action: str = "keep",
         archive_directory: Optional[Path] = None,
-        enable_metadata_extraction: bool = True,
+        base_directory: Optional[Path] = None,
     ):
         """Initialize the upload orchestrator.
         
@@ -59,17 +59,17 @@ class UploadOrchestrator:
             sqs_notifier: SQS notification service
             post_upload_action: Action after upload (keep/archive/delete)
             archive_directory: Directory for archived files (required for archive action)
-            enable_metadata_extraction: Enable Skanoteka metadata extraction
+            base_directory: Base directory for preserving directory structure in S3
         """
         self.image_detector = image_detector
         self.s3_uploader = s3_uploader
         self.sqs_notifier = sqs_notifier
         self.post_upload_action = PostUploadAction(post_upload_action)
         self.archive_directory = archive_directory
+        self.base_directory = base_directory
         
-        # Initialize metadata extractor if enabled
-        self.metadata_extractor = MetadataExtractor() if enable_metadata_extraction else None
-        self.enable_metadata_extraction = enable_metadata_extraction
+        # Initialize metadata handler
+        self.metadata_handler = MetadataHandler()
 
         # Statistics
         self.stats = {
@@ -79,14 +79,14 @@ class UploadOrchestrator:
             "validation_failures": 0,
             "upload_failures": 0,
             "notification_failures": 0,
-            "metadata_extracted": 0,
+            "json_files_uploaded": 0,
         }
 
         logger.info(
             "upload_orchestrator_initialized",
             post_upload_action=post_upload_action,
             archive_directory=str(archive_directory) if archive_directory else None,
-            metadata_extraction_enabled=enable_metadata_extraction,
+            base_directory=str(base_directory) if base_directory else None,
         )
 
     def process_file(self, file_path: Path) -> bool:
@@ -125,22 +125,7 @@ class UploadOrchestrator:
                 self._handle_failed_file(file_path, reason, status)
                 return False
             
-            # Stage 2: Extract Skanoteka metadata if enabled
-            if self.enable_metadata_extraction and self.metadata_extractor:
-                skanoteka_metadata = self.metadata_extractor.extract_metadata_from_filename(file_path)
-                if skanoteka_metadata and "error" not in skanoteka_metadata:
-                    # Merge Skanoteka metadata into existing metadata
-                    metadata["skanoteka"] = skanoteka_metadata
-                    self.stats["metadata_extracted"] += 1
-                    logger.info(
-                        "skanoteka_metadata_extracted",
-                        file=str(file_path),
-                        place=skanoteka_metadata.get("place"),
-                        unit=skanoteka_metadata.get("unit"),
-                        years=skanoteka_metadata.get("years"),
-                    )
-
-            # Stage 3: Upload to S3
+            # Stage 2: Upload image to S3
             status = UploadStatus.UPLOADING
             logger.info(
                 "file_upload_starting",
@@ -151,16 +136,47 @@ class UploadOrchestrator:
             s3_uri = self.s3_uploader.upload_file(
                 file_path=file_path,
                 metadata=metadata,
+                base_directory=self.base_directory,
             )
 
             logger.info(
-                "file_uploaded",
+                "image_uploaded",
                 file=str(file_path),
                 s3_uri=s3_uri,
             )
+            
+            # Stage 3: Upload companion JSON file if it exists
+            json_file = self.metadata_handler.find_companion_json(file_path)
+            json_s3_uri = None
+            if json_file:
+                try:
+                    json_s3_uri = self.s3_uploader.upload_json_file(
+                        json_file_path=json_file,
+                        image_s3_key=s3_uri.replace(f"s3://{self.s3_uploader.bucket}/", ""),
+                    )
+                    self.stats["json_files_uploaded"] += 1
+                    logger.info(
+                        "json_metadata_uploaded",
+                        json_file=str(json_file),
+                        json_s3_uri=json_s3_uri,
+                        image_s3_uri=s3_uri,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "json_upload_failed",
+                        json_file=str(json_file),
+                        error=str(e),
+                        exc_info=True,
+                    )
+                    # Continue even if JSON upload fails
 
             # Stage 4: Send SQS notification
             status = UploadStatus.NOTIFYING
+            
+            # Add JSON S3 URI to metadata if available
+            if json_s3_uri:
+                metadata["json_metadata_s3_uri"] = json_s3_uri
+            
             message_id = self.sqs_notifier.send_notification(
                 s3_uri=s3_uri,
                 original_filename=file_path.name,
@@ -216,14 +232,21 @@ class UploadOrchestrator:
     def _handle_post_upload_action(self, file_path: Path) -> None:
         """Handle post-upload action (keep/archive/delete).
         
+        Also handles companion JSON metadata files if they exist.
+        
         Args:
             file_path: Path to original file
         """
         try:
+            # Check for companion JSON file
+            json_file = file_path.with_suffix(".json")
+            has_json_companion = json_file.exists()
+            
             if self.post_upload_action == PostUploadAction.KEEP:
                 logger.debug(
                     "post_upload_keep",
                     file=str(file_path),
+                    has_json_companion=has_json_companion,
                 )
                 # Do nothing, keep file in place
 
@@ -239,22 +262,42 @@ class UploadOrchestrator:
                 archive_path = self._get_archive_path(file_path)
                 archive_path.parent.mkdir(parents=True, exist_ok=True)
 
-                # Move file to archive
+                # Move image file to archive
                 shutil.move(str(file_path), str(archive_path))
 
-                logger.info(
-                    "post_upload_archived",
-                    file=str(file_path),
-                    archive_path=str(archive_path),
-                )
+                # Move companion JSON file if it exists
+                if has_json_companion:
+                    json_archive_path = archive_path.with_suffix(".json")
+                    shutil.move(str(json_file), str(json_archive_path))
+                    logger.info(
+                        "post_upload_archived_with_json",
+                        file=str(file_path),
+                        archive_path=str(archive_path),
+                        json_archive_path=str(json_archive_path),
+                    )
+                else:
+                    logger.info(
+                        "post_upload_archived",
+                        file=str(file_path),
+                        archive_path=str(archive_path),
+                    )
 
             elif self.post_upload_action == PostUploadAction.DELETE:
                 file_path.unlink()
-
-                logger.info(
-                    "post_upload_deleted",
-                    file=str(file_path),
-                )
+                
+                # Delete companion JSON file if it exists
+                if has_json_companion:
+                    json_file.unlink()
+                    logger.info(
+                        "post_upload_deleted_with_json",
+                        file=str(file_path),
+                        json_file=str(json_file),
+                    )
+                else:
+                    logger.info(
+                        "post_upload_deleted",
+                        file=str(file_path),
+                    )
 
         except Exception as e:
             logger.error(

@@ -1,0 +1,237 @@
+version: '3.8'
+
+services:
+  # LocalStack - Local AWS services for testing
+  localstack:
+    image: localstack/localstack:latest
+    container_name: ocr-pipeline-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "./localstack-data:/tmp/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - ocr-pipeline-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - For distributed document grouping (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: ocr-pipeline-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ocr-pipeline-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # Service 1: OCR Image Service
+  ocr-image-service:
+    build:
+      context: ./ocr-image-microservice
+      dockerfile: Dockerfile
+    container_name: ocr-image-service
+    environment:
+      # AWS Configuration
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://localstack:4566}
+      
+      # SQS Configuration
+      - IMAGE_UPLOAD_QUEUE_URL=${IMAGE_UPLOAD_QUEUE_URL:-http://localstack:4566/000000000000/image-upload-queue}
+      - OCR_RESULTS_QUEUE_URL=${OCR_RESULTS_QUEUE_URL:-http://localstack:4566/000000000000/ocr-results-queue}
+      - SQS_MAX_MESSAGES=${SQS_MAX_MESSAGES:-1}
+      - SQS_WAIT_TIME_SECONDS=${SQS_WAIT_TIME_SECONDS:-20}
+      - SQS_VISIBILITY_TIMEOUT=${SQS_VISIBILITY_TIMEOUT:-300}
+      
+      # S3 Configuration
+      - S3_INPUT_BUCKET=${S3_INPUT_BUCKET:-test-images-bucket}
+      - S3_OUTPUT_BUCKET=${S3_OUTPUT_BUCKET:-test-ocr-results-bucket}
+      - S3_OUTPUT_PREFIX=${S3_OUTPUT_PREFIX:-ocr-results/}
+      
+      # Datalab OCR Configuration
+      - DATALAB_API_KEY=${DATALAB_API_KEY}
+      - OCR_OUTPUT_FORMAT=${OCR_OUTPUT_FORMAT:-markdown}
+      - OCR_MODE=${OCR_MODE:-accurate}
+      - OCR_PAGINATE=${OCR_PAGINATE:-true}
+      
+      # Processing Configuration
+      - TEMP_DIR=${TEMP_DIR:-/tmp/ocr-processing}
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-5}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./ocr-image-microservice:/app
+      - ocr-temp:/tmp/ocr-processing
+    depends_on:
+      localstack:
+        condition: service_healthy
+    networks:
+      - ocr-pipeline-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service 2: GEDCOM Generation Service
+  gedcom-generation-service:
+    build:
+      context: ./gedcom-generation-microservice
+      dockerfile: Dockerfile
+    container_name: gedcom-generation-service
+    environment:
+      # AWS Configuration
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://localstack:4566}
+      
+      # SQS Configuration
+      - OCR_RESULTS_QUEUE_URL=${OCR_RESULTS_QUEUE_URL:-http://localstack:4566/000000000000/ocr-results-queue}
+      - GEDCOM_READY_QUEUE_URL=${GEDCOM_READY_QUEUE_URL:-http://localstack:4566/000000000000/gedcom-ready-queue}
+      - SQS_MAX_MESSAGES=${SQS_MAX_MESSAGES:-1}
+      - SQS_WAIT_TIME_SECONDS=${SQS_WAIT_TIME_SECONDS:-20}
+      - SQS_VISIBILITY_TIMEOUT=${SQS_VISIBILITY_TIMEOUT:-300}
+      
+      # S3 Configuration
+      - S3_OUTPUT_BUCKET=${S3_OUTPUT_BUCKET:-test-gedcom-bucket}
+      - S3_GEDCOM_PREFIX=${S3_GEDCOM_PREFIX:-gedcom-files/}
+      
+      # OpenRouter Configuration
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-flash-1.5}
+      - OPENROUTER_TIMEOUT=${OPENROUTER_TIMEOUT:-300}
+      
+      # Document Grouping Configuration
+      - GROUPING_TIMEOUT_SECONDS=${GROUPING_TIMEOUT_SECONDS:-300}
+      - GROUPING_CHECK_INTERVAL=${GROUPING_CHECK_INTERVAL:-30}
+      - MAX_PAGES_PER_GROUP=${MAX_PAGES_PER_GROUP:-100}
+      
+      # Redis Configuration (optional)
+      - USE_REDIS=${USE_REDIS:-true}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_KEY_PREFIX=${REDIS_KEY_PREFIX:-gedcom:docgroup:}
+      
+      # GEDCOM Configuration
+      - GEDCOM_VERSION=${GEDCOM_VERSION:-5.5.1}
+      - ENABLE_GEDCOM_VALIDATION=${ENABLE_GEDCOM_VALIDATION:-true}
+      - STRICT_VALIDATION=${STRICT_VALIDATION:-false}
+      
+      # Retry Configuration
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_BACKOFF_BASE=${RETRY_BACKOFF_BASE:-2}
+      - RETRY_BACKOFF_MAX=${RETRY_BACKOFF_MAX:-60}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./gedcom-generation-microservice:/app
+      - gedcom-temp:/tmp/gedcom-generation
+    depends_on:
+      localstack:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ocr-pipeline-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service 3: GEDCOM Upload Service
+  gedcom-upload-service:
+    build:
+      context: ./gedcom-upload-microservice
+      dockerfile: Dockerfile
+    container_name: gedcom-upload-service
+    environment:
+      # AWS Configuration
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://localstack:4566}
+      
+      # SQS Configuration
+      - GEDCOM_READY_QUEUE_URL=${GEDCOM_READY_QUEUE_URL:-http://localstack:4566/000000000000/gedcom-ready-queue}
+      - SQS_MAX_MESSAGES=${SQS_MAX_MESSAGES:-1}
+      - SQS_WAIT_TIME_SECONDS=${SQS_WAIT_TIME_SECONDS:-20}
+      - SQS_VISIBILITY_TIMEOUT=${SQS_VISIBILITY_TIMEOUT:-300}
+      
+      # S3 Configuration
+      - S3_OUTPUT_BUCKET=${S3_OUTPUT_BUCKET:-test-gedcom-bucket}
+      - S3_OUTPUT_PREFIX=${S3_OUTPUT_PREFIX:-gedcom-files/}
+      
+      # Application Upload Configuration
+      - APP_UPLOAD_ENABLED=${APP_UPLOAD_ENABLED:-false}
+      - APP_URL=${APP_URL:-https://korzen.vovcia.net}
+      - APP_API_KEY=${APP_API_KEY}
+      - APP_UPLOAD_TIMEOUT=${APP_UPLOAD_TIMEOUT:-30}
+      - APP_PARSE_TIMEOUT=${APP_PARSE_TIMEOUT:-300}
+      - APP_AUTO_PARSE=${APP_AUTO_PARSE:-true}
+      
+      # Retry Configuration
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_DELAY_SECONDS=${RETRY_DELAY_SECONDS:-5}
+      
+      # Processing Configuration
+      - TEMP_DIR=${TEMP_DIR:-/tmp/gedcom-upload}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # Graceful Shutdown
+      - SHUTDOWN_GRACE_PERIOD=${SHUTDOWN_GRACE_PERIOD:-30}
+    volumes:
+      - ./gedcom-upload-microservice:/app
+      - upload-temp:/tmp/gedcom-upload
+    depends_on:
+      localstack:
+        condition: service_healthy
+    networks:
+      - ocr-pipeline-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  ocr-pipeline-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  ocr-temp:
+    driver: local
+  gedcom-temp:
+    driver: local
+  upload-temp:
+    driver: local
