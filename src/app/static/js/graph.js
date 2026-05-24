@@ -56,7 +56,7 @@ function initGraph() {
     });
 }
 
-// Get graph options for hierarchical layout
+// Get graph options for spring-based (force-directed) layout
 function getGraphOptions() {
     return {
         nodes: {
@@ -78,40 +78,44 @@ function getGraphOptions() {
                 }
             },
             smooth: {
-                type: 'cubicBezier',
-                forceDirection: 'vertical',
-                roundness: 0.4
+                type: 'continuous',
+                roundness: 0.5
             }
         },
         physics: {
             enabled: true,
-            hierarchicalRepulsion: {
-                centralGravity: 0.0,
-                springLength: 100,
-                springConstant: 0.01,
-                nodeDistance: 150,
-                damping: 0.09
+            solver: 'forceAtlas2Based',
+            forceAtlas2Based: {
+                gravitationalConstant: -50,
+                centralGravity: 0.01,
+                springLength: 300,
+                springConstant: 0.08,
+                damping: 0.4,
+                avoidOverlap: 0.7
             },
-            solver: 'hierarchicalRepulsion'
+            stabilization: {
+                enabled: true,
+                iterations: 1000,
+                updateInterval: 25,
+                onlyDynamicEdges: false,
+                fit: true
+            },
+            timestep: 0.5,
+            adaptiveTimestep: true
         },
         layout: {
-            hierarchical: {
-                enabled: true,
-                direction: 'UD',  // Up-Down: older nodes at top, newer at bottom
-                sortMethod: 'directed', // Use 'directed' to respect levels
-                nodeSpacing: 150,
-                levelSeparation: 150,
-                treeSpacing: 200,
-                blockShifting: true,
-                edgeMinimization: true,
-                parentCentralization: true
-            }
+            randomSeed: undefined,
+            improvedLayout: true,
+            clusterThreshold: 150
         },
         interaction: {
             hover: true,
             tooltipDelay: 200,
             navigationButtons: true,
-            keyboard: true
+            keyboard: true,
+            dragNodes: true,
+            dragView: true,
+            zoomView: true
         }
     };
 }
@@ -353,10 +357,7 @@ function renderGraph(data) {
         }
     });
     
-    // Calculate hierarchical levels with spouse grouping
-    const levels = calculateHierarchicalLevels(data.nodes, data.edges);
-    
-    // Process nodes with hierarchical levels
+    // Process nodes for spring-based layout (no hierarchical levels needed)
     const processedNodes = data.nodes.map(node => {
         const color = getNodeColor(node);
         const title = getNodeTooltip(node);
@@ -386,7 +387,6 @@ function renderGraph(data) {
                     size: 14
                 }
             },
-            level: levels.get(node.id) || 0,  // Assign hierarchical level
             hidden: hideSource && sourceNodeIds.has(node.id)
         };
     });

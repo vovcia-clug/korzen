@@ -112,7 +112,6 @@ class GedcomGenerationService:
         
         logger.info("GEDCOM Generation Service initialized successfully")
     
-    @langfuse_tracer.observe(name="process-sqs-message")
     async def process_message(self, message: dict) -> None:
         """
         Process a single OCR result message.
@@ -160,7 +159,6 @@ class GedcomGenerationService:
             logger.error(f"Error processing message: {e}", exc_info=True)
             # Don't delete message - it will become visible again for retry
     
-    @langfuse_tracer.observe(name="process-complete-document")
     async def process_complete_document(
         self,
         document_id: str,
@@ -298,7 +296,6 @@ class GedcomGenerationService:
             )
             # Don't remove group - allow retry
     
-    @langfuse_tracer.observe(name="validate-gedcom")
     async def _validate_gedcom(self, gedcom_content: str) -> tuple[bool, list]:
         """
         Validate GEDCOM content.
@@ -312,7 +309,6 @@ class GedcomGenerationService:
         is_valid, errors = self.gedcom_validator.validate(gedcom_content)
         return is_valid, errors
     
-    @langfuse_tracer.observe(name="upload-to-s3")
     async def _upload_to_s3(self, document_id: str, gedcom_content: str) -> str:
         """
         Upload GEDCOM to S3.
@@ -332,7 +328,6 @@ class GedcomGenerationService:
         )
         return s3_uri
     
-    @langfuse_tracer.observe(name="publish-to-sqs")
     async def _publish_to_sqs(self, gedcom_ready_message: dict) -> None:
         """
         Publish GEDCOM ready message to SQS.

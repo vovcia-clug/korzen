@@ -172,7 +172,6 @@ class DocumentGrouper:
         else:
             logger.info("Using in-memory document grouping (single instance only)")
     
-    @langfuse_tracer.observe(name="group-document")
     def add_message(self, message: Dict[str, Any]) -> None:
         """
         Add a message to the appropriate document group.
