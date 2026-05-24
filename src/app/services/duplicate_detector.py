@@ -102,18 +102,22 @@ class DuplicateDetector:
         """
         Determine if a person should be skipped for duplicate detection.
         
-        Persons with only a single name (first name) and no other identifying
-        information are too generic to reliably detect duplicates. This method
-        identifies such records to prevent false positive matches.
+        Persons without sufficient identifying information are too generic to
+        reliably detect duplicates. This method identifies such records to
+        prevent false positive matches.
         
-        A person is skipped if they have:
-        - Only a first name (no last name or maiden name)
-        - No birth date or death date
-        - No birth place, death place, parish, or residence
-        - No parent relationships (father_id or mother_id)
+        A person is skipped if they lack BOTH:
+        1. A surname (last name or maiden name), AND
+        2. Sufficient contextual data (dates AND locations together)
         
-        This prevents common names like "Jan" or "Maria" without additional
-        context from generating numerous false duplicate candidates.
+        This stricter validation prevents records with only a first name and
+        partial data (e.g., "Adele" with just a birth year) from matching
+        broadly with other similar records.
+        
+        Required data combinations (at least one must be true):
+        - Has surname (last_name or maiden_name)
+        - Has BOTH dates (birth_date or death_date) AND locations (birth_place,
+          death_place, parish, or residence)
         
         Args:
             person: Person entity to evaluate
@@ -122,13 +126,18 @@ class DuplicateDetector:
             True if duplicate detection should be skipped, False otherwise
         
         Example:
-            >>> person = Person(first_name="Jan")  # Only first name, no other data
+            >>> person = Person(first_name="Adele", birth_date="1850-01-01")
             >>> detector._should_skip_person_duplicate_detection(person)
-            True
+            True  # Has date but no surname and no location
             >>>
             >>> person2 = Person(first_name="Jan", last_name="Kowalski")
             >>> detector._should_skip_person_duplicate_detection(person2)
-            False
+            False  # Has surname
+            >>>
+            >>> person3 = Person(first_name="Maria", birth_date="1850-01-01",
+            ...                  birth_place="Krakow")
+            >>> detector._should_skip_person_duplicate_detection(person3)
+            False  # Has both dates and locations
         """
         # Check if person has a surname (last name or maiden name)
         has_surname = bool(person.last_name or person.maiden_name)
@@ -144,15 +153,14 @@ class DuplicateDetector:
             person.residence
         )
         
-        # Check if person has parent relationships
-        has_parents = bool(person.father_id or person.mother_id)
-        
-        # Skip if person only has a first name without any other identifying information
-        # This indicates a record that is too generic for reliable duplicate detection
-        if person.first_name and not has_surname and not has_dates and not has_locations and not has_parents:
+        # Require surname OR (dates AND locations together)
+        # This prevents records with only partial data from generating false positives
+        if not has_surname and not (has_dates and has_locations):
             logger.info(
                 f"Skipping duplicate detection for person {person.id}: "
-                f"only has first name '{person.first_name}' without surname or other identifying information"
+                f"insufficient identifying information (surname={has_surname}, "
+                f"dates={has_dates}, locations={has_locations}). "
+                f"Requires surname OR (dates AND locations)."
             )
             return True
         
@@ -568,6 +576,23 @@ class DuplicateDetector:
             >>> print(f"Phonetic: {breakdown['phonetic_sim']:.2f}")
         """
         try:
+            # FIX 3: Gender validation for person records
+            # Instant rejection if genders differ (prevents male-female matches)
+            if record_type == 'person':
+                if record1.gender and record2.gender:
+                    if record1.gender != record2.gender:
+                        logger.info(
+                            f"Gender mismatch detected: {record1.gender} vs {record2.gender}. "
+                            f"Returning score 0.0 (instant rejection)."
+                        )
+                        return 0.0, {
+                            'vector_sim': vector_sim,
+                            'phonetic_sim': None,
+                            'date_sim': None,
+                            'location_sim': None,
+                            'rejection_reason': 'gender_mismatch'
+                        }
+            
             # Calculate phonetic similarity (returns None if data missing in both)
             phonetic_sim = self._calculate_phonetic_similarity_for_record(
                 record1, record2, record_type
@@ -583,34 +608,36 @@ class DuplicateDetector:
                 record1, record2, record_type
             )
             
-            # Dynamically adjust weights based on available data
-            total_weight = 0.0
+            # FIX 4: Penalize missing data instead of ignoring it
+            # Use fixed weights and assign low scores (0.3) for missing components
+            # This prevents records with minimal data from scoring artificially high
+            MISSING_DATA_PENALTY = 0.3  # Score assigned when data is missing
+            
             composite_score = 0.0
             
             # Vector similarity is always included (primary signal)
             composite_score += self.WEIGHT_VECTOR * vector_sim
-            total_weight += self.WEIGHT_VECTOR
             
-            # Only include phonetic similarity if data is available
+            # Phonetic similarity: use actual score or penalty if missing
             if phonetic_sim is not None:
                 composite_score += self.WEIGHT_PHONETIC * phonetic_sim
-                total_weight += self.WEIGHT_PHONETIC
+            else:
+                composite_score += self.WEIGHT_PHONETIC * MISSING_DATA_PENALTY
             
-            # Only include date similarity if data is available
+            # Date similarity: use actual score or penalty if missing
             if date_sim is not None:
                 composite_score += self.WEIGHT_DATE * date_sim
-                total_weight += self.WEIGHT_DATE
+            else:
+                composite_score += self.WEIGHT_DATE * MISSING_DATA_PENALTY
             
-            # Only include location similarity if data is available
+            # Location similarity: use actual score or penalty if missing
             if location_sim is not None:
                 composite_score += self.WEIGHT_LOCATION * location_sim
-                total_weight += self.WEIGHT_LOCATION
-            
-            # Normalize by actual weights used
-            if total_weight > 0:
-                composite_score = composite_score / total_weight
             else:
-                composite_score = 0.0
+                composite_score += self.WEIGHT_LOCATION * MISSING_DATA_PENALTY
+            
+            # No normalization needed - using fixed weights that sum to 1.0
+            # composite_score is already in range [0.0, 1.0]
             
             # Log which components were used for debugging
             components_used = ['vector']

@@ -160,6 +160,36 @@
         color: #333;
     }
     
+    .person-link {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    .person-link:hover {
+        color: #764ba2;
+        text-decoration: underline;
+    }
+    
+    .graph-link {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 0.85em;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .graph-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
     .expand-icon {
         display: inline-block;
         margin-right: 8px;
@@ -379,15 +409,24 @@
         </button>
     </div>
     
-    <div class="search-bar">
-        <input type="text" id="searchInput" class="search-input" placeholder="{{ _('Search by name, place, or occupation...') }}">
-        <select id="genderFilter" class="filter-select">
+    <form method="get" action="{{ url_for('main.list_persons') }}" class="search-bar">
+        <input type="text" name="search" id="searchInput" class="search-input" 
+               placeholder="{{ _('Search by name or place...') }}" 
+               value="{{ request.args.get('search', '') }}">
+        <select name="gender" id="genderFilter" class="filter-select">
             <option value="">{{ _('All Genders') }}</option>
-            <option value="M">{{ _('Male') }}</option>
-            <option value="F">{{ _('Female') }}</option>
-            <option value="Unknown">{{ _('Unknown') }}</option>
+            <option value="M" {% if request.args.get('gender') == 'M' %}selected{% endif %}>{{ _('Male') }}</option>
+            <option value="F" {% if request.args.get('gender') == 'F' %}selected{% endif %}>{{ _('Female') }}</option>
+            <option value="Unknown" {% if request.args.get('gender') == 'Unknown' %}selected{% endif %}>{{ _('Unknown') }}</option>
         </select>
-    </div>
+        <button type="submit" class="btn-parse" style="min-width: 100px;">{{ _('Search') }}</button>
+        {% if request.args.get('search') or request.args.get('gender') %}
+        <a href="{{ url_for('main.list_persons') }}" class="btn-parse" style="min-width: 100px; background: linear-gradient(135deg, #999 0%, #666 100%); text-decoration: none; display: inline-block; text-align: center;">{{ _('Clear') }}</a>
+        {% endif %}
+        <input type="hidden" name="sort_by" value="{{ request.args.get('sort_by', 'last_name') }}">
+        <input type="hidden" name="sort_order" value="{{ request.args.get('sort_order', 'asc') }}">
+        <input type="hidden" name="per_page" value="{{ request.args.get('per_page', '50') }}">
+    </form>
     
     <div class="stats">
         <div class="stat-card">
@@ -395,7 +434,7 @@
             <div class="stat-value" id="totalCount">{% if pagination %}{{ pagination.total }}{% else %}0{% endif %}</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">{{ _('Displayed (Filtered)') }}</div>
+            <div class="stat-label">{{ _('Displayed') }}</div>
             <div class="stat-value" id="displayedCount">{% if pagination %}{{ pagination.items|length }}{% else %}0{% endif %}</div>
         </div>
         {% if pagination %}
@@ -414,18 +453,15 @@
                     <th>{{ _('Name') }}</th>
                     <th>{{ _('Gender') }}</th>
                     <th class="hide-mobile">{{ _('Birth Date') }}</th>
+                    <th class="hide-mobile">{{ _('Birth Place') }}</th>
                     <th class="hide-mobile">{{ _('Death Date') }}</th>
                     <th class="hide-mobile">{{ _('Age/Status') }}</th>
-                    <th>{{ _('Occupation') }}</th>
-                    <th class="hide-mobile">{{ _('Parish') }}</th>
                     <th class="hide-mobile">{{ _('Records') }}</th>
                 </tr>
             </thead>
             <tbody id="personsTableBody">
                 {% for person in pagination.items %}
-                <tr class="expandable-row" data-person-id="{{ person.id }}"
-                    data-gender="{{ person.gender or 'Unknown' }}"
-                    data-search="{{ (person.first_name or '') + ' ' + (person.last_name or '') + ' ' + (person.maiden_name or '') + ' ' + (person.birth_place or '') + ' ' + (person.death_place or '') + ' ' + (person.occupation or '') + ' ' + (person.parish or '') + ' ' + (person.residence or '') }}">
+                <tr class="expandable-row" data-person-id="{{ person.id }}">
                     <td>
                         <span class="expand-icon">▶</span>
                         <strong>{{ person.first_name or '' }} {{ person.last_name or '' }}</strong>
@@ -452,6 +488,7 @@
                         <span class="no-data">—</span>
                         {% endif %}
                     </td>
+                    <td class="hide-mobile">{{ person.birth_place or '—' }}</td>
                     <td class="date-cell hide-mobile">
                         {% if person.death_date %}
                         {{ person.death_date.strftime('%Y-%m-%d') }}
@@ -478,8 +515,6 @@
                             <span class="no-data">—</span>
                         {% endif %}
                     </td>
-                    <td>{{ person.occupation or '—' }}</td>
-                    <td class="hide-mobile">{{ person.parish or '—' }}</td>
                     <td class="hide-mobile">
                         {% set baptism_count = person.baptism_as_child | length %}
                         {% set marriage_count = (person.marriages_as_spouse1 | length) + (person.marriages_as_spouse2 | length) %}
@@ -495,7 +530,7 @@
                     </td>
                 </tr>
                 <tr class="detail-row" id="detail-{{ person.id }}">
-                    <td colspan="8" class="detail-cell">
+                    <td colspan="7" class="detail-cell">
                         <div class="detail-content">
                             <div class="detail-section">
                                 <h4>📋 {{ _('Basic Information') }}</h4>
@@ -513,12 +548,9 @@
                                     <span class="detail-label">{{ _('Gender:') }}</span>
                                     <span class="detail-value">{{ person.gender or _('Unknown') }}</span>
                                 </div>
-                                {% if person.occupation %}
-                                <div class="detail-item">
-                                    <span class="detail-label">{{ _('Occupation:') }}</span>
-                                    <span class="detail-value">{{ person.occupation }}</span>
-                                </div>
-                                {% endif %}
+                                <a href="{{ url_for('main.graph') }}?root_id={{ person.id }}" class="graph-link" target="_blank">
+                                    🌳 {{ _('View Family Tree') }}
+                                </a>
                             </div>
                             
                             <div class="detail-section">
@@ -568,10 +600,6 @@
                             <div class="detail-section">
                                 <h4>📍 {{ _('Location Information') }}</h4>
                                 <div class="detail-item">
-                                    <span class="detail-label">{{ _('Parish:') }}</span>
-                                    <span class="detail-value">{{ person.parish or '—' }}</span>
-                                </div>
-                                <div class="detail-item">
                                     <span class="detail-label">{{ _('Residence:') }}</span>
                                     <span class="detail-value">{{ person.residence or '—' }}</span>
                                 </div>
@@ -608,7 +636,9 @@
                                 <div class="detail-item">
                                     <span class="detail-label">{{ _('Father:') }}</span>
                                     <span class="detail-value">
-                                        {{ person.father.first_name or '—' }} {{ person.father.last_name or '—' }}
+                                        <a href="?search={{ person.father.first_name }} {{ person.father.last_name }}" class="person-link">
+                                            {{ person.father.first_name or '—' }} {{ person.father.last_name or '—' }}
+                                        </a>
                                         {% if person.father.birth_date %}
                                         <small style="color: #666;">({{ _('b.') }} {{ person.father.birth_date.strftime('%Y-%m-%d') }})</small>
                                         {% endif %}
@@ -619,7 +649,9 @@
                                 <div class="detail-item">
                                     <span class="detail-label">{{ _('Mother:') }}</span>
                                     <span class="detail-value">
-                                        {{ person.mother.first_name or '—' }} {{ person.mother.last_name or '—' }}
+                                        <a href="?search={{ person.mother.first_name }} {{ person.mother.last_name }}" class="person-link">
+                                            {{ person.mother.first_name or '—' }} {{ person.mother.last_name or '—' }}
+                                        </a>
                                         {% if person.mother.maiden_name %}
                                         <small style="color: #666;">({{ _('née') }} {{ person.mother.maiden_name }})</small>
                                         {% endif %}
@@ -646,7 +678,9 @@
                                 <div class="detail-item">
                                     <span class="detail-label">{{ _('Child') }} {{ loop.index }}:</span>
                                     <span class="detail-value">
-                                        {{ child.first_name or '—' }} {{ child.last_name or '—' }}
+                                        <a href="?search={{ child.first_name }} {{ child.last_name }}" class="person-link">
+                                            {{ child.first_name or '—' }} {{ child.last_name or '—' }}
+                                        </a>
                                         {% if child.birth_date %}
                                         <small style="color: #666;">({{ _('b.') }} {{ child.birth_date.strftime('%Y-%m-%d') }})</small>
                                         {% endif %}
@@ -660,6 +694,34 @@
                                     </span>
                                 </div>
                                 {% endif %}
+                            </div>
+                            {% endif %}
+                            
+                            {% set marriages_as_spouse1 = person.marriages_as_spouse1 | list %}
+                            {% set marriages_as_spouse2 = person.marriages_as_spouse2 | list %}
+                            {% set all_marriages = marriages_as_spouse1 + marriages_as_spouse2 %}
+                            {% if all_marriages %}
+                            <div class="detail-section">
+                                <h4>💍 {{ _('Marriages') }}</h4>
+                                {% for marriage in all_marriages %}
+                                <div class="detail-item">
+                                    <span class="detail-label">{{ _('Spouse:') }}</span>
+                                    <span class="detail-value">
+                                        {% if marriage in marriages_as_spouse1 and marriage.spouse2 %}
+                                        <a href="?search={{ marriage.spouse2.first_name }} {{ marriage.spouse2.last_name }}" class="person-link">
+                                            {{ marriage.spouse2.first_name or '—' }} {{ marriage.spouse2.last_name or '—' }}
+                                        </a>
+                                        {% elif marriage in marriages_as_spouse2 and marriage.spouse1 %}
+                                        <a href="?search={{ marriage.spouse1.first_name }} {{ marriage.spouse1.last_name }}" class="person-link">
+                                            {{ marriage.spouse1.first_name or '—' }} {{ marriage.spouse1.last_name or '—' }}
+                                        </a>
+                                        {% endif %}
+                                        {% if marriage.marriage_date %}
+                                        <small style="color: #666;">({{ marriage.marriage_date.strftime('%Y-%m-%d') }})</small>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% endfor %}
                             </div>
                             {% endif %}
                             
@@ -714,12 +776,6 @@
 
 {% block extra_js %}
 <script>
-    const searchInput = document.getElementById('searchInput');
-    const genderFilter = document.getElementById('genderFilter');
-    const tableBody = document.getElementById('personsTableBody');
-    const displayedCount = document.getElementById('displayedCount');
-    const totalCount = document.getElementById('totalCount');
-    
     // Handle row expansion
     document.addEventListener('DOMContentLoaded', function() {
         const expandableRows = document.querySelectorAll('.expandable-row');
@@ -750,68 +806,34 @@
         });
     });
     
-    function filterTable() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedGender = genderFilter.value;
-        const rows = tableBody.getElementsByTagName('tr');
-        let visibleCount = 0;
-        
-        for (let row of rows) {
-            // Skip detail rows
-            if (row.classList.contains('detail-row')) {
-                continue;
-            }
-            
-            const searchData = row.getAttribute('data-search');
-            const gender = row.getAttribute('data-gender');
-            
-            if (!searchData) continue;
-            
-            const matchesSearch = searchData.toLowerCase().includes(searchTerm);
-            const matchesGender = !selectedGender || gender === selectedGender;
-            
-            if (matchesSearch && matchesGender) {
-                row.style.display = '';
-                visibleCount++;
-                // Also show the corresponding detail row if it was expanded
-                const personId = row.getAttribute('data-person-id');
-                const detailRow = document.getElementById('detail-' + personId);
-                if (detailRow && detailRow.classList.contains('show')) {
-                    detailRow.style.display = 'table-row';
-                }
-            } else {
-                row.style.display = 'none';
-                // Hide the corresponding detail row
-                const personId = row.getAttribute('data-person-id');
-                const detailRow = document.getElementById('detail-' + personId);
-                if (detailRow) {
-                    detailRow.style.display = 'none';
-                }
-            }
-        }
-        
-        displayedCount.textContent = visibleCount;
-    }
-    
-    searchInput.addEventListener('input', filterTable);
-    genderFilter.addEventListener('change', filterTable);
-    
     // Sorting functionality
     function updateSort() {
         const sortBy = document.getElementById('sortBy').value;
         const sortOrder = new URLSearchParams(window.location.search).get('sort_order') || 'asc';
+        const search = new URLSearchParams(window.location.search).get('search') || '';
+        const gender = new URLSearchParams(window.location.search).get('gender') || '';
         const page = new URLSearchParams(window.location.search).get('page') || '1';
         const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
-        window.location.href = `/persons?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+        
+        let url = `/persons?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (gender) url += `&gender=${gender}`;
+        window.location.href = url;
     }
     
     function toggleSortOrder() {
         const sortBy = new URLSearchParams(window.location.search).get('sort_by') || 'last_name';
         const currentOrder = new URLSearchParams(window.location.search).get('sort_order') || 'asc';
         const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+        const search = new URLSearchParams(window.location.search).get('search') || '';
+        const gender = new URLSearchParams(window.location.search).get('gender') || '';
         const page = new URLSearchParams(window.location.search).get('page') || '1';
         const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
-        window.location.href = `/persons?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${newOrder}`;
+        
+        let url = `/persons?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${newOrder}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (gender) url += `&gender=${gender}`;
+        window.location.href = url;
     }
 </script>
 {% endblock %}

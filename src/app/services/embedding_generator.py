@@ -6,9 +6,9 @@ It converts extracted features into fixed-size 128-dimensional vector embeddings
 suitable for similarity search using pgvector.
 
 The embedding structure (128 dimensions total):
-- Phonetic features: 32 dimensions (hash-based encoding of phonetic codes)
+- Phonetic features: 64 dimensions (hash-based encoding of phonetic codes)
 - Temporal features: 16 dimensions (normalized years, age, date ranges)
-- Location features: 80 dimensions (hash-based encoding of locations)
+- Location features: 48 dimensions (hash-based encoding of locations)
 
 The embeddings are L2-normalized for cosine similarity search.
 """
@@ -31,16 +31,18 @@ class EmbeddingGenerator:
     codes and locations, and normalized encoding for temporal features.
     
     Embedding Structure (128 dimensions):
-    - Phonetic features: 32 dimensions
+    - Phonetic features: 64 dimensions
       * Hash-based encoding of phonetic codes
       * Captures name similarity
+      * Increased from 32 to reduce hash collisions for common names
     - Temporal features: 16 dimensions
       * Normalized years (1600-2000 range)
       * Age encoding
       * Date range features
-    - Location features: 80 dimensions
+    - Location features: 48 dimensions
       * Hash-based encoding of location strings
       * Captures geographic similarity
+      * Reduced from 80 to maintain total dimension count
     
     Features:
     - Hash-based encoding for categorical features
@@ -66,9 +68,11 @@ class EmbeddingGenerator:
     """
     
     # Dimension allocations
-    PHONETIC_DIM = 32
+    # FIX 5: Increased phonetic dimensions from 32 to 64 to reduce hash collisions
+    # for common names and improve name-based duplicate detection accuracy
+    PHONETIC_DIM = 64  # Increased from 32 to reduce hash collisions
     TEMPORAL_DIM = 16
-    LOCATION_DIM = 80
+    LOCATION_DIM = 48  # Reduced from 80 to maintain TOTAL_DIM = 128
     TOTAL_DIM = 128  # PHONETIC_DIM + TEMPORAL_DIM + LOCATION_DIM
     
     # Temporal normalization constants
@@ -127,7 +131,7 @@ class EmbeddingGenerator:
         phonetic_codes.extend(features.get('phonetic_last_name', []))
         phonetic_codes.extend(features.get('phonetic_maiden_name', []))
         
-        # Encode phonetic features (32 dimensions)
+        # Encode phonetic features (64 dimensions)
         phonetic_vector = self._encode_phonetic_features(phonetic_codes)
         
         # Encode temporal features (16 dimensions)
@@ -148,7 +152,7 @@ class EmbeddingGenerator:
         if features.get('residence'):
             locations.append(features['residence'])
         
-        # Encode location features (80 dimensions)
+        # Encode location features (48 dimensions)
         location_vector = self._encode_location_features(locations)
         
         # Concatenate all feature vectors
@@ -257,7 +261,7 @@ class EmbeddingGenerator:
             if features.get('cemetery'):
                 locations.append(features['cemetery'])
         
-        # Encode phonetic features (32 dimensions)
+        # Encode phonetic features (64 dimensions)
         phonetic_vector = self._encode_phonetic_features(phonetic_codes)
         
         # Encode temporal features (16 dimensions)
@@ -267,7 +271,7 @@ class EmbeddingGenerator:
             age=age
         )
         
-        # Encode location features (80 dimensions)
+        # Encode location features (48 dimensions)
         location_vector = self._encode_location_features(locations)
         
         # Concatenate all feature vectors

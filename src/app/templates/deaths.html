@@ -303,22 +303,31 @@
     </button>
 </div>
 
-<div class="search-bar">
-    <input type="text" id="searchInput" class="search-input" placeholder="{{ _('Search by deceased name, parish, village, or cemetery...') }}">
-    <select id="statusFilter" class="filter-select">
+<form method="get" action="{{ url_for('main.list_deaths') }}" class="search-bar">
+    <input type="text" name="search" id="searchInput" class="search-input"
+           placeholder="{{ _('Search by deceased name, parish, village, or cemetery...') }}"
+           value="{{ request.args.get('search', '') }}">
+    <select name="status" id="statusFilter" class="filter-select">
         <option value="">{{ _('All Marital Status') }}</option>
-        <option value="Conjugatus">{{ _('Married (Conjugatus)') }}</option>
-        <option value="Conjugata">{{ _('Married (Conjugata)') }}</option>
-        <option value="Viduus">{{ _('Widower (Viduus)') }}</option>
-        <option value="Vidua">{{ _('Widow (Vidua)') }}</option>
-        <option value="Virgo">{{ _('Unmarried (Virgo)') }}</option>
+        <option value="Conjugatus" {% if request.args.get('status') == 'Conjugatus' %}selected{% endif %}>{{ _('Married (Conjugatus)') }}</option>
+        <option value="Conjugata" {% if request.args.get('status') == 'Conjugata' %}selected{% endif %}>{{ _('Married (Conjugata)') }}</option>
+        <option value="Viduus" {% if request.args.get('status') == 'Viduus' %}selected{% endif %}>{{ _('Widower (Viduus)') }}</option>
+        <option value="Vidua" {% if request.args.get('status') == 'Vidua' %}selected{% endif %}>{{ _('Widow (Vidua)') }}</option>
+        <option value="Virgo" {% if request.args.get('status') == 'Virgo' %}selected{% endif %}>{{ _('Unmarried (Virgo)') }}</option>
     </select>
-    <select id="sacramentsFilter" class="filter-select">
+    <select name="sacraments" id="sacramentsFilter" class="filter-select">
         <option value="">{{ _('All Sacraments') }}</option>
-        <option value="true">{{ _('Received') }}</option>
-        <option value="false">{{ _('Not Received') }}</option>
+        <option value="true" {% if request.args.get('sacraments') == 'true' %}selected{% endif %}>{{ _('Received') }}</option>
+        <option value="false" {% if request.args.get('sacraments') == 'false' %}selected{% endif %}>{{ _('Not Received') }}</option>
     </select>
-</div>
+    <button type="submit" class="btn-parse" style="min-width: 100px;">{{ _('Search') }}</button>
+    {% if request.args.get('search') or request.args.get('status') or request.args.get('sacraments') %}
+    <a href="{{ url_for('main.list_deaths') }}" class="btn-parse" style="min-width: 100px; background: linear-gradient(135deg, #999 0%, #666 100%); text-decoration: none; display: inline-block; text-align: center;">{{ _('Clear') }}</a>
+    {% endif %}
+    <input type="hidden" name="sort_by" value="{{ request.args.get('sort_by', 'death_date') }}">
+    <input type="hidden" name="sort_order" value="{{ request.args.get('sort_order', 'desc') }}">
+    <input type="hidden" name="per_page" value="{{ request.args.get('per_page', '50') }}">
+</form>
 
 <div class="stats">
     <div class="stat-card">
@@ -353,9 +362,7 @@
         </thead>
         <tbody id="recordsTableBody">
             {% for death in pagination.items %}
-            <tr data-status="{{ death.marital_status or '' }}"
-                data-sacraments="{{ death.sacraments_received }}"
-                data-search="{{ (death.deceased_name or '') + ' ' + (death.deceased_surname or '') + ' ' + (death.deceased_maiden_name or '') + ' ' + (death.parish or '') + ' ' + (death.village or '') + ' ' + (death.cemetery or '') }}">
+            <tr>
                 <td class="date-cell">
                     {% if death.death_date %}
                     {{ death.death_date.strftime('%Y-%m-%d') }}
@@ -435,60 +442,38 @@
 
 {% block extra_js %}
 <script>
-    const searchInput = document.getElementById('searchInput');
-    const statusFilter = document.getElementById('statusFilter');
-    const sacramentsFilter = document.getElementById('sacramentsFilter');
-    const tableBody = document.getElementById('recordsTableBody');
-    const displayedCount = document.getElementById('displayedCount');
-    const totalCount = document.getElementById('totalCount');
-    
-    function filterTable() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedStatus = statusFilter.value;
-        const selectedSacraments = sacramentsFilter.value;
-        const rows = tableBody.getElementsByTagName('tr');
-        let visibleCount = 0;
-        
-        for (let row of rows) {
-            const searchData = row.getAttribute('data-search').toLowerCase();
-            const status = row.getAttribute('data-status');
-            const sacraments = row.getAttribute('data-sacraments');
-            
-            const matchesSearch = searchData.includes(searchTerm);
-            const matchesStatus = !selectedStatus || status.includes(selectedStatus);
-            const matchesSacraments = !selectedSacraments || sacraments === selectedSacraments;
-            
-            if (matchesSearch && matchesStatus && matchesSacraments) {
-                row.style.display = '';
-                visibleCount++;
-            } else {
-                row.style.display = 'none';
-            }
-        }
-        
-        displayedCount.textContent = visibleCount;
-    }
-    
-    searchInput.addEventListener('input', filterTable);
-    statusFilter.addEventListener('change', filterTable);
-    sacramentsFilter.addEventListener('change', filterTable);
-    
     // Sorting functionality
     function updateSort() {
         const sortBy = document.getElementById('sortBy').value;
         const sortOrder = new URLSearchParams(window.location.search).get('sort_order') || 'desc';
+        const search = new URLSearchParams(window.location.search).get('search') || '';
+        const status = new URLSearchParams(window.location.search).get('status') || '';
+        const sacraments = new URLSearchParams(window.location.search).get('sacraments') || '';
         const page = new URLSearchParams(window.location.search).get('page') || '1';
         const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
-        window.location.href = `/deaths?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+        
+        let url = `/deaths?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (status) url += `&status=${status}`;
+        if (sacraments) url += `&sacraments=${sacraments}`;
+        window.location.href = url;
     }
     
     function toggleSortOrder() {
         const sortBy = new URLSearchParams(window.location.search).get('sort_by') || 'death_date';
         const currentOrder = new URLSearchParams(window.location.search).get('sort_order') || 'desc';
         const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+        const search = new URLSearchParams(window.location.search).get('search') || '';
+        const status = new URLSearchParams(window.location.search).get('status') || '';
+        const sacraments = new URLSearchParams(window.location.search).get('sacraments') || '';
         const page = new URLSearchParams(window.location.search).get('page') || '1';
         const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
-        window.location.href = `/deaths?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${newOrder}`;
+        
+        let url = `/deaths?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${newOrder}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (status) url += `&status=${status}`;
+        if (sacraments) url += `&sacraments=${sacraments}`;
+        window.location.href = url;
     }
 </script>
 {% endblock %}

@@ -109,7 +109,9 @@ class MetadataJsonLoader:
             "place": "Bolechów",
             "unit": "4500 M-1874-1937-Bolechów",
             "years": "1874-1937",
-            "page": "301.jpg (301 z 303)"
+            "page": "301.jpg (301 z 303)",
+            "collection_id": "1784",
+            "powiat": "krakowski"
         }
         
         Args:
@@ -131,16 +133,32 @@ class MetadataJsonLoader:
         
         skanoteka_metadata = {}
         
+        # Extract collection_id and powiat first (for composite document_id)
+        collection_id = json_data.get('collection_id')
+        powiat = json_data.get('powiat')
+        
+        if collection_id:
+            skanoteka_metadata['collection_id'] = collection_id
+        if powiat:
+            skanoteka_metadata['powiat'] = powiat
+        
         # Extract basic fields
         if 'place' in json_data:
             skanoteka_metadata['place'] = json_data['place']
         
         if 'unit' in json_data:
             skanoteka_metadata['unit'] = json_data['unit']
-            # Extract document_id from unit (use unit number as document_id)
-            document_id = self._extract_document_id_from_unit(json_data['unit'])
+            # Extract document_id from unit with collection context
+            document_id = self._extract_document_id_from_unit(
+                json_data['unit'],
+                collection_id=collection_id
+            )
             if document_id:
                 skanoteka_metadata['document_id'] = document_id
+                # Also store unit_number separately
+                unit_number = self._extract_unit_number(json_data['unit'])
+                if unit_number:
+                    skanoteka_metadata['unit_number'] = unit_number
         
         if 'years' in json_data:
             skanoteka_metadata['years'] = json_data['years']
@@ -160,9 +178,9 @@ class MetadataJsonLoader:
         logger.info(f"Extracted Skanoteka metadata: {skanoteka_metadata}")
         return skanoteka_metadata
     
-    def _extract_document_id_from_unit(self, unit: str) -> Optional[str]:
+    def _extract_unit_number(self, unit: str) -> Optional[str]:
         """
-        Extract document ID from unit string.
+        Extract unit number from unit string.
         
         Examples:
             "4500 M-1874-1937-Bolechów" -> "4500"
@@ -172,14 +190,56 @@ class MetadataJsonLoader:
             unit: Unit string from Skanoteka
         
         Returns:
-            Document ID (unit number) or None
+            Unit number or None
         """
         try:
             # Extract leading number from unit string
             match = re.match(r'^(\d+)', unit.strip())
             if match:
-                document_id = match.group(1)
-                logger.debug(f"Extracted document_id '{document_id}' from unit '{unit}'")
+                unit_number = match.group(1)
+                logger.debug(f"Extracted unit_number '{unit_number}' from unit '{unit}'")
+                return unit_number
+        except Exception as e:
+            logger.warning(f"Failed to extract unit_number from unit '{unit}': {e}")
+        
+        return None
+    
+    def _extract_document_id_from_unit(self, unit: str, collection_id: Optional[str] = None) -> Optional[str]:
+        """
+        Extract document ID from unit string with collection context.
+        
+        When collection_id is provided, creates a composite document_id to prevent
+        collisions when scanning powiaty with multiple collections.
+        
+        Examples:
+            ("4500 M-1874-1937-Bolechów", "1784") -> "1784-4500"
+            ("3500 U-1750-1777", "1885") -> "1885-3500"
+            ("4500 M-1874-1937-Bolechów", None) -> "4500"
+        
+        Args:
+            unit: Unit string from Skanoteka
+            collection_id: Optional collection ID for composite document_id
+        
+        Returns:
+            Document ID (composite or unit number) or None
+        """
+        try:
+            # Extract leading number from unit string
+            match = re.match(r'^(\d+)', unit.strip())
+            if match:
+                unit_number = match.group(1)
+                
+                # Create composite document_id if collection_id is available
+                if collection_id:
+                    document_id = f"{collection_id}-{unit_number}"
+                    logger.debug(
+                        f"Extracted composite document_id '{document_id}' "
+                        f"from unit '{unit}' and collection_id '{collection_id}'"
+                    )
+                else:
+                    document_id = unit_number
+                    logger.debug(f"Extracted document_id '{document_id}' from unit '{unit}'")
+                
                 return document_id
         except Exception as e:
             logger.warning(f"Failed to extract document_id from unit '{unit}': {e}")

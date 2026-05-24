@@ -47,5 +47,5 @@ MAX_DAY = 31
 DUPLICATE_THRESHOLD = 0.85
 
 # Auto-merge configuration
-AUTO_MERGE_THRESHOLD = 0.95  # Only auto-merge at 100% similarity
+AUTO_MERGE_THRESHOLD = 1.0  # Only auto-merge at 100% similarity (true perfect match)
 ENABLE_AUTO_MERGE = True    # Feature flag to enable/disable auto-merge

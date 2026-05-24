@@ -29,8 +29,8 @@ class Config:
     APP_UPLOAD_ENABLED: bool = os.getenv("APP_UPLOAD_ENABLED", "true").lower() == "true"
     APP_URL: Optional[str] = os.getenv("APP_URL")
     APP_API_KEY: Optional[str] = os.getenv("APP_API_KEY")
-    APP_UPLOAD_TIMEOUT: int = int(os.getenv("APP_UPLOAD_TIMEOUT", "30"))
-    APP_PARSE_TIMEOUT: int = int(os.getenv("APP_PARSE_TIMEOUT", "300"))
+    APP_UPLOAD_TIMEOUT: int = int(os.getenv("APP_UPLOAD_TIMEOUT", "120"))
+    APP_PARSE_TIMEOUT: int = int(os.getenv("APP_PARSE_TIMEOUT", "600"))
     APP_AUTO_PARSE: bool = os.getenv("APP_AUTO_PARSE", "true").lower() == "true"
     
     # Retry Configuration

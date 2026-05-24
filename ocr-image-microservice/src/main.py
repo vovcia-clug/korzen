@@ -85,9 +85,31 @@ def process_message(
             if skanoteka_metadata:
                 # Merge Skanoteka metadata into main metadata
                 # Skanoteka metadata takes precedence for document_id and page_number
+                
+                # First, copy collection_id and unit_number if present
+                if 'collection_id' in skanoteka_metadata:
+                    metadata['collection_id'] = skanoteka_metadata['collection_id']
+                    logger.info(f"Using collection_id from Skanoteka: {skanoteka_metadata['collection_id']}")
+                
+                if 'unit_number' in skanoteka_metadata:
+                    metadata['unit_number'] = skanoteka_metadata['unit_number']
+                    logger.info(f"Using unit_number from Skanoteka: {skanoteka_metadata['unit_number']}")
+                
+                # Then handle document_id - create composite if we have collection context
                 if 'document_id' in skanoteka_metadata:
                     metadata['document_id'] = skanoteka_metadata['document_id']
                     logger.info(f"Using document_id from Skanoteka: {skanoteka_metadata['document_id']}")
+                
+                # Override with composite ID if we have collection_id and unit_number
+                if 'collection_id' in metadata and 'unit_number' in metadata:
+                    composite_id = f"{metadata['collection_id']}-{metadata['unit_number']}"
+                    if metadata.get('document_id') != composite_id:
+                        metadata['document_id'] = composite_id
+                        logger.info(f"Overriding with composite document_id: {composite_id}")
+                
+                if 'powiat' in skanoteka_metadata:
+                    metadata['powiat'] = skanoteka_metadata['powiat']
+                    logger.info(f"Using powiat from Skanoteka: {skanoteka_metadata['powiat']}")
                 
                 if 'page_number' in skanoteka_metadata:
                     metadata['page_number'] = skanoteka_metadata['page_number']
@@ -101,10 +123,19 @@ def process_message(
                 metadata['skanoteka'] = skanoteka_metadata
         else:
             logger.info("Step 4: No JSON metadata found, using extracted metadata only")
+            # If no JSON metadata but we have collection_id and unit_number from path, create composite ID
+            if 'collection_id' in metadata and 'unit_number' in metadata and metadata.get('document_id') == metadata.get('unit_number'):
+                composite_id = f"{metadata['collection_id']}-{metadata['unit_number']}"
+                metadata['document_id'] = composite_id
+                logger.info(f"Created composite document_id from path metadata: {composite_id}")
         
-        logger.info(f"Final metadata: document_id={metadata.get('document_id')}, "
-                   f"page_number={metadata.get('page_number')}, "
-                   f"total_pages={metadata.get('total_pages')}")
+        logger.info(
+            f"Final metadata: document_id={metadata.get('document_id')}, "
+            f"collection_id={metadata.get('collection_id')}, "
+            f"unit_number={metadata.get('unit_number')}, "
+            f"page_number={metadata.get('page_number')}, "
+            f"total_pages={metadata.get('total_pages')}"
+        )
         
         # Step 5: Perform OCR
         logger.info("Step 5: Performing OCR...")

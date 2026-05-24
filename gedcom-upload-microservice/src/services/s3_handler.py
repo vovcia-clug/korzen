@@ -80,6 +80,39 @@ class S3Handler:
             logger.error(f"Failed to download {s3_uri}: {e}")
             raise
     
+    def download_gedcom_content(self, s3_uri: str) -> str:
+        """
+        Download GEDCOM content from S3 as string.
+        
+        Args:
+            s3_uri: S3 URI (s3://bucket/key)
+        
+        Returns:
+            GEDCOM content as string
+        
+        Raises:
+            ClientError: If S3 download fails
+            ValueError: If S3 URI is invalid
+        """
+        # Parse S3 URI
+        bucket, key = self.parse_s3_uri(s3_uri)
+        
+        try:
+            logger.info(f"Downloading GEDCOM content from {s3_uri}")
+            
+            response = self.s3_client.get_object(
+                Bucket=bucket,
+                Key=key
+            )
+            
+            content = response['Body'].read().decode('utf-8')
+            logger.info(f"Successfully downloaded {len(content)} bytes from S3")
+            return content
+            
+        except ClientError as e:
+            logger.error(f"Failed to download content from {s3_uri}: {e}")
+            raise
+    
     def upload_gedcom(
         self,
         gedcom_content: str,

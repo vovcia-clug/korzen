@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app, session, redirect, url_for
 from werkzeug.utils import secure_filename
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 from sqlalchemy.orm import joinedload, selectinload
 
 from ..extensions import db
@@ -257,6 +257,14 @@ def list_persons():
         sort_by = request.args.get('sort_by', 'last_name')
         sort_order = request.args.get('sort_order', 'asc')
         
+        # Get search parameters
+        search_query = request.args.get('search', '').strip()
+        gender_filter = request.args.get('gender', '').strip()
+        
+        # Log search parameters for debugging
+        if search_query:
+            logger.info(f"Search query: '{search_query}', Gender filter: '{gender_filter}'")
+        
         # Eagerly load parent relationships to avoid N+1 queries
         from sqlalchemy.orm import joinedload
         
@@ -265,6 +273,52 @@ def list_persons():
             joinedload(Person.father),
             joinedload(Person.mother)
         )
+        
+        # Apply search filter if provided
+        if search_query:
+            # Split search query into terms for better matching
+            search_terms = search_query.split()
+            logger.info(f"Applying search filter with terms: {search_terms}")
+            
+            if len(search_terms) == 1:
+                # Single term - search in all fields
+                search_pattern = f"%{search_terms[0]}%"
+                query = query.filter(
+                    or_(
+                        Person.first_name.ilike(search_pattern),
+                        Person.last_name.ilike(search_pattern),
+                        Person.maiden_name.ilike(search_pattern),
+                        Person.birth_place.ilike(search_pattern),
+                        Person.death_place.ilike(search_pattern),
+                        Person.residence.ilike(search_pattern)
+                    )
+                )
+            else:
+                # Multiple terms - try to match across first and last name
+                # This handles "John Smith" searches better
+                filters = []
+                for term in search_terms:
+                    term_pattern = f"%{term}%"
+                    filters.append(
+                        or_(
+                            Person.first_name.ilike(term_pattern),
+                            Person.last_name.ilike(term_pattern),
+                            Person.maiden_name.ilike(term_pattern),
+                            Person.birth_place.ilike(term_pattern),
+                            Person.death_place.ilike(term_pattern),
+                            Person.residence.ilike(term_pattern)
+                        )
+                    )
+                # All terms must match (AND logic)
+                query = query.filter(and_(*filters))
+            
+            logger.info(f"Query after search filter applied")
+        
+        # Apply gender filter if provided
+        if gender_filter and gender_filter != 'Unknown':
+            query = query.filter(Person.gender == gender_filter)
+        elif gender_filter == 'Unknown':
+            query = query.filter(or_(Person.gender == None, Person.gender == 'Unknown'))
         
         # Apply sorting based on sort_by parameter
         if sort_by == 'last_name':
@@ -296,6 +350,9 @@ def list_persons():
         
         # Paginate results
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        if search_query:
+            logger.info(f"Search results: {pagination.total} total persons found, showing {len(pagination.items)} on page {page}")
         
         return render_template("persons.html", persons=pagination.items, pagination=pagination, now=datetime.now)
         
@@ -951,8 +1008,58 @@ def list_baptisms():
         sort_by = request.args.get('sort_by', 'baptism_date')
         sort_order = request.args.get('sort_order', 'desc')
         
+        # Get search parameters
+        search_query = request.args.get('search', '').strip()
+        gender_filter = request.args.get('gender', '').strip()
+        legitimate_filter = request.args.get('legitimate', '').strip()
+        
         # Build query with sorting
         query = BaptismRecord.query
+        
+        # Apply search filter if provided
+        if search_query:
+            search_terms = search_query.split()
+            
+            if len(search_terms) == 1:
+                search_pattern = f"%{search_terms[0]}%"
+                query = query.filter(
+                    or_(
+                        BaptismRecord.child_name.ilike(search_pattern),
+                        BaptismRecord.father_name.ilike(search_pattern),
+                        BaptismRecord.father_surname.ilike(search_pattern),
+                        BaptismRecord.mother_name.ilike(search_pattern),
+                        BaptismRecord.mother_maiden_name.ilike(search_pattern),
+                        BaptismRecord.parish.ilike(search_pattern),
+                        BaptismRecord.village.ilike(search_pattern)
+                    )
+                )
+            else:
+                filters = []
+                for term in search_terms:
+                    term_pattern = f"%{term}%"
+                    filters.append(
+                        or_(
+                            BaptismRecord.child_name.ilike(term_pattern),
+                            BaptismRecord.father_name.ilike(term_pattern),
+                            BaptismRecord.father_surname.ilike(term_pattern),
+                            BaptismRecord.mother_name.ilike(term_pattern),
+                            BaptismRecord.mother_maiden_name.ilike(term_pattern),
+                            BaptismRecord.parish.ilike(term_pattern),
+                            BaptismRecord.village.ilike(term_pattern)
+                        )
+                    )
+                query = query.filter(and_(*filters))
+        
+        # Apply gender filter if provided
+        if gender_filter and gender_filter != 'Unknown':
+            query = query.filter(BaptismRecord.child_gender == gender_filter)
+        elif gender_filter == 'Unknown':
+            query = query.filter(or_(BaptismRecord.child_gender == None, BaptismRecord.child_gender == 'Unknown'))
+        
+        # Apply legitimate filter if provided
+        if legitimate_filter:
+            query = query.filter(BaptismRecord.legitimate == (legitimate_filter == 'true'))
+        
         sort_column = get_sort_column(BaptismRecord, sort_by, BaptismRecord.baptism_date)
         
         if sort_order == 'asc':
@@ -1032,6 +1139,10 @@ def list_marriages():
         sort_by = request.args.get('sort_by', 'marriage_date')
         sort_order = request.args.get('sort_order', 'desc')
         
+        # Get search parameters
+        search_query = request.args.get('search', '').strip()
+        status_filter = request.args.get('status', '').strip()
+        
         # Eagerly load spouse relationships to avoid N+1 queries
         from sqlalchemy.orm import joinedload
         
@@ -1040,6 +1151,49 @@ def list_marriages():
             joinedload(MarriageRecord.spouse1),
             joinedload(MarriageRecord.spouse2)
         )
+        
+        # Apply search filter if provided
+        if search_query:
+            search_terms = search_query.split()
+            
+            if len(search_terms) == 1:
+                search_pattern = f"%{search_terms[0]}%"
+                query = query.filter(
+                    or_(
+                        MarriageRecord.spouse1_name.ilike(search_pattern),
+                        MarriageRecord.spouse1_surname.ilike(search_pattern),
+                        MarriageRecord.spouse2_name.ilike(search_pattern),
+                        MarriageRecord.spouse2_surname.ilike(search_pattern),
+                        MarriageRecord.spouse2_maiden_name.ilike(search_pattern),
+                        MarriageRecord.parish.ilike(search_pattern),
+                        MarriageRecord.village.ilike(search_pattern)
+                    )
+                )
+            else:
+                filters = []
+                for term in search_terms:
+                    term_pattern = f"%{term}%"
+                    filters.append(
+                        or_(
+                            MarriageRecord.spouse1_name.ilike(term_pattern),
+                            MarriageRecord.spouse1_surname.ilike(term_pattern),
+                            MarriageRecord.spouse2_name.ilike(term_pattern),
+                            MarriageRecord.spouse2_surname.ilike(term_pattern),
+                            MarriageRecord.spouse2_maiden_name.ilike(term_pattern),
+                            MarriageRecord.parish.ilike(term_pattern),
+                            MarriageRecord.village.ilike(term_pattern)
+                        )
+                    )
+                query = query.filter(and_(*filters))
+        
+        # Apply status filter if provided
+        if status_filter:
+            query = query.filter(
+                or_(
+                    MarriageRecord.spouse1_status.ilike(f"%{status_filter}%"),
+                    MarriageRecord.spouse2_status.ilike(f"%{status_filter}%")
+                )
+            )
         
         sort_column = get_sort_column(MarriageRecord, sort_by, MarriageRecord.marriage_date)
         
@@ -1121,8 +1275,54 @@ def list_deaths():
         sort_by = request.args.get('sort_by', 'death_date')
         sort_order = request.args.get('sort_order', 'desc')
         
+        # Get search parameters
+        search_query = request.args.get('search', '').strip()
+        status_filter = request.args.get('status', '').strip()
+        sacraments_filter = request.args.get('sacraments', '').strip()
+        
         # Build query with sorting
         query = DeathRecord.query
+        
+        # Apply search filter if provided
+        if search_query:
+            search_terms = search_query.split()
+            
+            if len(search_terms) == 1:
+                search_pattern = f"%{search_terms[0]}%"
+                query = query.filter(
+                    or_(
+                        DeathRecord.deceased_name.ilike(search_pattern),
+                        DeathRecord.deceased_surname.ilike(search_pattern),
+                        DeathRecord.deceased_maiden_name.ilike(search_pattern),
+                        DeathRecord.parish.ilike(search_pattern),
+                        DeathRecord.village.ilike(search_pattern),
+                        DeathRecord.cemetery.ilike(search_pattern)
+                    )
+                )
+            else:
+                filters = []
+                for term in search_terms:
+                    term_pattern = f"%{term}%"
+                    filters.append(
+                        or_(
+                            DeathRecord.deceased_name.ilike(term_pattern),
+                            DeathRecord.deceased_surname.ilike(term_pattern),
+                            DeathRecord.deceased_maiden_name.ilike(term_pattern),
+                            DeathRecord.parish.ilike(term_pattern),
+                            DeathRecord.village.ilike(term_pattern),
+                            DeathRecord.cemetery.ilike(term_pattern)
+                        )
+                    )
+                query = query.filter(and_(*filters))
+        
+        # Apply status filter if provided
+        if status_filter:
+            query = query.filter(DeathRecord.marital_status.ilike(f"%{status_filter}%"))
+        
+        # Apply sacraments filter if provided
+        if sacraments_filter:
+            query = query.filter(DeathRecord.sacraments_received == (sacraments_filter == 'true'))
+        
         sort_column = get_sort_column(DeathRecord, sort_by, DeathRecord.death_date)
         
         if sort_order == 'asc':

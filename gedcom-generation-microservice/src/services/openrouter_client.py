@@ -157,9 +157,32 @@ class OpenRouterClient:
                         f"Rate limit hit (attempt {attempt + 1}/{self.max_retries}). "
                         f"Retrying in {wait_time}s..."
                     )
+                    # Log to Langfuse as warning (will retry)
+                    langfuse_tracer.log_error(
+                        e,
+                        context={
+                            "operation": "openrouter_api_call",
+                            "error_type": "rate_limit",
+                            "attempt": attempt + 1,
+                            "max_retries": self.max_retries,
+                            "retry_wait_seconds": wait_time,
+                            "model": self.model
+                        },
+                        level="WARNING"
+                    )
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"Rate limit exceeded after {self.max_retries} attempts")
+                    # Log final failure to Langfuse
+                    langfuse_tracer.log_error(
+                        e,
+                        context={
+                            "operation": "openrouter_api_call",
+                            "error_type": "rate_limit_exceeded",
+                            "attempts": self.max_retries,
+                            "model": self.model
+                        }
+                    )
                     raise
                     
             except APITimeoutError as e:
@@ -174,28 +197,74 @@ class OpenRouterClient:
                         f"API timeout (attempt {attempt + 1}/{self.max_retries}). "
                         f"Retrying in {wait_time}s..."
                     )
+                    # Log to Langfuse as warning (will retry)
+                    langfuse_tracer.log_error(
+                        e,
+                        context={
+                            "operation": "openrouter_api_call",
+                            "error_type": "timeout",
+                            "attempt": attempt + 1,
+                            "max_retries": self.max_retries,
+                            "retry_wait_seconds": wait_time,
+                            "model": self.model
+                        },
+                        level="WARNING"
+                    )
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"API timeout after {self.max_retries} attempts")
+                    # Log final failure to Langfuse
+                    langfuse_tracer.log_error(
+                        e,
+                        context={
+                            "operation": "openrouter_api_call",
+                            "error_type": "timeout_exceeded",
+                            "attempts": self.max_retries,
+                            "model": self.model
+                        }
+                    )
                     raise
                     
             except APIError as e:
                 last_error = e
                 # Handle other API errors
                 logger.error(f"API error on attempt {attempt + 1}/{self.max_retries}: {str(e)}")
+                
+                # Log to Langfuse
+                error_context = {
+                    "operation": "openrouter_api_call",
+                    "error_type": "api_error",
+                    "attempt": attempt + 1,
+                    "max_retries": self.max_retries,
+                    "model": self.model,
+                    "error_message": str(e)
+                }
+                
                 if attempt < self.max_retries - 1:
                     wait_time = min(
                         self.retry_backoff_base ** attempt,
                         self.retry_backoff_max
                     )
                     logger.warning(f"Retrying in {wait_time}s...")
+                    error_context["retry_wait_seconds"] = wait_time
+                    langfuse_tracer.log_error(e, context=error_context, level="WARNING")
                     await asyncio.sleep(wait_time)
                 else:
+                    # Final failure
+                    langfuse_tracer.log_error(e, context=error_context)
                     raise
                     
             except ValueError as e:
                 # Parsing errors - no retry needed, this is a logic error
                 logger.error(f"Failed to parse response: {str(e)}")
+                langfuse_tracer.log_error(
+                    e,
+                    context={
+                        "operation": "openrouter_response_parsing",
+                        "error_type": "parsing_error",
+                        "model": self.model
+                    }
+                )
                 raise
         
         # Should not reach here due to raise in loop, but just in case

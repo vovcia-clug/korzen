@@ -49,9 +49,10 @@ import os
 import re
 import sys
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import boto3
 from botocore.config import Config as BotoConfig
@@ -202,6 +203,8 @@ class S3OCRScanner:
         The path structure is: ocr-results/{original-path}/{filename}.md
         We need to extract document_id and page_number from the path.
         
+        For powiat scanning, generates composite document IDs to prevent collisions.
+        
         Args:
             ocr_key: S3 key of the OCR result file
             
@@ -223,10 +226,26 @@ class S3OCRScanner:
         # Common patterns:
         # - book-123/page-005.md -> document_id=book-123, page_number=5
         # - documents/2024/record-456/page-010.md -> document_id=record-456, page_number=10
+        # - powiat/collection_id/unit_number/page.md -> document_id=collection_id-unit_number
         
-        # Get parent directory as potential document_id
+        # Get parent directory parts
         parent_parts = path_obj.parent.parts
-        if parent_parts:
+        if len(parent_parts) >= 2:
+            # Check if this looks like a powiat/collection/unit structure
+            potential_collection = parent_parts[-2]
+            potential_unit = parent_parts[-1]
+            
+            # If both look like numeric IDs, create composite document_id
+            if potential_collection.isdigit() and potential_unit.isdigit():
+                collection_id = potential_collection
+                unit_number = potential_unit
+                metadata["document_id"] = f"{collection_id}-{unit_number}"
+                metadata["collection_id"] = collection_id
+                metadata["unit_number"] = unit_number
+            else:
+                # Use the last directory as document_id
+                metadata["document_id"] = parent_parts[-1]
+        elif parent_parts:
             # Use the last directory as document_id
             metadata["document_id"] = parent_parts[-1]
         else:
@@ -272,6 +291,81 @@ class S3OCRScanner:
         image_path += ".jpg"
         
         return f"s3://{self.config.s3_input_bucket}/{image_path}"
+    
+    def analyze_collection_completeness(
+        self,
+        ocr_keys: List[str]
+    ) -> Dict[str, Dict]:
+        """Analyze which collections are complete based on page sequences.
+        
+        Args:
+            ocr_keys: List of S3 keys for OCR results
+            
+        Returns:
+            Dictionary mapping document_id to analysis results with 'complete' status
+        """
+        # Group pages by document_id
+        document_pages = defaultdict(set)
+        
+        for ocr_key in ocr_keys:
+            metadata = self.extract_metadata_from_path(ocr_key)
+            document_id = metadata.get("document_id")
+            page_number = metadata.get("page_number")
+            
+            if document_id and page_number is not None:
+                document_pages[document_id].add(page_number)
+        
+        # Analyze each document for completeness
+        analyses = {}
+        for document_id, pages in document_pages.items():
+            if not pages:
+                analyses[document_id] = {
+                    "complete": False,
+                    "total_pages": 0,
+                    "missing_count": 0,
+                    "status": "empty"
+                }
+                continue
+            
+            sorted_pages = sorted(pages)
+            min_page = sorted_pages[0]
+            max_page = sorted_pages[-1]
+            expected_pages = max_page - min_page + 1
+            actual_pages = len(pages)
+            
+            # Find missing pages
+            expected_set = set(range(min_page, max_page + 1))
+            missing_pages = sorted(expected_set - pages)
+            missing_count = len(missing_pages)
+            
+            # Calculate completion percentage
+            completion_percentage = (actual_pages / expected_pages * 100) if expected_pages > 0 else 0.0
+            
+            # Determine if complete (no missing pages)
+            is_complete = missing_count == 0
+            
+            # Determine status
+            if is_complete:
+                status = "complete"
+            elif completion_percentage >= 90:
+                status = "mostly_complete"
+            elif completion_percentage >= 50:
+                status = "partial"
+            else:
+                status = "incomplete"
+            
+            analyses[document_id] = {
+                "complete": is_complete,
+                "total_pages": actual_pages,
+                "page_range": f"{min_page}-{max_page}",
+                "expected_pages": expected_pages,
+                "missing_pages": missing_pages,
+                "missing_count": missing_count,
+                "completion_percentage": round(completion_percentage, 2),
+                "status": status
+            }
+        
+        return analyses
 
 
 class MessageConstructor:
@@ -488,6 +582,18 @@ Examples:
         help="Skip downloading OCR content (faster, but messages won't include markdown_text)"
     )
     
+    parser.add_argument(
+        "--complete-only",
+        action="store_true",
+        help="Only send messages for complete collections (no missing pages)"
+    )
+    
+    parser.add_argument(
+        "--show-analysis",
+        action="store_true",
+        help="Show collection completeness analysis before sending"
+    )
+    
     args = parser.parse_args()
     
     # Print banner
@@ -529,6 +635,61 @@ Examples:
         
         print()
         
+        # Step 1.5: Analyze collection completeness if needed
+        collection_analyses = {}
+        if args.complete_only or args.show_analysis:
+            print("Step 1.5: Analyzing collection completeness...")
+            collection_analyses = scanner.analyze_collection_completeness(ocr_keys)
+            
+            complete_collections = sum(1 for a in collection_analyses.values() if a["complete"])
+            incomplete_collections = len(collection_analyses) - complete_collections
+            
+            print(f"Found {len(collection_analyses)} unique collections:")
+            print(f"  - Complete: {complete_collections}")
+            print(f"  - Incomplete: {incomplete_collections}")
+            
+            if args.show_analysis:
+                print("\nCollection Analysis:")
+                print("-" * 80)
+                for doc_id, analysis in sorted(collection_analyses.items()):
+                    status_emoji = "✓" if analysis["complete"] else "✗"
+                    print(f"{status_emoji} {doc_id}: {analysis['total_pages']} pages, "
+                          f"{analysis['completion_percentage']}% complete, "
+                          f"status: {analysis['status']}")
+                    if not analysis["complete"] and analysis["missing_count"] > 0:
+                        missing = analysis["missing_pages"]
+                        if len(missing) <= 10:
+                            print(f"   Missing pages: {', '.join(map(str, missing))}")
+                        else:
+                            print(f"   Missing pages: {', '.join(map(str, missing[:10]))}... "
+                                  f"(and {len(missing)-10} more)")
+                print("-" * 80)
+            
+            print()
+            
+            # Filter OCR keys if complete-only mode
+            if args.complete_only:
+                complete_doc_ids = {doc_id for doc_id, a in collection_analyses.items() if a["complete"]}
+                
+                # Filter ocr_keys to only include complete collections
+                filtered_keys = []
+                for ocr_key in ocr_keys:
+                    metadata = scanner.extract_metadata_from_path(ocr_key)
+                    document_id = metadata.get("document_id")
+                    if document_id in complete_doc_ids:
+                        filtered_keys.append(ocr_key)
+                
+                print(f"Filtering to complete collections only:")
+                print(f"  - Original: {len(ocr_keys)} files")
+                print(f"  - Filtered: {len(filtered_keys)} files from {len(complete_doc_ids)} complete collections")
+                print()
+                
+                ocr_keys = filtered_keys
+                
+                if not ocr_keys:
+                    print("No complete collections found. Exiting.")
+                    return 0
+        
         # Step 2: Process and send messages
         print(f"Step 2: Processing {len(ocr_keys)} OCR results...")
         print()
@@ -547,6 +708,13 @@ Examples:
                 try:
                     # Extract metadata from path
                     metadata = scanner.extract_metadata_from_path(ocr_key)
+                    
+                    # Add collection analysis info to metadata if available
+                    document_id = metadata.get("document_id")
+                    if document_id in collection_analyses:
+                        analysis = collection_analyses[document_id]
+                        metadata["total_pages"] = analysis["total_pages"]
+                        metadata["collection_complete"] = analysis["complete"]
                     
                     # Get source image URI
                     source_image_uri = scanner.get_source_image_uri(ocr_key)

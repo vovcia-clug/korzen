@@ -39,6 +39,8 @@ This microservice is part of a three-service architecture that processes genealo
 
 ## Features
 
+- **S3 URI Optimization**: Reuses GEDCOM files already in S3 (no redundant uploads)
+- **Large File Support**: Handles files of any size via S3 reference pattern
 - **Dual Upload Destinations**: Uploads GEDCOM files to both S3 and hosted application
 - **Reliable Processing**: Retry logic with configurable attempts and delays
 - **Graceful Shutdown**: Handles termination signals cleanly
@@ -46,15 +48,19 @@ This microservice is part of a three-service architecture that processes genealo
 - **Auto-Parse**: Optionally triggers parsing after upload to application
 - **Comprehensive Logging**: Detailed logging for monitoring and debugging
 - **Error Handling**: Robust error handling with detailed error messages
+- **Backward Compatible**: Supports both S3 URI and inline content messages
 
 ## Message Processing Flow
 
 1. **Receive Message**: Poll SQS queue for GEDCOM ready messages
-2. **Parse Message**: Extract GEDCOM content and metadata
-3. **Upload to S3**: Store GEDCOM in final S3 location (organized by document_id)
-4. **Upload to Application**: POST GEDCOM to hosted application API
-5. **Trigger Parse**: Optionally trigger parsing in the application
-6. **Delete Message**: Remove message from queue after successful processing
+2. **Parse Message**: Extract GEDCOM metadata and S3 URI (or content)
+3. **Check S3 URI**: Use existing S3 location if provided (no re-upload needed)
+4. **Download if Needed**: Download content from S3 only if required for application upload
+5. **Upload to Application**: POST GEDCOM to hosted application API
+6. **Trigger Parse**: Optionally trigger parsing in the application
+7. **Delete Message**: Remove message from queue after successful processing
+
+**Note**: The service now prioritizes S3 URIs over inline content, eliminating redundant uploads and supporting files of any size.
 
 ## Directory Structure
 
@@ -116,8 +122,8 @@ gedcom-upload-microservice/
 | `APP_UPLOAD_ENABLED` | Enable application upload | No | `true` |
 | `APP_URL` | Hosted application base URL | Yes* | - |
 | `APP_API_KEY` | API key for authentication | No | - |
-| `APP_UPLOAD_TIMEOUT` | Upload request timeout (seconds) | No | `30` |
-| `APP_PARSE_TIMEOUT` | Parse request timeout (seconds) | No | `300` |
+| `APP_UPLOAD_TIMEOUT` | Upload request timeout (seconds) | No | `120` |
+| `APP_PARSE_TIMEOUT` | Parse request timeout (seconds) | No | `600` |
 | `APP_AUTO_PARSE` | Auto-trigger parsing after upload | No | `true` |
 
 *Required if `APP_UPLOAD_ENABLED=true`
@@ -141,6 +147,8 @@ gedcom-upload-microservice/
 
 The service expects messages in the following format from the GEDCOM Generation Service:
 
+### Optimized Format (with S3 URI - Recommended)
+
 ```json
 {
   "message_id": "uuid-v4",
@@ -154,8 +162,8 @@ The service expects messages in the following format from the GEDCOM Generation 
     "pages_processed": 50
   },
   "gedcom_data": {
-    "content": "0 HEAD\n1 SOUR OCR-to-GEDCOM...",
     "filename": "book-123.ged",
+    "s3_uri": "s3://bucket/gedcom-files/book-123.ged",
     "record_counts": {
       "individuals": 150,
       "families": 45,
@@ -174,6 +182,26 @@ The service expects messages in the following format from the GEDCOM Generation 
   }
 }
 ```
+
+**Benefits**:
+- ✅ No SQS message size limits (S3 URI is ~100 bytes)
+- ✅ No redundant S3 uploads
+- ✅ Supports GEDCOM files of any size
+- ✅ Faster processing (no upload delay)
+
+### Legacy Format (with inline content - Backward Compatible)
+
+```json
+{
+  "gedcom_data": {
+    "content": "0 HEAD\n1 SOUR OCR-to-GEDCOM...",
+    "filename": "book-123.ged",
+    "validation_status": "valid"
+  }
+}
+```
+
+**Note**: The service will upload to S3 if only `content` is provided (backward compatibility).
 
 ## Upload Destinations
 
@@ -397,7 +425,20 @@ python -m src.main
 
 - **[OCR Image Microservice](../ocr-image-microservice/)**: Extracts text from images
 - **[GEDCOM Generation Microservice](../gedcom-generation-microservice/)**: Generates GEDCOM files
-- **[Architecture Documentation](../ocr-microservice/ARCHITECTURE_SPLIT_REVISED.md)**: Complete system architecture
+- **[S3 URI Optimization](S3_URI_OPTIMIZATION.md)**: Details on S3 reference pattern implementation
+
+## Recent Changes
+
+### S3 URI Optimization (2026-05-24)
+
+The service has been optimized to use S3 URIs from messages instead of re-uploading GEDCOM files:
+
+- **No Redundant Uploads**: Reuses files already in S3
+- **Large File Support**: Handles files of any size via S3 references
+- **Cost Savings**: 50% reduction in S3 PUT operations
+- **Backward Compatible**: Still supports inline content messages
+
+See [S3_URI_OPTIMIZATION.md](S3_URI_OPTIMIZATION.md) for complete details.
 
 ## License
 

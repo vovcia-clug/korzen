@@ -1,0 +1,6 @@
+# Zoo Rules Configuration
+
+## Python Environment
+1. Always use virtualenv: `. ~/venv/bin/activate`
+   - All Python commands should be executed within this virtual environment
+   - This ensures consistent dependencies across the project

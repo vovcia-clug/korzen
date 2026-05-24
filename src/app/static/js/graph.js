@@ -83,25 +83,7 @@ function getGraphOptions() {
             }
         },
         physics: {
-            enabled: true,
-            solver: 'forceAtlas2Based',
-            forceAtlas2Based: {
-                gravitationalConstant: -50,
-                centralGravity: 0.01,
-                springLength: 300,
-                springConstant: 0.08,
-                damping: 0.4,
-                avoidOverlap: 0.7
-            },
-            stabilization: {
-                enabled: true,
-                iterations: 1000,
-                updateInterval: 25,
-                onlyDynamicEdges: false,
-                fit: true
-            },
-            timestep: 0.5,
-            adaptiveTimestep: true
+            enabled: false  // Disabled for hierarchical layout with fixed positions
         },
         layout: {
             randomSeed: undefined,
@@ -232,6 +214,180 @@ function calculateHierarchicalLevels(nodes, edges) {
     return levels;
 }
 
+// Calculate hierarchical positions based on birth years with spouse grouping
+function calculateHierarchicalPositions(nodes, edges) {
+    const marriages = new Map();
+    const children = new Map();
+    const parents = new Map();
+    
+    // Initialize maps
+    nodes.forEach(node => {
+        marriages.set(node.id, new Set());
+        children.set(node.id, new Set());
+        parents.set(node.id, new Set());
+    });
+    
+    // Build relationships
+    edges.forEach(edge => {
+        if (edge.type === 'MARRIED_TO') {
+            if (marriages.has(edge.from) && marriages.has(edge.to)) {
+                marriages.get(edge.from).add(edge.to);
+                marriages.get(edge.to).add(edge.from);
+            }
+        } else if (edge.type === 'PARENT_OF') {
+            if (children.has(edge.from) && parents.has(edge.to)) {
+                children.get(edge.from).add(edge.to);
+                parents.get(edge.to).add(edge.from);
+            }
+        }
+    });
+    
+    // Group spouses together
+    const spouseGroups = [];
+    const visitedSpouses = new Set();
+    
+    nodes.forEach(node => {
+        if (!visitedSpouses.has(node.id)) {
+            const group = new Set([node.id]);
+            const queue = [node.id];
+            visitedSpouses.add(node.id);
+            
+            while (queue.length > 0) {
+                const curr = queue.shift();
+                marriages.get(curr).forEach(spouse => {
+                    if (!visitedSpouses.has(spouse)) {
+                        visitedSpouses.add(spouse);
+                        group.add(spouse);
+                        queue.push(spouse);
+                    }
+                });
+            }
+            spouseGroups.push(Array.from(group));
+        }
+    });
+    
+    // Extract birth years and calculate average for spouse groups
+    const nodeToYear = new Map();
+    const groupToYear = new Map();
+    
+    spouseGroups.forEach((group, groupIndex) => {
+        const birthYears = [];
+        
+        group.forEach(nodeId => {
+            const node = nodes.find(n => n.id === nodeId);
+            if (node && node.birth_date) {
+                // Parse birth year from YYYY-MM-DD format
+                const year = parseInt(node.birth_date.split('-')[0]);
+                if (!isNaN(year)) {
+                    birthYears.push(year);
+                }
+            }
+        });
+        
+        // Calculate average birth year for the group
+        let groupYear;
+        if (birthYears.length > 0) {
+            groupYear = Math.round(birthYears.reduce((a, b) => a + b, 0) / birthYears.length);
+        } else {
+            // No birth dates in group, assign a default far in the future (will be placed at bottom)
+            groupYear = 9999;
+        }
+        
+        groupToYear.set(groupIndex, groupYear);
+        
+        // Map each node to its group's year
+        group.forEach(nodeId => {
+            nodeToYear.set(nodeId, groupYear);
+        });
+    });
+    
+    // Find min and max years for scaling
+    const years = Array.from(nodeToYear.values()).filter(y => y !== 9999);
+    const minYear = years.length > 0 ? Math.min(...years) : 1800;
+    const maxYear = years.length > 0 ? Math.max(...years) : 2000;
+    const yearRange = maxYear - minYear || 100;
+    
+    // Calculate Y positions (80 pixels per decade)
+    const pixelsPerYear = 8;
+    const nodeToY = new Map();
+    
+    nodeToYear.forEach((year, nodeId) => {
+        if (year === 9999) {
+            // Place nodes without birth dates at the bottom
+            nodeToY.set(nodeId, (maxYear - minYear + 50) * pixelsPerYear);
+        } else {
+            nodeToY.set(nodeId, (year - minYear) * pixelsPerYear);
+        }
+    });
+    
+    // Calculate X positions to avoid overlap
+    // Group nodes by Y position (same level)
+    const levelToNodes = new Map();
+    nodeToY.forEach((y, nodeId) => {
+        if (!levelToNodes.has(y)) {
+            levelToNodes.set(y, []);
+        }
+        levelToNodes.get(y).push(nodeId);
+    });
+    
+    // Assign X positions with horizontal spacing
+    const horizontalSpacing = 250;
+    const nodeToX = new Map();
+    
+    levelToNodes.forEach((nodesAtLevel, y) => {
+        // For spouse groups at this level, keep them together
+        const spouseGroupsAtLevel = [];
+        const processedNodes = new Set();
+        
+        nodesAtLevel.forEach(nodeId => {
+            if (!processedNodes.has(nodeId)) {
+                // Find this node's spouse group
+                const group = spouseGroups.find(g => g.includes(nodeId));
+                if (group) {
+                    const groupNodesAtLevel = group.filter(id => nodesAtLevel.includes(id));
+                    spouseGroupsAtLevel.push(groupNodesAtLevel);
+                    groupNodesAtLevel.forEach(id => processedNodes.add(id));
+                }
+            }
+        });
+        
+        // Calculate total width needed
+        const totalGroups = spouseGroupsAtLevel.length;
+        const startX = -(totalGroups - 1) * horizontalSpacing / 2;
+        
+        // Assign X positions
+        spouseGroupsAtLevel.forEach((group, groupIndex) => {
+            const groupX = startX + groupIndex * horizontalSpacing;
+            
+            if (group.length === 1) {
+                // Single person
+                nodeToX.set(group[0], groupX);
+            } else {
+                // Multiple spouses - place them close together
+                const spouseSpacing = 120;
+                const groupStartX = groupX - (group.length - 1) * spouseSpacing / 2;
+                
+                group.forEach((nodeId, index) => {
+                    nodeToX.set(nodeId, groupStartX + index * spouseSpacing);
+                });
+            }
+        });
+    });
+    
+    // Return nodes with fixed positions
+    return nodes.map(node => {
+        const x = nodeToX.get(node.id) || 0;
+        const y = nodeToY.get(node.id) || 0;
+        
+        return {
+            ...node,
+            x: x,
+            y: y,
+            fixed: { x: true, y: true }
+        };
+    });
+}
+
 // Load graph data from API
 async function loadGraph() {
     const loadingDiv = document.getElementById('loading');
@@ -357,14 +513,22 @@ function renderGraph(data) {
         }
     });
     
-    // Process nodes for spring-based layout (no hierarchical levels needed)
-    const processedNodes = data.nodes.map(node => {
+    // Calculate hierarchical positions based on birth years
+    const nodesWithPositions = calculateHierarchicalPositions(data.nodes, data.edges);
+    
+    // Process nodes with hierarchical positioning and root highlighting
+    const processedNodes = nodesWithPositions.map(node => {
         const color = getNodeColor(node);
         const title = getNodeTooltip(node);
         
         // Build label with birth and death years for Person nodes
         let label = node.label;
         if (node.type === 'Person') {
+            // Add star icon for root node
+            if (node.id === currentRootId) {
+                label = '⭐ ' + label;
+            }
+            
             // Extract years from dates (format: YYYY-MM-DD or just YYYY)
             const birthYear = node.birth_date ? node.birth_date.split('-')[0] : '';
             const deathYear = node.death_date ? node.death_date.split('-')[0] : '';
@@ -375,11 +539,29 @@ function renderGraph(data) {
             }
         }
         
+        // Apply special styling for root node
+        const isRoot = node.id === currentRootId;
+        const nodeColor = isRoot ? {
+            background: color.background,
+            border: '#FFD700',  // Gold border for root
+            highlight: {
+                background: color.background,
+                border: '#4CAF50'  // Green border on highlight
+            }
+        } : color;
+        
+        const borderWidth = isRoot ? 5 : 1;
+        
         return {
             id: node.id,
             label: label,
             title: title,
-            color: color,
+            color: nodeColor,
+            borderWidth: borderWidth,
+            borderWidthSelected: isRoot ? 6 : 2,
+            x: node.x,
+            y: node.y,
+            fixed: node.fixed,
             font: {
                 color: '#333',
                 multi: true,

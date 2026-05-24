@@ -58,16 +58,41 @@ class GedcomGenerator:
         
         try:
             # Format document with metadata
-            formatted_document = await self._format_document(sorted_messages, document_metadata)
+            try:
+                formatted_document = await self._format_document(sorted_messages, document_metadata)
+            except Exception as e:
+                logger.error(f"Failed to format document {document_id}: {e}")
+                langfuse_tracer.log_error(
+                    e,
+                    context={
+                        "document_id": document_id,
+                        "operation": "format_document",
+                        "num_messages": len(sorted_messages)
+                    }
+                )
+                raise ValueError(f"Document formatting failed: {e}")
             
             # Get system prompt
             system_prompt = get_gedcom_system_prompt(self.gedcom_version)
             
             # Generate GEDCOM via LLM (automatically traced by @observe decorator)
-            gedcom_content = await self.openrouter_client.generate_gedcom(
-                formatted_document,
-                system_prompt
-            )
+            try:
+                gedcom_content = await self.openrouter_client.generate_gedcom(
+                    formatted_document,
+                    system_prompt
+                )
+            except Exception as e:
+                logger.error(f"OpenRouter API call failed for {document_id}: {e}")
+                langfuse_tracer.log_error(
+                    e,
+                    context={
+                        "document_id": document_id,
+                        "operation": "openrouter_api_call",
+                        "formatted_document_length": len(formatted_document),
+                        "model": self.openrouter_client.model
+                    }
+                )
+                raise ValueError(f"LLM API call failed: {e}")
             
             logger.info(
                 f"Successfully generated GEDCOM: {len(gedcom_content)} bytes"
@@ -75,11 +100,20 @@ class GedcomGenerator:
             
             return gedcom_content
             
+        except ValueError:
+            # Re-raise ValueError as-is (already logged)
+            raise
         except Exception as e:
-            logger.error(f"Failed to generate GEDCOM: {e}")
+            logger.error(f"Failed to generate GEDCOM for {document_id}: {e}")
+            langfuse_tracer.log_error(
+                e,
+                context={
+                    "document_id": document_id,
+                    "operation": "gedcom_generation"
+                }
+            )
             raise ValueError(f"GEDCOM generation failed: {e}")
     
-    @langfuse_tracer.observe(name="format-document")
     async def _format_document(
         self,
         sorted_messages: list,
@@ -103,26 +137,52 @@ class GedcomGenerator:
     
     def count_gedcom_records(self, gedcom_content: str) -> dict:
         """
-        Count individuals and families in GEDCOM content.
+        Count individuals, families, and events in GEDCOM content.
         
         Args:
             gedcom_content: GEDCOM file content
         
         Returns:
-            Dictionary with counts: {individuals, families}
+            Dictionary with counts: {
+                individuals, families, baptisms, deaths, marriages,
+                total_persons, total_events
+            }
         """
         lines = gedcom_content.split('\n')
         
         individual_count = 0
         family_count = 0
+        baptism_count = 0
+        death_count = 0
+        marriage_count = 0
         
         for line in lines:
+            stripped = line.strip()
+            
+            # Count individuals (persons)
             if line.startswith('0 @I') and '@ INDI' in line:
                 individual_count += 1
+            # Count families
             elif line.startswith('0 @F') and '@ FAM' in line:
                 family_count += 1
+            # Count baptisms (BAPM or CHR tags)
+            elif stripped.startswith('1 BAPM') or stripped.startswith('1 CHR'):
+                baptism_count += 1
+            # Count deaths
+            elif stripped.startswith('1 DEAT'):
+                death_count += 1
+            # Count marriages
+            elif stripped.startswith('1 MARR'):
+                marriage_count += 1
+        
+        total_events = baptism_count + death_count + marriage_count
         
         return {
             "individuals": individual_count,
-            "families": family_count
+            "families": family_count,
+            "baptisms": baptism_count,
+            "deaths": death_count,
+            "marriages": marriage_count,
+            "total_persons": individual_count,
+            "total_events": total_events
         }

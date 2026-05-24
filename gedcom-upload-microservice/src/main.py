@@ -53,44 +53,60 @@ def process_message(
         gedcom_data = parsed["gedcom_data"]
         document_metadata = parsed["document_metadata"]
         
-        gedcom_content = gedcom_data.get("content")
         filename = gedcom_data.get("filename", "output.ged")
         document_id = document_metadata.get("document_id", "unknown")
-        
-        if not gedcom_content:
-            logger.error(f"Message {message_id} missing GEDCOM content")
-            return False
+        s3_uri = gedcom_data.get("s3_uri")
+        gedcom_content = gedcom_data.get("content")
         
         logger.info(
             f"Processing message {message_id}: "
-            f"document_id={document_id}, filename={filename}"
+            f"document_id={document_id}, filename={filename}, "
+            f"s3_uri={'present' if s3_uri else 'missing'}, "
+            f"content={'present' if gedcom_content else 'missing'}"
         )
         
-        # Upload to S3
-        logger.info("Uploading GEDCOM to S3...")
-        s3_uri = s3_handler.upload_gedcom(
-            gedcom_content=gedcom_content,
-            document_id=document_id,
-            filename=filename
-        )
-        logger.info(f"GEDCOM uploaded to S3: {s3_uri}")
+        # Check if we have S3 URI (preferred) or content
+        if not s3_uri and not gedcom_content:
+            logger.error(f"Message {message_id} missing both s3_uri and content")
+            return False
+        
+        # If S3 URI is provided, use it (file already uploaded by generation service)
+        if s3_uri:
+            logger.info(f"GEDCOM already in S3: {s3_uri}")
+            
+            # Download content only if needed for application upload
+            if Config.APP_UPLOAD_ENABLED and not gedcom_content:
+                logger.info("Downloading GEDCOM content from S3 for application upload...")
+                gedcom_content = s3_handler.download_gedcom_content(s3_uri)
+        else:
+            # Fallback: Upload to S3 if only content is provided (backward compatibility)
+            logger.info("No S3 URI provided, uploading GEDCOM to S3...")
+            s3_uri = s3_handler.upload_gedcom(
+                gedcom_content=gedcom_content,
+                document_id=document_id,
+                filename=filename
+            )
+            logger.info(f"GEDCOM uploaded to S3: {s3_uri}")
         
         # Upload to application (if enabled)
         app_result = None
         if Config.APP_UPLOAD_ENABLED:
-            logger.info("Uploading GEDCOM to hosted application...")
-            app_result = app_uploader.upload_and_parse(
-                gedcom_content=gedcom_content,
-                filename=filename,
-                document_id=document_id,
-                auto_parse=Config.APP_AUTO_PARSE
-            )
-            
-            if app_result.get("success"):
-                logger.info(f"Application upload successful: {app_result}")
+            if not gedcom_content:
+                logger.warning("Cannot upload to application: no GEDCOM content available")
             else:
-                logger.warning(f"Application upload failed: {app_result}")
-                # Don't fail the entire process if app upload fails
+                logger.info("Uploading GEDCOM to hosted application...")
+                app_result = app_uploader.upload_and_parse(
+                    gedcom_content=gedcom_content,
+                    filename=filename,
+                    document_id=document_id,
+                    auto_parse=Config.APP_AUTO_PARSE
+                )
+                
+                if app_result.get("success"):
+                    logger.info(f"Application upload successful: {app_result}")
+                else:
+                    logger.warning(f"Application upload failed: {app_result}")
+                    # Don't fail the entire process if app upload fails
         else:
             logger.info("Application upload disabled, skipping")
         

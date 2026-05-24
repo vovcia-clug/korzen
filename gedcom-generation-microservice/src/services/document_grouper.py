@@ -29,6 +29,19 @@ class DocumentGroup:
     
     def add_message(self, message: Dict[str, Any]) -> None:
         """Add a message to the group and reset the timeout timer."""
+        page_number = message.get("metadata", {}).get("page_number")
+        
+        # Check for duplicate page numbers
+        existing_pages = [m.get("metadata", {}).get("page_number") for m in self.messages]
+        if page_number in existing_pages and page_number is not None:
+            from ..utils.logger import get_logger
+            logger = get_logger(__name__)
+            logger.warning(
+                f"DUPLICATE PAGE DETECTED: Document {self.document_id}, "
+                f"page {page_number} already exists in group. "
+                f"Current pages: {sorted([p for p in existing_pages if p is not None])}"
+            )
+        
         self.messages.append(message)
         
         # Reset timeout timer on each new message
@@ -67,6 +80,18 @@ class DocumentGroup:
             for m in self.messages
         ]
     
+    def get_unique_page_count(self) -> int:
+        """Get count of unique page numbers received.
+        
+        Returns count of unique non-None page numbers.
+        """
+        page_numbers = [
+            m.get("metadata", {}).get("page_number")
+            for m in self.messages
+            if m.get("metadata", {}).get("page_number") is not None
+        ]
+        return len(set(page_numbers))
+    
     def is_complete(self, timeout_seconds: int) -> tuple[bool, str]:
         """
         Check if document group is complete.
@@ -77,10 +102,25 @@ class DocumentGroup:
         Returns:
             Tuple of (is_complete, reason)
         """
-        # Check if all expected pages received
+        from ..utils.logger import get_logger
+        logger = get_logger(__name__)
+        
+        # Check if all expected pages received (count unique pages, not total messages)
         if self.expected_pages:
-            if len(self.messages) >= self.expected_pages:
+            unique_page_count = self.get_unique_page_count()
+            page_numbers = sorted([m.get('metadata', {}).get('page_number') for m in self.messages if m.get('metadata', {}).get('page_number') is not None])
+            logger.debug(
+                f"Document {self.document_id}: {unique_page_count}/{self.expected_pages} unique pages received "
+                f"({len(self.messages)} total messages). Pages: {page_numbers}"
+            )
+            if unique_page_count >= self.expected_pages:
                 return True, "all_pages_received"
+        else:
+            unique_page_count = self.get_unique_page_count()
+            logger.debug(
+                f"Document {self.document_id}: No expected_pages set, {unique_page_count} unique pages "
+                f"({len(self.messages)} total messages) received"
+            )
         
         # Check if timeout reached (based on last message received)
         elapsed = time.time() - self.last_updated
@@ -184,14 +224,37 @@ class DocumentGrouper:
         page_number = metadata.get("page_number")
         
         if not document_id:
-            raise ValueError("Message missing document_id in metadata")
+            error = ValueError("Message missing document_id in metadata")
+            logger.error(str(error))
+            langfuse_tracer.log_error(
+                error,
+                context={
+                    "operation": "add_message_to_group",
+                    "error_type": "missing_document_id",
+                    "message_metadata": metadata
+                }
+            )
+            raise error
         
         logger.info(f"Adding message to document group: {document_id}, page {page_number}")
         
-        if self.use_redis:
-            self._add_message_redis(document_id, message)
-        else:
-            self._add_message_memory(document_id, message)
+        try:
+            if self.use_redis:
+                self._add_message_redis(document_id, message)
+            else:
+                self._add_message_memory(document_id, message)
+        except Exception as e:
+            logger.error(f"Failed to add message to group {document_id}: {e}")
+            langfuse_tracer.log_error(
+                e,
+                context={
+                    "operation": "add_message_to_group",
+                    "document_id": document_id,
+                    "page_number": page_number,
+                    "use_redis": self.use_redis
+                }
+            )
+            raise
     
     def _add_message_memory(self, document_id: str, message: Dict[str, Any]) -> None:
         """Add message to in-memory storage."""
@@ -201,8 +264,10 @@ class DocumentGrouper:
             
             self.groups[document_id].add_message(message)
             
+            unique_pages = self.groups[document_id].get_unique_page_count()
+            total_messages = len(self.groups[document_id].messages)
             logger.debug(
-                f"Document {document_id}: {len(self.groups[document_id].messages)} messages buffered"
+                f"Document {document_id}: {unique_pages} unique pages ({total_messages} total messages) buffered"
             )
     
     def _add_message_redis(self, document_id: str, message: Dict[str, Any]) -> None:
@@ -210,44 +275,68 @@ class DocumentGrouper:
         redis_key = f"{self.redis_key_prefix}{document_id}"
         lock_key = f"{redis_key}:lock"
         
-        # Acquire distributed lock
-        lock_acquired = self.redis_client.set(lock_key, "1", nx=True, ex=10)
-        
         try:
-            if not lock_acquired:
-                # Wait briefly and retry
-                time.sleep(0.1)
-                lock_acquired = self.redis_client.set(lock_key, "1", nx=True, ex=10)
+            # Acquire distributed lock
+            lock_acquired = self.redis_client.set(lock_key, "1", nx=True, ex=10)
             
-            if not lock_acquired:
-                logger.warning(f"Could not acquire lock for document {document_id}")
-                # Fall back to adding without lock (may cause race conditions)
-            
-            # Get existing group or create new
-            group_data = self.redis_client.get(redis_key)
-            if group_data:
-                group = DocumentGroup.from_dict(json.loads(group_data))
-            else:
-                group = DocumentGroup(document_id=document_id)
-            
-            # Add message
-            group.add_message(message)
-            
-            # Save back to Redis with TTL (2x timeout to allow for processing)
-            self.redis_client.setex(
-                redis_key,
-                self.timeout_seconds * 2,
-                json.dumps(group.to_dict())
+            try:
+                if not lock_acquired:
+                    # Wait briefly and retry
+                    time.sleep(0.1)
+                    lock_acquired = self.redis_client.set(lock_key, "1", nx=True, ex=10)
+                
+                if not lock_acquired:
+                    logger.warning(f"Could not acquire lock for document {document_id}")
+                    langfuse_tracer.log_error(
+                        ValueError(f"Could not acquire Redis lock for document {document_id}"),
+                        context={
+                            "operation": "redis_lock_acquisition",
+                            "document_id": document_id,
+                            "lock_key": lock_key
+                        },
+                        level="WARNING"
+                    )
+                    # Fall back to adding without lock (may cause race conditions)
+                
+                # Get existing group or create new
+                group_data = self.redis_client.get(redis_key)
+                if group_data:
+                    group = DocumentGroup.from_dict(json.loads(group_data))
+                else:
+                    group = DocumentGroup(document_id=document_id)
+                
+                # Add message
+                group.add_message(message)
+                
+                # Save back to Redis with TTL (2x timeout to allow for processing)
+                self.redis_client.setex(
+                    redis_key,
+                    self.timeout_seconds * 2,
+                    json.dumps(group.to_dict())
+                )
+                
+                unique_pages = group.get_unique_page_count()
+                total_messages = len(group.messages)
+                logger.debug(
+                    f"Document {document_id}: {unique_pages} unique pages ({total_messages} total messages) buffered (Redis)"
+                )
+                
+            finally:
+                # Release lock
+                if lock_acquired:
+                    self.redis_client.delete(lock_key)
+                    
+        except Exception as e:
+            logger.error(f"Redis operation failed for document {document_id}: {e}")
+            langfuse_tracer.log_error(
+                e,
+                context={
+                    "operation": "redis_add_message",
+                    "document_id": document_id,
+                    "redis_key": redis_key
+                }
             )
-            
-            logger.debug(
-                f"Document {document_id}: {len(group.messages)} messages buffered (Redis)"
-            )
-            
-        finally:
-            # Release lock
-            if lock_acquired:
-                self.redis_client.delete(lock_key)
+            raise
     
     def is_complete(self, document_id: str) -> tuple[bool, str]:
         """

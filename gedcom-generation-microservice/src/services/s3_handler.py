@@ -41,7 +41,9 @@ class S3Handler:
         self,
         content: str,
         document_id: str,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        source_s3_uri: Optional[str] = None,
+        preserve_structure: bool = True
     ) -> str:
         """
         Upload GEDCOM content to S3.
@@ -50,6 +52,8 @@ class S3Handler:
             content: GEDCOM file content as string
             document_id: Document identifier for organizing files
             filename: Optional custom filename (defaults to document_id.ged)
+            source_s3_uri: Optional source image S3 URI to preserve directory structure
+            preserve_structure: If True and source_s3_uri provided, preserve directory structure
         
         Returns:
             S3 URI of uploaded GEDCOM file
@@ -61,7 +65,51 @@ class S3Handler:
         if filename is None:
             filename = f"{document_id}.ged"
         
-        output_key = f"{self.output_prefix}{filename}"
+        # Preserve directory structure if source URI is provided
+        if preserve_structure and source_s3_uri:
+            try:
+                # Parse source S3 URI to extract the path structure
+                # Format: s3://bucket/path/to/file.ext
+                if source_s3_uri.startswith("s3://"):
+                    # Remove s3://bucket/ prefix
+                    path_part = source_s3_uri.split("/", 3)
+                    if len(path_part) >= 4:
+                        # Get the directory path (everything except the filename)
+                        source_key = path_part[3]
+                        source_path = Path(source_key)
+                        parent_path = source_path.parent
+                        
+                        # Construct output key with preserved structure
+                        if str(parent_path) != '.':
+                            output_key = f"{self.output_prefix}{parent_path}/{filename}"
+                        else:
+                            output_key = f"{self.output_prefix}{filename}"
+                        
+                        logger.info(
+                            f"Preserving directory structure from {source_s3_uri}: "
+                            f"parent_path={parent_path}, output_key={output_key}"
+                        )
+                    else:
+                        # Fallback to simple prefix if parsing fails
+                        output_key = f"{self.output_prefix}{filename}"
+                        logger.warning(
+                            f"Could not parse source URI structure, using simple prefix: {source_s3_uri}"
+                        )
+                else:
+                    # Fallback for non-s3:// URIs
+                    output_key = f"{self.output_prefix}{filename}"
+                    logger.warning(
+                        f"Source URI not in s3:// format, using simple prefix: {source_s3_uri}"
+                    )
+            except Exception as e:
+                # Fallback to simple prefix on any error
+                output_key = f"{self.output_prefix}{filename}"
+                logger.warning(
+                    f"Error parsing source URI structure, using simple prefix: {e}"
+                )
+        else:
+            # Original behavior: just use prefix + filename
+            output_key = f"{self.output_prefix}{filename}"
         
         try:
             logger.info(

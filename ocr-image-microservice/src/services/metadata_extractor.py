@@ -19,17 +19,21 @@ class MetadataExtractor:
         """
         Extract document_id and page_number from S3 URI path patterns.
         
+        For powiat scanning with multiple collections, generates composite document IDs
+        to prevent collisions when different collections have units with the same numbers.
+        
         Supported patterns:
+        - s3://bucket/powiat/collection_id/unit_number/page.jpg -> document_id="collection_id-unit_number"
         - s3://bucket/documents/{document_id}/page-{page_number}.jpg
         - s3://bucket/documents/{document_id}/{page_number}.jpg
         - s3://bucket/{document_id}/page-{page_number}.jpg
         - s3://bucket/{document_id}/{filename}
         
         Args:
-            s3_uri: S3 URI (e.g., s3://bucket/documents/book-123/page-005.jpg)
+            s3_uri: S3 URI (e.g., s3://bucket/krakowski/1784/3500/001.jpg)
         
         Returns:
-            Dictionary with extracted metadata (document_id, page_number, filename)
+            Dictionary with extracted metadata (document_id, collection_id, unit_number, page_number, filename)
         """
         metadata = {}
         
@@ -63,23 +67,50 @@ class MetadataExtractor:
                     logger.info(f"Extracted page_number={page_number} from filename: {filename}")
                     break
             
-            # Try to extract document_id from path
-            # Look for a directory name before the filename
-            if len(parts) >= 2:
-                # Use the parent directory as document_id
+            # Extract document_id with collection context to prevent ID collisions
+            # For powiat structure: powiat/collection_id/unit_number/file.jpg
+            if len(parts) >= 3:
+                # Check if this looks like a powiat/collection/unit structure
+                # parts[-3] could be collection_id, parts[-2] could be unit_number
+                potential_collection = parts[-3]
+                potential_unit = parts[-2]
+                
+                # If both look like numeric IDs, create composite document_id
+                if potential_collection.isdigit() and potential_unit.isdigit():
+                    collection_id = potential_collection
+                    unit_number = potential_unit
+                    document_id = f"{collection_id}-{unit_number}"
+                    
+                    metadata['collection_id'] = collection_id
+                    metadata['unit_number'] = unit_number
+                    metadata['document_id'] = document_id
+                    
+                    logger.info(
+                        f"Extracted composite document_id={document_id} "
+                        f"(collection={collection_id}, unit={unit_number}) from path"
+                    )
+                else:
+                    # Not a powiat structure, use parent directory as document_id
+                    document_id = parts[-2]
+                    metadata['document_id'] = document_id
+                    logger.info(f"Extracted document_id={document_id} from path")
+            elif len(parts) >= 2:
+                # Simple structure: use parent directory as document_id
                 document_id = parts[-2]
                 metadata['document_id'] = document_id
                 logger.info(f"Extracted document_id={document_id} from path")
             
             # If path has more structure, try to find a better document_id
             # Pattern: documents/{document_id}/... or books/{document_id}/...
-            for i, part in enumerate(parts[:-1]):
-                if part in ['documents', 'books', 'records', 'images']:
-                    if i + 1 < len(parts):
-                        document_id = parts[i + 1]
-                        metadata['document_id'] = document_id
-                        logger.info(f"Extracted document_id={document_id} from structured path")
-                        break
+            # Only override if we haven't already found a composite ID
+            if 'collection_id' not in metadata:
+                for i, part in enumerate(parts[:-1]):
+                    if part in ['documents', 'books', 'records', 'images']:
+                        if i + 1 < len(parts):
+                            document_id = parts[i + 1]
+                            metadata['document_id'] = document_id
+                            logger.info(f"Extracted document_id={document_id} from structured path")
+                            break
             
         except Exception as e:
             logger.error(f"Error extracting metadata from S3 path: {e}")

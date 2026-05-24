@@ -287,16 +287,25 @@
     </button>
 </div>
 
-<div class="search-bar">
-    <input type="text" id="searchInput" class="search-input" placeholder="{{ _('Search by spouse names, parish, or village...') }}">
-    <select id="statusFilter" class="filter-select">
+<form method="get" action="{{ url_for('main.list_marriages') }}" class="search-bar">
+    <input type="text" name="search" id="searchInput" class="search-input"
+           placeholder="{{ _('Search by spouse names, parish, or village...') }}"
+           value="{{ request.args.get('search', '') }}">
+    <select name="status" id="statusFilter" class="filter-select">
         <option value="">{{ _('All Status') }}</option>
-        <option value="Juvenis">{{ _('Bachelor (Juvenis)') }}</option>
-        <option value="Virgo">{{ _('Spinster (Virgo)') }}</option>
-        <option value="Viduus">{{ _('Widower (Viduus)') }}</option>
-        <option value="Vidua">{{ _('Widow (Vidua)') }}</option>
+        <option value="Juvenis" {% if request.args.get('status') == 'Juvenis' %}selected{% endif %}>{{ _('Bachelor (Juvenis)') }}</option>
+        <option value="Virgo" {% if request.args.get('status') == 'Virgo' %}selected{% endif %}>{{ _('Spinster (Virgo)') }}</option>
+        <option value="Viduus" {% if request.args.get('status') == 'Viduus' %}selected{% endif %}>{{ _('Widower (Viduus)') }}</option>
+        <option value="Vidua" {% if request.args.get('status') == 'Vidua' %}selected{% endif %}>{{ _('Widow (Vidua)') }}</option>
     </select>
-</div>
+    <button type="submit" class="btn-parse" style="min-width: 100px;">{{ _('Search') }}</button>
+    {% if request.args.get('search') or request.args.get('status') %}
+    <a href="{{ url_for('main.list_marriages') }}" class="btn-parse" style="min-width: 100px; background: linear-gradient(135deg, #999 0%, #666 100%); text-decoration: none; display: inline-block; text-align: center;">{{ _('Clear') }}</a>
+    {% endif %}
+    <input type="hidden" name="sort_by" value="{{ request.args.get('sort_by', 'marriage_date') }}">
+    <input type="hidden" name="sort_order" value="{{ request.args.get('sort_order', 'desc') }}">
+    <input type="hidden" name="per_page" value="{{ request.args.get('per_page', '50') }}">
+</form>
 
 <div class="stats">
     <div class="stat-card">
@@ -329,8 +338,7 @@
         </thead>
         <tbody id="recordsTableBody">
             {% for marriage in pagination.items %}
-            <tr data-status="{{ (marriage.spouse1_status or '') + ' ' + (marriage.spouse2_status or '') }}"
-                data-search="{{ (marriage.spouse1_name or '') + ' ' + (marriage.spouse1_surname or '') + ' ' + (marriage.spouse2_name or '') + ' ' + (marriage.spouse2_surname or '') + ' ' + (marriage.parish or '') + ' ' + (marriage.village or '') }}">
+            <tr>
                 <td class="date-cell">
                     {% if marriage.marriage_date %}
                     {{ marriage.marriage_date.strftime('%Y-%m-%d') }}
@@ -445,55 +453,34 @@
 
 {% block extra_js %}
 <script>
-    const searchInput = document.getElementById('searchInput');
-    const statusFilter = document.getElementById('statusFilter');
-    const tableBody = document.getElementById('recordsTableBody');
-    const displayedCount = document.getElementById('displayedCount');
-    const totalCount = document.getElementById('totalCount');
-    
-    function filterTable() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedStatus = statusFilter.value;
-        const rows = tableBody.getElementsByTagName('tr');
-        let visibleCount = 0;
-        
-        for (let row of rows) {
-            const searchData = row.getAttribute('data-search').toLowerCase();
-            const status = row.getAttribute('data-status');
-            
-            const matchesSearch = searchData.includes(searchTerm);
-            const matchesStatus = !selectedStatus || status.includes(selectedStatus);
-            
-            if (matchesSearch && matchesStatus) {
-                row.style.display = '';
-                visibleCount++;
-            } else {
-                row.style.display = 'none';
-            }
-        }
-        
-        displayedCount.textContent = visibleCount;
-    }
-    
-    searchInput.addEventListener('input', filterTable);
-    statusFilter.addEventListener('change', filterTable);
-    
     // Sorting functionality
     function updateSort() {
         const sortBy = document.getElementById('sortBy').value;
         const sortOrder = new URLSearchParams(window.location.search).get('sort_order') || 'desc';
+        const search = new URLSearchParams(window.location.search).get('search') || '';
+        const status = new URLSearchParams(window.location.search).get('status') || '';
         const page = new URLSearchParams(window.location.search).get('page') || '1';
         const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
-        window.location.href = `/marriages?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+        
+        let url = `/marriages?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (status) url += `&status=${status}`;
+        window.location.href = url;
     }
     
     function toggleSortOrder() {
         const sortBy = new URLSearchParams(window.location.search).get('sort_by') || 'marriage_date';
         const currentOrder = new URLSearchParams(window.location.search).get('sort_order') || 'desc';
         const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+        const search = new URLSearchParams(window.location.search).get('search') || '';
+        const status = new URLSearchParams(window.location.search).get('status') || '';
         const page = new URLSearchParams(window.location.search).get('page') || '1';
         const perPage = new URLSearchParams(window.location.search).get('per_page') || '50';
-        window.location.href = `/marriages?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${newOrder}`;
+        
+        let url = `/marriages?page=${page}&per_page=${perPage}&sort_by=${sortBy}&sort_order=${newOrder}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (status) url += `&status=${status}`;
+        window.location.href = url;
     }
 </script>
 {% endblock %}

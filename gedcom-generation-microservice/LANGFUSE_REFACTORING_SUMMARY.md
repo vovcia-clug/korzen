@@ -1,303 +1,318 @@
-# Langfuse Refactoring Summary
+# Langfuse Integration Refactoring Summary
 
 ## Overview
-
-Successfully refactored the Langfuse implementation from manual Static Client classes to the simpler `@observe` decorator pattern, following Langfuse best practices.
+This document summarizes the Langfuse integration refactoring completed for the GEDCOM generation microservice. The refactoring adds comprehensive tracing for document group processing, error logging throughout the pipeline, and detailed entity count metrics.
 
 ## Changes Made
 
-### 1. Refactored [`langfuse_tracer.py`](src/utils/langfuse_tracer.py)
+### 1. Enhanced Langfuse Tracer Utility (`src/utils/langfuse_tracer.py`)
 
-**Before**: Complex context managers using Static Client classes
-- `trace_context()` - Manual trace creation
-- `span_context()` - Manual span creation  
-- `generation_context()` - Manual generation creation
-- Required passing trace objects between functions
+#### New Functions Added:
 
-**After**: Simple decorator pattern with helper functions
-- `@observe_if_enabled()` - Automatic function tracing
-- `update_current_trace()` - Update trace metadata
-- `update_current_observation()` - Update observation metadata
-- `get_langfuse_context()` - Access langfuse_context
-- No manual trace/span management needed
+**`create_span(name, metadata)`** - Context manager for manual span creation
+- Creates Langfuse spans for tracking specific operations
+- Accepts metadata dictionary for rich context
+- Gracefully handles cases where Langfuse is unavailable
+- Returns span context that can be used to update the span
 
-**Code Reduction**: ~60% less boilerplate code
+**`log_error(error, context, level)`** - Error logging to Langfuse
+- Captures exception details, stack traces, and context
+- Supports different error levels (ERROR, WARNING, etc.)
+- Automatically extracts error type and message
+- Associates errors with current observation/span
+- Includes optional context dictionary for debugging
 
-### 2. Updated [`openrouter_client.py`](src/services/openrouter_client.py)
+#### Example Usage:
+```python
+# Create a span with metadata
+with langfuse_tracer.create_span("process-document-group", metadata={"document_id": doc_id}):
+    # Your processing code here
+    pass
 
-**Changes**:
-- Added `@observe_if_enabled(name="openrouter-llm-call", as_type="generation")` decorator
-- Removed manual `generation_context()` usage
-- Uses `update_current_observation()` for model info and token usage
-- Simplified error handling with `update_trace_with_error()`
+# Log an error with context
+try:
+    # Some operation
+    pass
+except Exception as e:
+    langfuse_tracer.log_error(
+        e,
+        context={"document_id": doc_id, "operation": "gedcom_generation"}
+    )
+    raise
+```
 
-**Benefits**:
-- Automatic generation-type observation
-- Cleaner code structure
-- Proper token usage tracking
+### 2. Document Group Spans (`src/main.py`)
 
-### 3. Updated [`gedcom_generator.py`](src/services/gedcom_generator.py)
+#### Added to `process_complete_document()`:
 
-**Changes**:
-- Added `@observe_if_enabled(name="gedcom-generation")` to main function
-- Added `@observe_if_enabled(name="format-document")` to helper function
-- Removed manual `span_context()` usage
-- Uses `update_current_observation()` for metadata
+**Decorator**: Added `@langfuse_tracer.observe(name="process-document-group")` to the function
 
-**Benefits**:
-- Automatic nested observations
-- Cleaner function signatures (no trace parameter needed)
-- Better separation of concerns
+**Span Metadata**: Created comprehensive metadata for each document group:
+- `document_id`: Unique identifier for the document
+- `num_pages`: Number of pages in the group
+- `expected_pages`: Expected total pages
+- `completion_reason`: Why processing started (all_pages_received, timeout_reached)
+- `document_title`: Title from metadata
+- `location`: Location from metadata
+- `date_range`: Date range from metadata
+- `page_numbers_received`: List of actual page numbers received
 
-### 4. Updated [`document_grouper.py`](src/services/document_grouper.py)
+**Nested Span**: Used `create_span()` to create an inner span with all the metadata
 
-**Changes**:
-- Added `@observe_if_enabled(name="group-document")` to `add_message()`
-- Removed manual `span_context()` usage
-- Uses `update_current_observation()` for metadata
+#### Example Trace Hierarchy:
+```
+process-document-group (outer span from @observe)
+└── process-document-group (inner span with metadata)
+    ├── gedcom-generation
+    │   └── openrouter-llm-call
+    └── [error logs if any occur]
+```
 
-**Benefits**:
-- Automatic tracing of document grouping
-- Simplified code
+### 3. Error Logging Implementation
 
-### 5. Updated [`main.py`](src/main.py)
+#### Locations Where Error Logging Was Added:
 
-**Changes**:
-- Added `@observe_if_enabled()` decorators to key functions:
-  - `process_message()` - Top-level trace
-  - `process_complete_document()` - Document processing
-  - `_validate_gedcom()` - Validation span
-  - `_upload_to_s3()` - Upload span
-  - `_publish_to_sqs()` - Publishing span
-- Removed all manual context managers
-- Uses `update_current_trace()` for session grouping
-- Uses `update_current_observation()` for metadata
+**`src/main.py` - `process_complete_document()`**:
+- Document group not found
+- Missing pages warning
+- GEDCOM generation failures
+- GEDCOM validation failures
+- S3 upload failures
+- SQS publish failures
+- Top-level processing errors
 
-**Benefits**:
-- Much cleaner and more readable code
-- Automatic trace hierarchy
-- No manual trace object passing
-- Easier to maintain
+**`src/services/gedcom_generator.py` - `generate_from_document_group()`**:
+- Document formatting errors
+- OpenRouter API call failures
+- General GEDCOM generation errors
 
-## Features Maintained
+**`src/services/openrouter_client.py` - `generate_gedcom()`**:
+- Rate limit errors (with retry context)
+- API timeout errors (with retry context)
+- General API errors (with retry context)
+- Response parsing errors
 
-All existing features continue to work:
+**`src/services/document_grouper.py` - `add_message()`**:
+- Missing document_id errors
+- Message addition failures
+- Redis lock acquisition warnings
+- Redis operation failures
 
-✅ **Session Grouping**: Documents grouped by `document_id` using `session_id`  
-✅ **Token Usage Tracking**: LLM calls track input/output/total tokens  
-✅ **Error Tracking**: Errors captured with context and error type  
-✅ **Graceful Degradation**: Works seamlessly when Langfuse is disabled  
-✅ **Nested Observations**: Proper trace hierarchy maintained  
-✅ **Metadata**: All relevant metadata captured  
-✅ **Tags**: Traces tagged for filtering  
+#### Error Context Examples:
+
+**Missing Pages Warning**:
+```python
+langfuse_tracer.log_error(
+    ValueError(f"Missing pages: {sorted(missing)}"),
+    context={
+        "document_id": document_id,
+        "operation": "page_completeness_check",
+        "missing_pages": sorted(missing),
+        "expected_pages": group.expected_pages,
+        "received_pages": sorted(received)
+    },
+    level="WARNING"
+)
+```
+
+**API Retry Error**:
+```python
+langfuse_tracer.log_error(
+    e,
+    context={
+        "operation": "openrouter_api_call",
+        "error_type": "rate_limit",
+        "attempt": attempt + 1,
+        "max_retries": self.max_retries,
+        "retry_wait_seconds": wait_time,
+        "model": self.model
+    },
+    level="WARNING"
+)
+```
+
+## Files Modified
+
+1. **`src/utils/langfuse_tracer.py`**
+   - Added `create_span()` context manager
+   - Added `log_error()` function
+   - Imported `langfuse_context` for span updates
+   - Added no-op implementations for when Langfuse is unavailable
+
+2. **`src/main.py`**
+   - Added `@observe` decorator to `process_complete_document()`
+   - Created document group span with comprehensive metadata
+   - Added error logging for all critical operations
+   - Wrapped operations in try-except blocks with Langfuse error logging
+
+3. **`src/services/gedcom_generator.py`**
+   - Added error logging for document formatting failures
+   - Added error logging for OpenRouter API call failures
+   - Added error logging for general generation errors
+
+4. **`src/services/openrouter_client.py`**
+   - Added error logging for rate limit errors
+   - Added error logging for timeout errors
+   - Added error logging for API errors
+   - Added error logging for parsing errors
+   - Included retry context in warning-level logs
+
+5. **`src/services/document_grouper.py`**
+   - Added error logging for missing document_id
+   - Added error logging for message addition failures
+   - Added warning-level logging for Redis lock issues
+   - Added error logging for Redis operation failures
 
 ## Testing
 
-Created comprehensive test suite: [`test_refactored_langfuse.py`](test_refactored_langfuse.py)
+Created comprehensive test suite: `test_langfuse_refactoring.py`
 
-Tests verify:
-- ✅ Initialization
-- ✅ Decorator functionality (sync and async)
-- ✅ Context updates (trace and observation)
-- ✅ Error handling
-- ✅ Nested observations
-- ✅ Generation type observations
-- ✅ Graceful degradation when disabled
+### Test Coverage:
+- ✅ Span creation with metadata
+- ✅ Error logging with context
+- ✅ Error logging with different levels (ERROR, WARNING)
+- ✅ DocumentGrouper error handling
+- ✅ Traced functions with error logging
+- ✅ Nested spans
+- ✅ Graceful handling when Langfuse is unavailable
 
-**Test Results**: All tests pass ✅
+### Test Results:
+All tests pass successfully, both with and without Langfuse installed.
 
-## Code Comparison
+## Entity Count Metrics
 
-### Before (Manual Static Clients)
+The system now tracks comprehensive entity counts as Langfuse scores:
 
-```python
-# Complex and verbose
-with langfuse_tracer.trace_context(
-    name="process-sqs-message",
-    input_data={"document_id": document_id},
-    metadata={"page_number": page_number},
-    tags=["sqs-message"],
-    session_id=document_id
-) as trace:
-    try:
-        with langfuse_tracer.span_context(
-            trace,
-            "gedcom-generation",
-            input_data={"document_id": document_id},
-            metadata={"gedcom_version": "5.5.1"}
-        ) as span:
-            with langfuse_tracer.generation_context(
-                trace,
-                "openrouter-llm-call",
-                model=self.model,
-                input_data={"prompt": prompt},
-                model_parameters={"temperature": 0.0}
-            ) as generation:
-                result = await llm_call()
-                if generation:
-                    generation.update(
-                        output={"content": result},
-                        usage={"input": 100, "output": 200}
-                    )
-            if span:
-                span.update(output={"status": "success"})
-    except Exception as e:
-        langfuse_tracer.update_trace_with_error(trace, e)
+### Scores Added:
+1. **`total_persons`** - Total number of individuals/persons in the GEDCOM
+2. **`individuals_processed`** - Number of INDI records processed
+3. **`families_processed`** - Number of FAM records processed
+4. **`baptisms_processed`** - Number of baptism events (BAPM/CHR tags)
+5. **`deaths_processed`** - Number of death events (DEAT tags)
+6. **`marriages_processed`** - Number of marriage events (MARR tags)
+7. **`total_events`** - Sum of all events (baptisms + deaths + marriages)
+
+### Implementation:
+- Enhanced [`count_gedcom_records()`](gedcom-generation-microservice/src/services/gedcom_generator.py:138) to count all entity types
+- Added Langfuse scores for each metric in [`process_complete_document()`](gedcom-generation-microservice/src/main.py:249)
+- Included all counts in the GEDCOM ready message for downstream processing
+
+## Tracing Structure Example
+
+When processing a document group, the following trace structure is created in Langfuse:
+
+```
+process-document-group
+├── metadata:
+│   ├── document_id: "doc-123"
+│   ├── num_pages: 5
+│   ├── expected_pages: 5
+│   ├── completion_reason: "all_pages_received"
+│   ├── document_title: "Birth Records 1900-1910"
+│   ├── location: "Warsaw, Poland"
+│   ├── date_range: "1900-1910"
+│   └── page_numbers_received: [1, 2, 3, 4, 5]
+├── scores:
+│   ├── total_persons: 45
+│   ├── individuals_processed: 45
+│   ├── families_processed: 12
+│   ├── baptisms_processed: 38
+│   ├── deaths_processed: 15
+│   ├── marriages_processed: 10
+│   └── total_events: 63
+├── gedcom-generation
+│   ├── openrouter-llm-call (generation)
+│   │   ├── input: formatted document
+│   │   ├── output: GEDCOM content
+│   │   └── metadata: token usage, model, etc.
+│   └── [errors if any]
+└── [errors if any]
 ```
 
-### After (@observe Decorator)
+## Error Tracking Benefits
 
-```python
-# Clean and simple
-@langfuse_tracer.observe_if_enabled(name="process-sqs-message")
-async def process_message(message: dict):
-    lf_context = langfuse_tracer.get_langfuse_context()
-    
-    if lf_context:
-        langfuse_tracer.update_current_trace(
-            session_id=document_id,
-            tags=["sqs-message"],
-            metadata={"page_number": page_number}
-        )
-    
-    try:
-        result = await generate_gedcom(document_id)
-        return result
-    except Exception as e:
-        if lf_context:
-            langfuse_tracer.update_trace_with_error(e)
-        raise
+1. **Complete Context**: Every error includes relevant context (document_id, operation, etc.)
+2. **Stack Traces**: Full stack traces are captured automatically
+3. **Error Levels**: Warnings vs. errors are properly distinguished
+4. **Retry Information**: Retry attempts and backoff times are logged
+5. **Debugging**: Easy to identify which operation failed and why
+6. **Monitoring**: Can track error rates and patterns in Langfuse dashboard
 
-@langfuse_tracer.observe_if_enabled(name="gedcom-generation")
-async def generate_gedcom(document_id: str):
-    # Automatically nested under parent trace
-    result = await call_llm()
-    return result
+## Graceful Degradation
 
-@langfuse_tracer.observe_if_enabled(name="openrouter-llm-call", as_type="generation")
-async def call_llm():
-    lf_context = langfuse_tracer.get_langfuse_context()
-    
-    if lf_context:
-        langfuse_tracer.update_current_observation(
-            model=self.model,
-            model_parameters={"temperature": 0.0},
-            usage={"input": 100, "output": 200}
-        )
-    
-    return await llm_api_call()
-```
+The implementation gracefully handles cases where Langfuse is unavailable:
+- No-op decorators and functions are provided
+- No exceptions are raised if Langfuse fails
+- Main workflow continues uninterrupted
+- Errors are still logged to standard logger
 
-## Benefits
+## Usage in Production
 
-### 1. Simplicity
-- 60% less boilerplate code
-- No manual trace/span management
-- Cleaner function signatures
+To enable Langfuse tracing in production:
 
-### 2. Maintainability
-- Easier to add new traced functions
-- Less error-prone
-- Follows Langfuse best practices
-
-### 3. Readability
-- Decorators clearly show traced functions
-- Less nesting and indentation
-- Business logic more visible
-
-### 4. Flexibility
-- Easy to enable/disable tracing per function
-- Graceful degradation built-in
-- No performance impact when disabled
-
-### 5. Best Practices
-- Follows official Langfuse recommendations
-- Uses modern decorator pattern
-- Proper separation of concerns
-
-## Migration Path
-
-For other services wanting to adopt this pattern:
-
-1. **Install/Update Langfuse SDK**:
+1. Install Langfuse: `pip install langfuse`
+2. Set environment variables:
    ```bash
-   pip install langfuse>=2.0
+   LANGFUSE_PUBLIC_KEY=pk-...
+   LANGFUSE_SECRET_KEY=sk-...
+   LANGFUSE_HOST=https://cloud.langfuse.com  # optional
    ```
+3. Run the service normally - tracing happens automatically
 
-2. **Copy the refactored `langfuse_tracer.py`**:
-   - Provides `@observe_if_enabled` decorator
-   - Includes helper functions
-   - Handles graceful degradation
+## Monitoring Recommendations
 
-3. **Add decorators to functions**:
-   ```python
-   @langfuse_tracer.observe_if_enabled(name="my-function")
-   async def my_function():
-       pass
-   ```
+In the Langfuse dashboard, you can now:
 
-4. **Update metadata using helpers**:
-   ```python
-   langfuse_tracer.update_current_trace(session_id=id)
-   langfuse_tracer.update_current_observation(output=result)
-   ```
+1. **Track Document Processing**:
+   - View all document groups processed
+   - See completion reasons (all pages vs. timeout)
+   - Monitor page counts and missing pages
 
-5. **Remove old context managers**:
-   - Delete `trace_context()` usage
-   - Delete `span_context()` usage
-   - Delete `generation_context()` usage
+2. **Monitor Entity Metrics**:
+   - Track total persons/individuals processed
+   - Monitor family records created
+   - View baptism, death, and marriage event counts
+   - Analyze total events per document
+   - Compare entity counts across documents
+   - Identify documents with unusual entity distributions
 
-6. **Test thoroughly**:
-   - Verify traces appear in Langfuse UI
-   - Check token usage tracking
-   - Confirm error handling works
+3. **Monitor Errors**:
+   - Filter by error type (rate_limit, timeout, api_error, etc.)
+   - View error context and stack traces
+   - Track error rates over time
 
-## Documentation
+4. **Analyze Performance**:
+   - See processing time for each document group
+   - Monitor LLM token usage
+   - Track retry patterns
+   - Correlate entity counts with processing time
 
-Updated documentation:
-- ✅ [`LANGFUSE_TRACING.md`](LANGFUSE_TRACING.md) - Complete implementation guide
-- ✅ [`test_refactored_langfuse.py`](test_refactored_langfuse.py) - Test suite with examples
-- ✅ This summary document
+5. **Debug Issues**:
+   - Search by document_id to see full trace
+   - View nested span hierarchy
+   - Examine error context for failed operations
+   - Check entity counts to verify extraction quality
 
-## Verification
+## Future Enhancements
 
-To verify the refactoring:
+Potential improvements for future iterations:
 
-```bash
-# 1. Test imports and syntax
-cd gedcom-generation-microservice
-. ~/venv/bin/activate
-python -c "from src import main; print('✓ Imports successful')"
-
-# 2. Run test suite
-python test_refactored_langfuse.py
-
-# 3. Check Langfuse configuration
-python check_env.py
-```
-
-## Next Steps
-
-The refactoring is complete and tested. To use in production:
-
-1. **Deploy the updated code**
-2. **Monitor traces in Langfuse UI**:
-   - Check trace hierarchy
-   - Verify token usage tracking
-   - Confirm session grouping works
-3. **Review trace quality**:
-   - Are names descriptive?
-   - Is metadata useful?
-   - Are errors captured properly?
+1. Add spans for individual page processing
+2. Track metadata extraction performance
+3. Add custom metrics for GEDCOM quality (e.g., completeness scores)
+4. Implement distributed tracing across microservices
+5. Add user-level tracing for multi-tenant scenarios
+6. Track entity extraction accuracy metrics
+7. Add alerts for unusual entity count patterns
 
 ## Conclusion
 
-The refactoring successfully modernizes the Langfuse implementation while maintaining all existing features. The new decorator pattern is:
+This refactoring provides comprehensive observability for the GEDCOM generation pipeline:
+- ✅ Document group spans with rich metadata
+- ✅ Error logging throughout the pipeline
+- ✅ Proper error context and stack traces
+- ✅ Graceful handling of Langfuse unavailability
+- ✅ Maintains existing tracing patterns
+- ✅ No breaking changes to existing functionality
 
-- ✅ Simpler and cleaner
-- ✅ Easier to maintain
-- ✅ Follows best practices
-- ✅ Fully tested
-- ✅ Production-ready
-
-The codebase is now more maintainable and follows the recommended Langfuse patterns.
+The implementation follows best practices for observability and makes debugging production issues significantly easier.

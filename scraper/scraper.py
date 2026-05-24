@@ -13,8 +13,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
 # --- CONFIGURATION ---
-COLLECTION_URL = "https://metryki.genealodzy.pl/id1784"
+POWIAT_URL = "https://metryki.genealodzy.pl/pow-24"  # Powiat to scrape
 BASE_URL = "https://skanoteka.genealodzy.pl"
+METRYKI_BASE_URL = "https://metryki.genealodzy.pl"
 DOWNLOAD_FOLDER = "/app/watched-images"
 MAX_IMAGES_PER_UNIT = 1000  # Maximum images to download per unit
 
@@ -79,6 +80,7 @@ except Exception as e:
 # --- GLOBAL TRACKING ---
 total_images_downloaded = 0
 units_processed = 0
+collections_processed = 0
 
 def extract_metadata_from_url(url):
     """
@@ -226,9 +228,71 @@ def extract_metadata_from_driver(driver):
             "error": str(e)
         }
 
-def extract_units_from_collection(url):
+def extract_collections_from_powiat(powiat_url):
+    """Extract all collection links from a powiat (district) page."""
+    print(f"\n=== EXTRACTING COLLECTIONS FROM POWIAT ===")
+    print(f"Powiat URL: {powiat_url}")
+    
+    print(f"DEBUG: Navigating to URL: {powiat_url}")
+    driver.get(powiat_url)
+    print(f"DEBUG: Current URL after navigation: {driver.current_url}")
+    print(f"DEBUG: Page title: {driver.title}")
+    
+    if driver.current_url == "data:,":
+        print("✗ ERROR: Browser navigated to 'data:,' - URL navigation failed!")
+        return []
+    
+    time.sleep(3)
+    
+    collections = []
+    page_source = driver.page_source
+    soup = BeautifulSoup(page_source, 'html.parser')
+    
+    # Extract powiat identifier from URL (e.g., pow-24)
+    powiat_name = "unknown"
+    url_match = re.search(r'(pow-\d+)', powiat_url)
+    if url_match:
+        powiat_name = url_match.group(1)
+        print(f"DEBUG: Extracted powiat identifier from URL: '{powiat_name}'")
+    else:
+        print(f"⚠️  Could not extract powiat identifier from URL: {powiat_url}")
+    
+    # Find all collection links (pattern: id followed by numbers, e.g., "id1883")
+    collection_links = soup.find_all('a', href=re.compile(r'^id\d+$'))
+    
+    for link in collection_links:
+        href = link.get('href')
+        if not href:
+            continue
+        
+        # Extract collection ID from href
+        collection_id_match = re.search(r'^id(\d+)$', href)
+        if not collection_id_match:
+            continue
+        
+        collection_id = collection_id_match.group(1)
+        # Build full URL: https://metryki.genealodzy.pl/id1883
+        collection_url = METRYKI_BASE_URL + '/' + href
+        
+        # Get collection name/description
+        collection_name = link.text.strip() if link.text else f"Collection {collection_id}"
+        
+        collections.append({
+            'id': collection_id,
+            'url': collection_url,
+            'name': collection_name,
+            'powiat': powiat_name
+        })
+    
+    print(f"Found {len(collections)} collections in powiat '{powiat_name}'")
+    for i, coll in enumerate(collections, 1):
+        print(f"  {i}. Collection {coll['id']}: {coll['name']}")
+    
+    return collections
+
+def extract_units_from_collection(url, collection_id):
     """Extract all unit links from the collection index page."""
-    print(f"\n=== EXTRACTING UNITS FROM COLLECTION ===")
+    print(f"\n=== EXTRACTING UNITS FROM COLLECTION {collection_id} ===")
     print(f"Collection URL: {url}")
     
     print(f"DEBUG: Navigating to URL: {url}")
@@ -342,24 +406,34 @@ def get_first_image_url_from_unit(unit_url):
         print(f"  ⚠️  No image links found in unit")
         return None
 
-def scrape_unit_images(start_url, unit_info):
+def scrape_unit_images(start_url, unit_info, powiat_name, collection_id):
     """Scrape all images from a single unit."""
-    global total_images_downloaded
+    global total_images_downloaded, collections_processed
     
     print(f"\n{'='*80}")
     print(f"SCRAPING UNIT: {unit_info['number']} - {unit_info['description']}")
     print(f"Expected files: {unit_info['file_count']}")
     print(f"{'='*80}")
     
-    # Create subdirectory for this unit
-    unit_folder = os.path.join(DOWNLOAD_FOLDER, f"unit_{unit_info['number']}")
+    # Create subdirectory structure: powiat/collection_id/unit/
+    unit_folder = os.path.join(DOWNLOAD_FOLDER, powiat_name, collection_id, unit_info['number'])
     if not os.path.exists(unit_folder):
         os.makedirs(unit_folder)
+        print(f"Created directory: {unit_folder}")
+    else:
+        print(f"Directory exists: {unit_folder}")
     
     # Track visited URLs and filenames for this unit
     visited_image_urls = set()
     downloaded_filenames = set()
     unit_images_count = 0
+    
+    # Check for already downloaded files
+    existing_files = set()
+    if os.path.exists(unit_folder):
+        existing_files = {f for f in os.listdir(unit_folder) if f.endswith('.jpg') or f.endswith('.jpeg')}
+        if existing_files:
+            print(f"Found {len(existing_files)} already downloaded images in this unit")
     
     print(f"DEBUG: Navigating to start URL: {start_url}")
     driver.get(start_url)
@@ -381,7 +455,12 @@ def scrape_unit_images(start_url, unit_info):
         
         # Extract metadata from current page
         metadata = extract_metadata_from_driver(driver)
-        print(f"Extracted metadata: Place={metadata.get('place')}, Unit={metadata.get('unit')}, Page={metadata.get('page')}")
+        
+        # Add collection_id and powiat to metadata for composite document IDs
+        metadata['collection_id'] = collection_id
+        metadata['powiat'] = powiat_name
+        
+        print(f"Extracted metadata: Place={metadata.get('place')}, Unit={metadata.get('unit')}, Page={metadata.get('page')}, Collection={collection_id}, Powiat={powiat_name}")
         
         # Extract image URL from JavaScript
         page_source = driver.page_source
@@ -422,34 +501,39 @@ def scrape_unit_images(start_url, unit_info):
             downloaded_filenames.add(filename)
             filepath = os.path.join(unit_folder, filename)
             
-            # Save metadata to JSON file
-            metadata_filepath = os.path.splitext(filepath)[0] + '.json'
-            try:
-                with open(metadata_filepath, 'w', encoding='utf-8') as f:
-                    json.dump(metadata, f, indent=2, ensure_ascii=False)
-                print(f"✓ Saved metadata: {metadata_filepath}")
-            except Exception as e:
-                print(f"⚠️  Error saving metadata: {e}")
-            
-            # Download image
-            try:
-                session = requests.Session()
-                for cookie in driver.get_cookies():
-                    session.cookies.set(cookie['name'], cookie['value'])
+            # Check if file already exists
+            if filename in existing_files:
+                print(f"⏭️  Skipping {filename} - already downloaded")
+                unit_images_count += 1  # Count as processed
+            else:
+                # Save metadata to JSON file
+                metadata_filepath = os.path.splitext(filepath)[0] + '.json'
+                try:
+                    with open(metadata_filepath, 'w', encoding='utf-8') as f:
+                        json.dump(metadata, f, indent=2, ensure_ascii=False)
+                    print(f"✓ Saved metadata: {metadata_filepath}")
+                except Exception as e:
+                    print(f"⚠️  Error saving metadata: {e}")
                 
-                headers = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-                response = session.get(img_url, headers=headers)
-                
-                if response.status_code == 200:
-                    with open(filepath, 'wb') as f:
-                        f.write(response.content)
-                    print(f"✓ Saved: {filepath}")
-                    unit_images_count += 1
-                    total_images_downloaded += 1
-                else:
-                    print(f"✗ Failed download. Status code: {response.status_code}")
-            except Exception as e:
-                print(f"✗ Error saving file: {e}")
+                # Download image
+                try:
+                    session = requests.Session()
+                    for cookie in driver.get_cookies():
+                        session.cookies.set(cookie['name'], cookie['value'])
+                    
+                    headers = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                    response = session.get(img_url, headers=headers)
+                    
+                    if response.status_code == 200:
+                        with open(filepath, 'wb') as f:
+                            f.write(response.content)
+                        print(f"✓ Saved: {filepath}")
+                        unit_images_count += 1
+                        total_images_downloaded += 1
+                    else:
+                        print(f"✗ Failed download. Status code: {response.status_code}")
+                except Exception as e:
+                    print(f"✗ Error saving file: {e}")
         else:
             print("Could not extract image URL")
         
@@ -475,34 +559,62 @@ def scrape_unit_images(start_url, unit_info):
     return unit_images_count
 
 try:
-    # Step 1: Extract all units from collection
-    units = extract_units_from_collection(COLLECTION_URL)
+    # Step 1: Extract all collections from powiat
+    collections = extract_collections_from_powiat(POWIAT_URL)
     
-    if not units:
-        print("⚠️  No units found in collection!")
+    if not collections:
+        print("⚠️  No collections found in powiat!")
     else:
-        # Step 2: Process each unit
-        for i, unit in enumerate(units, 1):
+        total_collections = len(collections)
+        
+        # Step 2: Process each collection
+        for coll_idx, collection in enumerate(collections, 1):
             print(f"\n{'#'*80}")
-            print(f"# PROCESSING UNIT {i}/{len(units)}")
+            print(f"# PROCESSING COLLECTION {coll_idx}/{total_collections}")
+            print(f"# Collection ID: {collection['id']} - {collection['name']}")
+            print(f"# Powiat: {collection['powiat']}")
             print(f"{'#'*80}")
             
-            # Get first image URL for this unit
-            first_image_url = get_first_image_url_from_unit(unit['url'])
+            # Step 3: Extract all units from this collection
+            units = extract_units_from_collection(collection['url'], collection['id'])
             
-            if first_image_url:
-                # Scrape all images in this unit
-                images_in_unit = scrape_unit_images(first_image_url, unit)
-                units_processed += 1
-            else:
-                print(f"⚠️  Skipping unit {unit['number']} - no images found")
+            if not units:
+                print(f"⚠️  No units found in collection {collection['id']}!")
+                continue
             
-            print(f"\n--- Progress: {units_processed}/{len(units)} units, {total_images_downloaded} total images ---")
+            # Step 4: Process each unit in the collection
+            for unit_idx, unit in enumerate(units, 1):
+                print(f"\n{'#'*80}")
+                print(f"# PROCESSING UNIT {unit_idx}/{len(units)} in Collection {collection['id']}")
+                print(f"{'#'*80}")
+                
+                # Get first image URL for this unit
+                first_image_url = get_first_image_url_from_unit(unit['url'])
+                
+                if first_image_url:
+                    # Scrape all images in this unit
+                    images_in_unit = scrape_unit_images(
+                        first_image_url,
+                        unit,
+                        collection['powiat'],
+                        collection['id']
+                    )
+                    units_processed += 1
+                else:
+                    print(f"⚠️  Skipping unit {unit['number']} - no images found")
+                
+                print(f"\n--- Progress: Collection {coll_idx}/{total_collections}, Unit {unit_idx}/{len(units)}, {total_images_downloaded} total images ---")
+            
+            collections_processed += 1
+            print(f"\n{'='*80}")
+            print(f"COLLECTION {collection['id']} COMPLETE")
+            print(f"{'='*80}")
 
 finally:
     print(f"\n{'='*80}")
     print("SCRAPING COMPLETE")
     print(f"{'='*80}")
+    print(f"Collections processed: {collections_processed}")
     print(f"Units processed: {units_processed}")
     print(f"Total images downloaded: {total_images_downloaded}")
     print(f"Download folder: {DOWNLOAD_FOLDER}")
