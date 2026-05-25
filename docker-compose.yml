@@ -18,7 +18,7 @@ services:
       context: ./docker
       dockerfile: Dockerfile.db
     container_name: db
-    command: ["postgres", "-c", "shared_preload_libraries=age"]
+    command: ["postgres", "-c", "shared_preload_libraries=age,pg_stat_statements"]
     environment:
       POSTGRES_DB: korzen
       POSTGRES_USER: postgres

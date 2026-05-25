@@ -1765,6 +1765,85 @@ def review_duplicate(candidate_id):
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/api/persons/<person_id>", methods=["DELETE"])
+def delete_person(person_id):
+    """
+    Delete a person and all associated data from both PostgreSQL and AGE graph database.
+    
+    This endpoint:
+    1. Verifies the person exists
+    2. Deletes from AGE graph database first
+    3. Deletes from PostgreSQL (CASCADE handles related records)
+    4. Handles transactions with proper rollback on errors
+    
+    Args:
+        person_id: The UUID of the person to delete (as string)
+        
+    Returns:
+        JSON response with success status and message
+    """
+    logger.info(f"DELETE endpoint called for person_id: {person_id}, type: {type(person_id)}")
+    logger.info(f"Request method: {request.method}, Request path: {request.path}")
+    
+    try:
+        # Verify the person exists
+        person = db.session.get(Person, person_id)
+        if not person:
+            logger.warning(f"Person not found for deletion: {person_id}")
+            return jsonify({
+                "success": False,
+                "error": "Person not found"
+            }), 404
+        
+        # Store person info for logging
+        person_name = f"{person.first_name or ''} {person.last_name or ''}".strip() or f"ID {person_id}"
+        person_uuid = str(person.id)
+        
+        logger.info(f"Starting deletion of person: {person_name} (UUID: {person_uuid})")
+        
+        # Delete from AGE graph database first (before PostgreSQL deletion)
+        # This ensures consistency between graph and relational storage
+        try:
+            raw_conn = db.session.connection().connection
+            graph_importer = AgeGraphImporter(raw_conn)
+            
+            graph_deleted = graph_importer.delete_record_from_graph('person', person_uuid)
+            
+            if graph_deleted:
+                logger.info(f"Successfully deleted person from graph: {person_uuid}")
+            else:
+                logger.warning(f"Graph deletion returned False for person: {person_uuid} (may not exist in graph)")
+        except Exception as graph_error:
+            logger.error(f"Error deleting person from graph: {graph_error}", exc_info=True)
+            # Continue with PostgreSQL deletion even if graph deletion fails
+            # This prevents blocking person deletion if graph is unavailable
+        
+        # Delete the person from PostgreSQL
+        # Note: CASCADE will automatically handle deletion of:
+        # - Child persons (father_id, mother_id foreign keys)
+        # - Baptism records (person_id foreign key)
+        # - Marriage records (spouse1_id, spouse2_id foreign keys)
+        # - Death records (person_id foreign key)
+        # - Duplicate candidates and resolutions
+        db.session.delete(person)
+        db.session.commit()
+        
+        logger.info(f"Successfully deleted person from PostgreSQL: {person_name} (UUID: {person_uuid})")
+        
+        return jsonify({
+            "success": True,
+            "message": "Person deleted successfully"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error deleting person {person_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": "An error occurred while deleting the person"
+        }), 500
+
+
 @bp.route("/set-language/<language>")
 def set_language(language):
     """Set user's preferred language in session."""

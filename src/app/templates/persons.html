@@ -376,6 +376,54 @@
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
     }
+    
+    .btn-delete {
+        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 0.85em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .btn-delete:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+    }
+    
+    .btn-delete:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .detail-actions {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e3ff;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .success-message {
+        background: #e8f5e9;
+        color: #2e7d32;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #4caf50;
+        margin-bottom: 20px;
+        display: none;
+    }
+    
+    .success-message.show {
+        display: block;
+    }
 </style>
 {% endblock %}
 
@@ -390,6 +438,16 @@
         <strong>{{ _('Error:') }}</strong> {{ error }}
     </div>
     {% endif %}
+    
+    <!-- Success Message -->
+    <div id="successMessage" class="success-message">
+        <strong>{{ _('Success:') }}</strong> <span id="successText"></span>
+    </div>
+    
+    <!-- Error Message for AJAX operations -->
+    <div id="ajaxErrorMessage" class="error-message" style="display: none;">
+        <strong>{{ _('Error:') }}</strong> <span id="ajaxErrorText"></span>
+    </div>
     
     <!-- Sorting Controls -->
     <div class="sort-controls">
@@ -752,6 +810,16 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Delete Action -->
+                        <div class="detail-actions">
+                            <button class="btn-delete"
+                                    data-person-id="{{ person.id }}"
+                                    data-person-name="{{ person.first_name or '' }} {{ person.last_name or '' }}"
+                                    onclick="deletePerson(this)">
+                                🗑️ {{ _('Delete Person') }}
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -834,6 +902,119 @@
         if (search) url += `&search=${encodeURIComponent(search)}`;
         if (gender) url += `&gender=${gender}`;
         window.location.href = url;
+    }
+    
+    // Delete person functionality
+    function deletePerson(button) {
+        // Prevent event bubbling to row click handler
+        event.stopPropagation();
+        
+        const personId = button.getAttribute('data-person-id');
+        const personName = button.getAttribute('data-person-name');
+        
+        // Show confirmation dialog
+        const confirmMessage = `{{ _('Are you sure you want to delete') }} ${personName} {{ _('and all associated data? This action cannot be undone.') }}`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        // Disable the button to prevent double-clicks
+        button.disabled = true;
+        button.textContent = '{{ _('Deleting...') }}';
+        
+        // Make DELETE request to API
+        fetch(`/api/persons/${personId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || '{{ _('Failed to delete person') }}');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Show success message
+            showSuccessMessage(`{{ _('Successfully deleted') }} ${personName}`);
+            
+            // Remove the person's rows from the table
+            const expandableRow = document.querySelector(`.expandable-row[data-person-id="${personId}"]`);
+            const detailRow = document.getElementById(`detail-${personId}`);
+            
+            if (expandableRow) {
+                expandableRow.remove();
+            }
+            if (detailRow) {
+                detailRow.remove();
+            }
+            
+            // Update the displayed count
+            const displayedCountElement = document.getElementById('displayedCount');
+            if (displayedCountElement) {
+                const currentCount = parseInt(displayedCountElement.textContent);
+                displayedCountElement.textContent = currentCount - 1;
+            }
+            
+            // Update the total count
+            const totalCountElement = document.getElementById('totalCount');
+            if (totalCountElement) {
+                const currentTotal = parseInt(totalCountElement.textContent);
+                totalCountElement.textContent = currentTotal - 1;
+            }
+            
+            // If no more persons on this page, reload to show updated pagination
+            const remainingRows = document.querySelectorAll('.expandable-row').length;
+            if (remainingRows === 0) {
+                window.location.reload();
+            }
+        })
+        .catch(error => {
+            // Show error message
+            showErrorMessage(error.message);
+            
+            // Re-enable the button
+            button.disabled = false;
+            button.innerHTML = '🗑️ {{ _('Delete Person') }}';
+        });
+    }
+    
+    // Show success message
+    function showSuccessMessage(message) {
+        const successDiv = document.getElementById('successMessage');
+        const successText = document.getElementById('successText');
+        
+        successText.textContent = message;
+        successDiv.classList.add('show');
+        
+        // Hide after 5 seconds
+        setTimeout(() => {
+            successDiv.classList.remove('show');
+        }, 5000);
+        
+        // Scroll to top to show the message
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // Show error message
+    function showErrorMessage(message) {
+        const errorDiv = document.getElementById('ajaxErrorMessage');
+        const errorText = document.getElementById('ajaxErrorText');
+        
+        errorText.textContent = message;
+        errorDiv.style.display = 'block';
+        
+        // Hide after 8 seconds
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 8000);
+        
+        // Scroll to top to show the message
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 </script>
 {% endblock %}

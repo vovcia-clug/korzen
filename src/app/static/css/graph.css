@@ -1,10 +1,107 @@
 /* Graph Visualization Styles */
 
-/* Ensure vis-network nodes support multi-line text */
-.vis-network .vis-label {
-    white-space: pre-line;
-    text-align: center;
-    line-height: 1.4;
+/* Custom SVG graph renderer */
+.custom-graph {
+    background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+    cursor: grab;
+}
+
+.graph-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    user-select: none;
+}
+
+.graph-svg.panning {
+    cursor: grabbing;
+}
+
+.graph-layer-animated {
+    transition: transform 0.35s ease;
+}
+
+.generation-guide {
+    stroke: #eeeeee;
+    stroke-width: 1;
+}
+
+.generation-label {
+    fill: #9e9e9e;
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+}
+
+.graph-edge {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.parent-edge,
+.family-bridge-edge {
+    stroke: #2e7d32;
+    stroke-width: 2.5;
+}
+
+.marriage-edge {
+    stroke: #c2185b;
+    stroke-width: 3;
+}
+
+.source-edge {
+    stroke: #ff9800;
+    stroke-width: 2;
+    stroke-dasharray: 7 5;
+}
+
+.generic-edge {
+    stroke: #757575;
+    stroke-width: 2;
+}
+
+.edge-label {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    pointer-events: none;
+}
+
+.graph-node {
+    cursor: pointer;
+    outline: none;
+}
+
+.graph-node rect {
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.18));
+    transition: stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.graph-node:hover rect,
+.graph-node:focus rect,
+.graph-node.selected rect {
+    stroke: #4CAF50;
+    stroke-width: 4;
+    filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.25));
+}
+
+.graph-node.root-node rect {
+    filter: drop-shadow(0 3px 8px rgba(255, 193, 7, 0.45));
+}
+
+.node-label {
+    fill: #333;
+    font-family: Arial, sans-serif;
+    pointer-events: none;
+}
+
+.node-label-name {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.node-label-years {
+    font-size: 12px;
+    fill: #555;
 }
 
 .controls {

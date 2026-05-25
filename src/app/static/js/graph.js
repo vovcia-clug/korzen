@@ -1,391 +1,92 @@
-// Graph visualization using vis-network
-let network = null;
-let nodes = null;
-let edges = null;
+// Custom genealogical graph visualization.
+// The renderer uses SVG for drawing and computes all hierarchical positions client-side.
+let graphSvg = null;
+let graphLayer = null;
+let edgeLayer = null;
+let nodeLayer = null;
+let nodesById = new Map();
+let layoutState = null;
 let currentRootId = null;
 let allData = { nodes: [], edges: [] };
+let selectedNodeId = null;
+let viewTransform = { x: 0, y: 0, scale: 1 };
+let panState = null;
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const NODE_WIDTH = 170;
+const NODE_HEIGHT = 72;
+const SPOUSE_GAP = 28;
+const GROUP_GAP = 90;
+const GENERATION_GAP = 170;
+const SOURCE_GAP = 120;
+const FIT_PADDING = 60;
+const MIN_SCALE = 0.15;
+const MAX_SCALE = 2.5;
 
 // Get translations (passed from template, fallback to English)
 const t = window.graphTranslations || {
-    born: "Born",
-    died: "Died",
-    place: "Place",
-    occupation: "Occupation",
-    source: "Source",
-    doubleClickToSetAsAncestor: "Double-click to set as ancestor",
-    gender: "Gender",
-    birthDate: "Birth Date",
-    deathDate: "Death Date",
-    birthPlace: "Birth Place",
-    relationships: "Relationships",
-    loadingGraphData: "Loading graph data",
-    errorLoadingGraph: "Error loading graph"
+    born: 'Born',
+    died: 'Died',
+    place: 'Place',
+    occupation: 'Occupation',
+    source: 'Source',
+    doubleClickToSetAsAncestor: 'Double-click to set as ancestor',
+    gender: 'Gender',
+    birthDate: 'Birth Date',
+    deathDate: 'Death Date',
+    birthPlace: 'Birth Place',
+    relationships: 'Relationships',
+    loadingGraphData: 'Loading graph data',
+    errorLoadingGraph: 'Error loading graph'
 };
 
-// Initialize the graph
 function initGraph() {
     const container = document.getElementById('graph');
-    
-    // Create empty datasets
-    nodes = new vis.DataSet([]);
-    edges = new vis.DataSet([]);
-    
-    const data = {
-        nodes: nodes,
-        edges: edges
-    };
-    
-    const options = getGraphOptions();
-    
-    network = new vis.Network(container, data, options);
-    
-    // Add click event listener
-    network.on('click', function(params) {
-        if (params.nodes.length > 0) {
-            const nodeId = params.nodes[0];
-            showNodeInfo(nodeId);
-        }
+    if (!container) return;
+
+    container.innerHTML = '';
+    container.classList.add('custom-graph');
+
+    graphSvg = createSvgElement('svg', {
+        class: 'graph-svg',
+        role: 'img',
+        'aria-label': 'Family tree graph'
     });
-    
-    // Add double-click event listener to set as root
-    network.on('doubleClick', function(params) {
-        if (params.nodes.length > 0) {
-            const nodeId = params.nodes[0];
-            setAsRoot(nodeId);
-        }
+
+    graphLayer = createSvgElement('g', { class: 'graph-layer' });
+    edgeLayer = createSvgElement('g', { class: 'graph-edges' });
+    nodeLayer = createSvgElement('g', { class: 'graph-nodes' });
+
+    graphLayer.appendChild(edgeLayer);
+    graphLayer.appendChild(nodeLayer);
+    graphSvg.appendChild(graphLayer);
+    container.appendChild(graphSvg);
+
+    graphSvg.addEventListener('wheel', handleWheel, { passive: false });
+    graphSvg.addEventListener('mousedown', startPan);
+    graphSvg.addEventListener('dblclick', function(event) {
+        if (event.target === graphSvg) resetView();
     });
+    window.addEventListener('mousemove', movePan);
+    window.addEventListener('mouseup', endPan);
+    window.addEventListener('resize', debounce(function() {
+        if (layoutState) fitToLayout(false);
+    }, 150));
 }
 
-// Get graph options for spring-based (force-directed) layout
-function getGraphOptions() {
-    return {
-        nodes: {
-            shape: 'box',
-            margin: 10,
-            widthConstraint: {
-                maximum: 200
-            },
-            font: {
-                size: 14,
-                face: 'Arial'
-            }
-        },
-        edges: {
-            arrows: {
-                to: {
-                    enabled: true,
-                    scaleFactor: 0.5
-                }
-            },
-            smooth: {
-                type: 'continuous',
-                roundness: 0.5
-            }
-        },
-        physics: {
-            enabled: false  // Disabled for hierarchical layout with fixed positions
-        },
-        layout: {
-            randomSeed: undefined,
-            improvedLayout: true,
-            clusterThreshold: 150
-        },
-        interaction: {
-            hover: true,
-            tooltipDelay: 200,
-            navigationButtons: true,
-            keyboard: true,
-            dragNodes: true,
-            dragView: true,
-            zoomView: true
-        }
-    };
+function createSvgElement(tagName, attributes) {
+    const element = document.createElementNS(SVG_NS, tagName);
+    Object.keys(attributes || {}).forEach(key => {
+        element.setAttribute(key, attributes[key]);
+    });
+    return element;
 }
 
-// Calculate hierarchical levels based on parent-child relationships
-function calculateHierarchicalLevels(nodes, edges) {
-    const levels = new Map();
-    const marriages = new Map();
-    const children = new Map();
-    const parents = new Map();
-    
-    // Initialize maps
-    nodes.forEach(node => {
-        marriages.set(node.id, new Set());
-        children.set(node.id, new Set());
-        parents.set(node.id, new Set());
-        levels.set(node.id, 0); // Default level
-    });
-    
-    // Build relationships
-    edges.forEach(edge => {
-        if (edge.type === 'MARRIED_TO') {
-            if (marriages.has(edge.from) && marriages.has(edge.to)) {
-                marriages.get(edge.from).add(edge.to);
-                marriages.get(edge.to).add(edge.from);
-            }
-        } else if (edge.type === 'PARENT_OF') {
-            if (children.has(edge.from) && parents.has(edge.to)) {
-                children.get(edge.from).add(edge.to);
-                parents.get(edge.to).add(edge.from);
-            }
-        }
-    });
-    
-    // Group spouses together
-    const spouseGroups = [];
-    const visitedSpouses = new Set();
-    
-    nodes.forEach(node => {
-        if (!visitedSpouses.has(node.id)) {
-            const group = new Set([node.id]);
-            const queue = [node.id];
-            visitedSpouses.add(node.id);
-            
-            while (queue.length > 0) {
-                const curr = queue.shift();
-                marriages.get(curr).forEach(spouse => {
-                    if (!visitedSpouses.has(spouse)) {
-                        visitedSpouses.add(spouse);
-                        group.add(spouse);
-                        queue.push(spouse);
-                    }
-                });
-            }
-            spouseGroups.push(group);
-        }
-    });
-    
-    // Map node to its spouse group
-    const nodeToGroup = new Map();
-    spouseGroups.forEach((group, index) => {
-        group.forEach(nodeId => {
-            nodeToGroup.set(nodeId, index);
-        });
-    });
-    
-    // Calculate levels iteratively
-    let changed = true;
-    let iterations = 0;
-    const MAX_ITERATIONS = 100;
-    
-    while (changed && iterations < MAX_ITERATIONS) {
-        changed = false;
-        iterations++;
-        
-        nodes.forEach(node => {
-            const nodeId = node.id;
-            let maxParentLevel = -1;
-            
-            parents.get(nodeId).forEach(parentId => {
-                if (levels.has(parentId)) {
-                    maxParentLevel = Math.max(maxParentLevel, levels.get(parentId));
-                }
-            });
-            
-            let expectedLevel = maxParentLevel === -1 ? 0 : maxParentLevel + 1;
-            
-            // All nodes in the same spouse group must have the same level
-            const groupId = nodeToGroup.get(nodeId);
-            const group = spouseGroups[groupId];
-            
-            let maxGroupLevel = expectedLevel;
-            group.forEach(memberId => {
-                maxGroupLevel = Math.max(maxGroupLevel, levels.get(memberId));
-                
-                // Also check parents of other group members
-                parents.get(memberId).forEach(parentId => {
-                    if (levels.has(parentId)) {
-                        maxGroupLevel = Math.max(maxGroupLevel, levels.get(parentId) + 1);
-                    }
-                });
-            });
-            
-            // Update level for all members of the group if needed
-            group.forEach(memberId => {
-                if (levels.get(memberId) !== maxGroupLevel) {
-                    levels.set(memberId, maxGroupLevel);
-                    changed = true;
-                }
-            });
-        });
-    }
-    
-    return levels;
-}
-
-// Calculate hierarchical positions based on birth years with spouse grouping
-function calculateHierarchicalPositions(nodes, edges) {
-    const marriages = new Map();
-    const children = new Map();
-    const parents = new Map();
-    
-    // Initialize maps
-    nodes.forEach(node => {
-        marriages.set(node.id, new Set());
-        children.set(node.id, new Set());
-        parents.set(node.id, new Set());
-    });
-    
-    // Build relationships
-    edges.forEach(edge => {
-        if (edge.type === 'MARRIED_TO') {
-            if (marriages.has(edge.from) && marriages.has(edge.to)) {
-                marriages.get(edge.from).add(edge.to);
-                marriages.get(edge.to).add(edge.from);
-            }
-        } else if (edge.type === 'PARENT_OF') {
-            if (children.has(edge.from) && parents.has(edge.to)) {
-                children.get(edge.from).add(edge.to);
-                parents.get(edge.to).add(edge.from);
-            }
-        }
-    });
-    
-    // Group spouses together
-    const spouseGroups = [];
-    const visitedSpouses = new Set();
-    
-    nodes.forEach(node => {
-        if (!visitedSpouses.has(node.id)) {
-            const group = new Set([node.id]);
-            const queue = [node.id];
-            visitedSpouses.add(node.id);
-            
-            while (queue.length > 0) {
-                const curr = queue.shift();
-                marriages.get(curr).forEach(spouse => {
-                    if (!visitedSpouses.has(spouse)) {
-                        visitedSpouses.add(spouse);
-                        group.add(spouse);
-                        queue.push(spouse);
-                    }
-                });
-            }
-            spouseGroups.push(Array.from(group));
-        }
-    });
-    
-    // Extract birth years and calculate average for spouse groups
-    const nodeToYear = new Map();
-    const groupToYear = new Map();
-    
-    spouseGroups.forEach((group, groupIndex) => {
-        const birthYears = [];
-        
-        group.forEach(nodeId => {
-            const node = nodes.find(n => n.id === nodeId);
-            if (node && node.birth_date) {
-                // Parse birth year from YYYY-MM-DD format
-                const year = parseInt(node.birth_date.split('-')[0]);
-                if (!isNaN(year)) {
-                    birthYears.push(year);
-                }
-            }
-        });
-        
-        // Calculate average birth year for the group
-        let groupYear;
-        if (birthYears.length > 0) {
-            groupYear = Math.round(birthYears.reduce((a, b) => a + b, 0) / birthYears.length);
-        } else {
-            // No birth dates in group, assign a default far in the future (will be placed at bottom)
-            groupYear = 9999;
-        }
-        
-        groupToYear.set(groupIndex, groupYear);
-        
-        // Map each node to its group's year
-        group.forEach(nodeId => {
-            nodeToYear.set(nodeId, groupYear);
-        });
-    });
-    
-    // Find min and max years for scaling
-    const years = Array.from(nodeToYear.values()).filter(y => y !== 9999);
-    const minYear = years.length > 0 ? Math.min(...years) : 1800;
-    const maxYear = years.length > 0 ? Math.max(...years) : 2000;
-    const yearRange = maxYear - minYear || 100;
-    
-    // Calculate Y positions (80 pixels per decade)
-    const pixelsPerYear = 8;
-    const nodeToY = new Map();
-    
-    nodeToYear.forEach((year, nodeId) => {
-        if (year === 9999) {
-            // Place nodes without birth dates at the bottom
-            nodeToY.set(nodeId, (maxYear - minYear + 50) * pixelsPerYear);
-        } else {
-            nodeToY.set(nodeId, (year - minYear) * pixelsPerYear);
-        }
-    });
-    
-    // Calculate X positions to avoid overlap
-    // Group nodes by Y position (same level)
-    const levelToNodes = new Map();
-    nodeToY.forEach((y, nodeId) => {
-        if (!levelToNodes.has(y)) {
-            levelToNodes.set(y, []);
-        }
-        levelToNodes.get(y).push(nodeId);
-    });
-    
-    // Assign X positions with horizontal spacing
-    const horizontalSpacing = 250;
-    const nodeToX = new Map();
-    
-    levelToNodes.forEach((nodesAtLevel, y) => {
-        // For spouse groups at this level, keep them together
-        const spouseGroupsAtLevel = [];
-        const processedNodes = new Set();
-        
-        nodesAtLevel.forEach(nodeId => {
-            if (!processedNodes.has(nodeId)) {
-                // Find this node's spouse group
-                const group = spouseGroups.find(g => g.includes(nodeId));
-                if (group) {
-                    const groupNodesAtLevel = group.filter(id => nodesAtLevel.includes(id));
-                    spouseGroupsAtLevel.push(groupNodesAtLevel);
-                    groupNodesAtLevel.forEach(id => processedNodes.add(id));
-                }
-            }
-        });
-        
-        // Calculate total width needed
-        const totalGroups = spouseGroupsAtLevel.length;
-        const startX = -(totalGroups - 1) * horizontalSpacing / 2;
-        
-        // Assign X positions
-        spouseGroupsAtLevel.forEach((group, groupIndex) => {
-            const groupX = startX + groupIndex * horizontalSpacing;
-            
-            if (group.length === 1) {
-                // Single person
-                nodeToX.set(group[0], groupX);
-            } else {
-                // Multiple spouses - place them close together
-                const spouseSpacing = 120;
-                const groupStartX = groupX - (group.length - 1) * spouseSpacing / 2;
-                
-                group.forEach((nodeId, index) => {
-                    nodeToX.set(nodeId, groupStartX + index * spouseSpacing);
-                });
-            }
-        });
-    });
-    
-    // Return nodes with fixed positions
-    return nodes.map(node => {
-        const x = nodeToX.get(node.id) || 0;
-        const y = nodeToY.get(node.id) || 0;
-        
-        return {
-            ...node,
-            x: x,
-            y: y,
-            fixed: { x: true, y: true }
-        };
-    });
+function clearSvg() {
+    if (edgeLayer) edgeLayer.innerHTML = '';
+    if (nodeLayer) nodeLayer.innerHTML = '';
+    nodesById.clear();
+    selectedNodeId = null;
 }
 
 // Load graph data from API
@@ -393,242 +94,578 @@ async function loadGraph() {
     const loadingDiv = document.getElementById('loading');
     const errorDiv = document.getElementById('error');
     const loadBtn = document.getElementById('loadBtn');
-    
+
     try {
         loadingDiv.style.display = 'block';
         errorDiv.style.display = 'none';
         loadBtn.disabled = true;
-        
+
         const limit = document.getElementById('limitInput').value;
         const depth = document.getElementById('depthInput').value;
-        
-        let url = `/api/graph/data?limit=${limit}&depth=${depth}`;
+
+        let url = `/api/graph/data?limit=${encodeURIComponent(limit)}&depth=${encodeURIComponent(depth)}`;
         if (currentRootId) {
-            url += `&root_id=${currentRootId}`;
+            url += `&root_id=${encodeURIComponent(currentRootId)}`;
         }
-        
+
         const response = await fetch(url);
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || 'Failed to load graph data');
         }
-        
+
         allData = data;
         renderGraph(data);
-        
+
         document.getElementById('nodeCount').textContent = data.count || 0;
-        
     } catch (error) {
         console.error('Error loading graph:', error);
         errorDiv.textContent = `Error: ${error.message}`;
         errorDiv.style.display = 'block';
+        clearSvg();
     } finally {
         loadingDiv.style.display = 'none';
         loadBtn.disabled = false;
     }
 }
 
-// Render graph with data
 function renderGraph(data) {
-    if (!network) {
+    if (!graphSvg) {
         initGraph();
     }
-    
-    // Clear existing data
-    nodes.clear();
-    edges.clear();
-    
-    // Check if source edges should be hidden
-    const hideSource = document.getElementById('hideSourceEdges')?.checked;
-    
-    // Identify source node IDs from edges
-    const sourceNodeIds = new Set();
-    data.edges.forEach(edge => {
-        if (edge.type === 'FROM_SOURCE') {
-            // Find which node is the source record (non-Person type)
-            const fromNode = data.nodes.find(n => n.id === edge.from);
-            const toNode = data.nodes.find(n => n.id === edge.to);
-            
-            if (fromNode && fromNode.type !== 'Person') {
-                sourceNodeIds.add(edge.from);
-            }
-            if (toNode && toNode.type !== 'Person') {
-                sourceNodeIds.add(edge.to);
-            }
-        }
-    });
-    
-    // Build marriage map to identify spouse pairs
-    const marriages = new Map(); // person_id -> Set of spouse_ids
-    data.edges.forEach(edge => {
-        if (edge.type === 'MARRIED_TO') {
-            if (!marriages.has(edge.from)) {
-                marriages.set(edge.from, new Set());
-            }
-            if (!marriages.has(edge.to)) {
-                marriages.set(edge.to, new Set());
-            }
-            marriages.get(edge.from).add(edge.to);
-            marriages.get(edge.to).add(edge.from);
-        }
-    });
-    
-    // Deduplicate parent-child edges: only one edge per child from married couples
-    const childToParents = new Map(); // child_id -> [parent_ids]
-    const parentChildEdges = data.edges.filter(e => e.type === 'PARENT_OF');
-    
-    parentChildEdges.forEach(edge => {
-        const childId = edge.to;
-        if (!childToParents.has(childId)) {
-            childToParents.set(childId, []);
-        }
-        childToParents.get(childId).push(edge.from);
-    });
-    
-    // Determine which parent-child edges to keep
-    const edgesToKeep = new Set();
-    childToParents.forEach((parents, childId) => {
-        if (parents.length === 1) {
-            // Only one parent, keep the edge
-            edgesToKeep.add(`${parents[0]}-${childId}-PARENT_OF`);
-        } else if (parents.length === 2) {
-            // Check if parents are married to each other
-            const [parent1, parent2] = parents;
-            const areMarried = marriages.has(parent1) && marriages.get(parent1).has(parent2);
-            
-            if (areMarried) {
-                // Parents are married, keep only one edge (prefer first parent)
-                edgesToKeep.add(`${parent1}-${childId}-PARENT_OF`);
-            } else {
-                // Parents are not married, keep both edges
-                edgesToKeep.add(`${parent1}-${childId}-PARENT_OF`);
-                edgesToKeep.add(`${parent2}-${childId}-PARENT_OF`);
-            }
-        } else {
-            // More than 2 parents (unusual), keep all edges
-            parents.forEach(parentId => {
-                edgesToKeep.add(`${parentId}-${childId}-PARENT_OF`);
-            });
-        }
-    });
-    
-    // Calculate hierarchical positions based on birth years
-    const nodesWithPositions = calculateHierarchicalPositions(data.nodes, data.edges);
-    
-    // Process nodes with hierarchical positioning and root highlighting
-    const processedNodes = nodesWithPositions.map(node => {
-        const color = getNodeColor(node);
-        const title = getNodeTooltip(node);
-        
-        // Build label with birth and death years for Person nodes
-        let label = node.label;
-        if (node.type === 'Person') {
-            // Add star icon for root node
-            if (node.id === currentRootId) {
-                label = '⭐ ' + label;
-            }
-            
-            // Extract years from dates (format: YYYY-MM-DD or just YYYY)
-            const birthYear = node.birth_date ? node.birth_date.split('-')[0] : '';
-            const deathYear = node.death_date ? node.death_date.split('-')[0] : '';
-            
-            // Format as "(birth year - death year)"
-            if (birthYear || deathYear) {
-                label += '\n(' + birthYear + ' - ' + deathYear + ')';
-            }
-        }
-        
-        // Apply special styling for root node
-        const isRoot = node.id === currentRootId;
-        const nodeColor = isRoot ? {
-            background: color.background,
-            border: '#FFD700',  // Gold border for root
-            highlight: {
-                background: color.background,
-                border: '#4CAF50'  // Green border on highlight
-            }
-        } : color;
-        
-        const borderWidth = isRoot ? 5 : 1;
-        
-        return {
-            id: node.id,
-            label: label,
-            title: title,
-            color: nodeColor,
-            borderWidth: borderWidth,
-            borderWidthSelected: isRoot ? 6 : 2,
-            x: node.x,
-            y: node.y,
-            fixed: node.fixed,
-            font: {
-                color: '#333',
-                multi: true,
-                bold: {
-                    size: 14
-                }
-            },
-            hidden: hideSource && sourceNodeIds.has(node.id)
-        };
-    });
-    
-    // Process edges with special handling for marriage edges and parent-child deduplication
-    // Filter out edges that should be hidden instead of marking them as hidden
-    const processedEdges = data.edges
-        .filter(edge => {
-            // Filter out hidden edges
-            if (shouldHideEdge(edge.type)) return false;
-            
-            // Filter out duplicate parent-child edges
-            if (edge.type === 'PARENT_OF') {
-                const edgeKey = `${edge.from}-${edge.to}-PARENT_OF`;
-                return edgesToKeep.has(edgeKey);
-            }
-            
-            return true;
-        })
-        .map(edge => {
-            const color = getEdgeColor(edge.type);
-            const label = edge.type === 'MARRIED_TO' ? '💑' : '';
-            
-            // For marriage edges, make them very short and strong to group spouses
-            const edgeConfig = {
-                id: `${edge.from}-${edge.to}-${edge.type}`,
-                from: edge.from,
-                to: edge.to,
-                label: label,
-                color: color,
-                width: edge.type === 'MARRIED_TO' ? 3 : 2
-            };
-            
-            // Configure marriage edges to keep spouses close together
-            if (edge.type === 'MARRIED_TO') {
-                edgeConfig.arrows = { to: { enabled: false } };
-                edgeConfig.smooth = { enabled: false }; // Straight line for spouses
-                edgeConfig.length = 100; // Short fixed length to keep spouses close
-                edgeConfig.physics = true; // Enable physics for this edge
-            }
-            
-            return edgeConfig;
-        });
-    
-    // Add nodes and edges
-    nodes.add(processedNodes);
-    edges.add(processedEdges);
-    
-    // Fit the network
-    setTimeout(() => {
-        network.fit({
-            animation: {
-                duration: 1000,
-                easingFunction: 'easeInOutQuad'
-            }
-        });
-    }, 100);
+
+    clearSvg();
+
+    const prepared = prepareGraphData(data);
+    layoutState = calculateGenealogicalLayout(prepared.nodes, prepared.edges);
+
+    drawGenerationGuides(layoutState);
+    drawEdges(layoutState, prepared.edges);
+    drawNodes(layoutState);
+
+    applyTransform();
+    setTimeout(function() {
+        fitToLayout(true);
+    }, 50);
 }
 
-// Get node color based on gender
+function prepareGraphData(data) {
+    const hideSource = document.getElementById('hideSourceEdges')?.checked;
+    const sourceNodeIds = new Set();
+
+    (data.edges || []).forEach(edge => {
+        if (edge.type !== 'FROM_SOURCE') return;
+
+        const fromNode = (data.nodes || []).find(node => node.id === edge.from);
+        const toNode = (data.nodes || []).find(node => node.id === edge.to);
+
+        if (fromNode && fromNode.type !== 'Person') sourceNodeIds.add(edge.from);
+        if (toNode && toNode.type !== 'Person') sourceNodeIds.add(edge.to);
+    });
+
+    const visibleNodes = (data.nodes || []).filter(node => !(hideSource && sourceNodeIds.has(node.id)));
+    const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
+    const visibleEdges = (data.edges || []).filter(edge => {
+        if (shouldHideEdge(edge.type)) return false;
+        return visibleNodeIds.has(edge.from) && visibleNodeIds.has(edge.to);
+    });
+
+    return {
+        nodes: visibleNodes,
+        edges: visibleEdges
+    };
+}
+
+function calculateGenealogicalLayout(rawNodes, rawEdges) {
+    const nodeMap = new Map(rawNodes.map(node => [node.id, node]));
+    const relationships = buildRelationshipMaps(rawNodes, rawEdges);
+    const groups = buildSpouseGroups(rawNodes, relationships.marriages);
+
+    assignGroupLevels(groups, relationships.parents, relationships.children);
+    assignGroupPositions(groups, relationships.parents, relationships.children, nodeMap);
+
+    const positionedNodes = positionNodesInsideGroups(groups, nodeMap);
+    const bounds = calculateBounds(positionedNodes);
+
+    return {
+        nodes: positionedNodes,
+        nodeMap,
+        groups,
+        relationships,
+        bounds
+    };
+}
+
+function buildRelationshipMaps(rawNodes, rawEdges) {
+    const marriages = new Map();
+    const parents = new Map();
+    const children = new Map();
+
+    rawNodes.forEach(node => {
+        marriages.set(node.id, new Set());
+        parents.set(node.id, new Set());
+        children.set(node.id, new Set());
+    });
+
+    rawEdges.forEach(edge => {
+        if (!parents.has(edge.from) || !parents.has(edge.to)) return;
+
+        if (edge.type === 'MARRIED_TO') {
+            marriages.get(edge.from).add(edge.to);
+            marriages.get(edge.to).add(edge.from);
+        } else if (edge.type === 'PARENT_OF') {
+            children.get(edge.from).add(edge.to);
+            parents.get(edge.to).add(edge.from);
+        }
+    });
+
+    return { marriages, parents, children };
+}
+
+function buildSpouseGroups(rawNodes, marriages) {
+    const visited = new Set();
+    const groups = [];
+    const groupByNodeId = new Map();
+
+    rawNodes.forEach(node => {
+        if (visited.has(node.id)) return;
+
+        const memberIds = [];
+        const queue = [node.id];
+        visited.add(node.id);
+
+        while (queue.length > 0) {
+            const nodeId = queue.shift();
+            memberIds.push(nodeId);
+
+            (marriages.get(nodeId) || new Set()).forEach(spouseId => {
+                if (!visited.has(spouseId)) {
+                    visited.add(spouseId);
+                    queue.push(spouseId);
+                }
+            });
+        }
+
+        const group = {
+            id: groups.length,
+            memberIds,
+            level: 0,
+            x: 0,
+            y: 0,
+            width: Math.max(NODE_WIDTH, memberIds.length * NODE_WIDTH + (memberIds.length - 1) * SPOUSE_GAP),
+            parentGroupIds: new Set(),
+            childGroupIds: new Set()
+        };
+
+        groups.push(group);
+        memberIds.forEach(memberId => groupByNodeId.set(memberId, group.id));
+    });
+
+    groups.groupByNodeId = groupByNodeId;
+    return groups;
+}
+
+function assignGroupLevels(groups, parents, children) {
+    const groupByNodeId = groups.groupByNodeId;
+
+    groups.forEach(group => {
+        group.memberIds.forEach(memberId => {
+            (parents.get(memberId) || new Set()).forEach(parentId => {
+                const parentGroupId = groupByNodeId.get(parentId);
+                if (parentGroupId !== undefined && parentGroupId !== group.id) {
+                    group.parentGroupIds.add(parentGroupId);
+                    groups[parentGroupId].childGroupIds.add(group.id);
+                }
+            });
+
+            (children.get(memberId) || new Set()).forEach(childId => {
+                const childGroupId = groupByNodeId.get(childId);
+                if (childGroupId !== undefined && childGroupId !== group.id) {
+                    group.childGroupIds.add(childGroupId);
+                    groups[childGroupId].parentGroupIds.add(group.id);
+                }
+            });
+        });
+    });
+
+    let changed = true;
+    let iterations = 0;
+
+    while (changed && iterations < groups.length * 4 + 20) {
+        changed = false;
+        iterations += 1;
+
+        groups.forEach(group => {
+            let desiredLevel = 0;
+            group.parentGroupIds.forEach(parentGroupId => {
+                desiredLevel = Math.max(desiredLevel, groups[parentGroupId].level + 1);
+            });
+
+            if (desiredLevel > group.level) {
+                group.level = desiredLevel;
+                changed = true;
+            }
+        });
+    }
+}
+
+function assignGroupPositions(groups, parents, children, nodeMap) {
+    const levels = new Map();
+    groups.forEach(group => {
+        if (!levels.has(group.level)) levels.set(group.level, []);
+        levels.get(group.level).push(group);
+    });
+
+    const sortedLevels = Array.from(levels.keys()).sort((a, b) => a - b);
+
+    sortedLevels.forEach(level => {
+        const groupsAtLevel = levels.get(level);
+        groupsAtLevel.sort(function(a, b) {
+            const parentXDiff = averageParentX(a, groups) - averageParentX(b, groups);
+            if (isFinite(parentXDiff) && parentXDiff !== 0) return parentXDiff;
+            return compareGroups(a, b, nodeMap);
+        });
+        spreadGroups(groupsAtLevel, level);
+    });
+
+    for (let pass = 0; pass < 3; pass += 1) {
+        for (let index = sortedLevels.length - 2; index >= 0; index -= 1) {
+            levels.get(sortedLevels[index]).forEach(group => {
+                const childXs = Array.from(group.childGroupIds)
+                    .map(childGroupId => groups[childGroupId].x)
+                    .filter(Number.isFinite);
+
+                if (childXs.length > 0) {
+                    group.x = average(childXs);
+                }
+            });
+            normalizeLevel(levels.get(sortedLevels[index]));
+        }
+
+        sortedLevels.forEach(level => {
+            levels.get(level).sort(function(a, b) {
+                const parentXDiff = averageParentX(a, groups) - averageParentX(b, groups);
+                if (isFinite(parentXDiff) && parentXDiff !== 0) return parentXDiff;
+                return a.x - b.x;
+            });
+            normalizeLevel(levels.get(level));
+        });
+    }
+
+    groups.forEach(group => {
+        group.y = group.level * GENERATION_GAP;
+    });
+
+    placeSourceGroups(groups, nodeMap);
+}
+
+function averageParentX(group, groups) {
+    const parentXs = Array.from(group.parentGroupIds)
+        .map(parentGroupId => groups[parentGroupId].x)
+        .filter(Number.isFinite);
+    return parentXs.length > 0 ? average(parentXs) : Number.POSITIVE_INFINITY;
+}
+
+function spreadGroups(groupsAtLevel, level) {
+    const totalWidth = groupsAtLevel.reduce((sum, group) => sum + group.width, 0) + Math.max(0, groupsAtLevel.length - 1) * GROUP_GAP;
+    let cursor = -totalWidth / 2;
+
+    groupsAtLevel.forEach(group => {
+        group.x = cursor + group.width / 2;
+        group.y = level * GENERATION_GAP;
+        cursor += group.width + GROUP_GAP;
+    });
+}
+
+function normalizeLevel(groupsAtLevel) {
+    if (!groupsAtLevel || groupsAtLevel.length === 0) return;
+
+    groupsAtLevel.sort((a, b) => a.x - b.x);
+
+    for (let index = 1; index < groupsAtLevel.length; index += 1) {
+        const previous = groupsAtLevel[index - 1];
+        const current = groupsAtLevel[index];
+        const minimumX = previous.x + previous.width / 2 + GROUP_GAP + current.width / 2;
+        if (current.x < minimumX) {
+            current.x = minimumX;
+        }
+    }
+
+    const minX = groupsAtLevel[0].x - groupsAtLevel[0].width / 2;
+    const maxGroup = groupsAtLevel[groupsAtLevel.length - 1];
+    const maxX = maxGroup.x + maxGroup.width / 2;
+    const offset = (minX + maxX) / 2;
+
+    groupsAtLevel.forEach(group => {
+        group.x -= offset;
+    });
+}
+
+function placeSourceGroups(groups, nodeMap) {
+    const maxPersonLevel = groups.reduce((maxLevel, group) => {
+        const hasPerson = group.memberIds.some(nodeId => nodeMap.get(nodeId)?.type === 'Person');
+        return hasPerson ? Math.max(maxLevel, group.level) : maxLevel;
+    }, 0);
+
+    const sourceGroups = groups.filter(group => group.memberIds.every(nodeId => nodeMap.get(nodeId)?.type !== 'Person'));
+    if (sourceGroups.length === 0) return;
+
+    sourceGroups.forEach((group, index) => {
+        group.level = maxPersonLevel + 1;
+        group.y = maxPersonLevel * GENERATION_GAP + SOURCE_GAP;
+        group.x = (index - (sourceGroups.length - 1) / 2) * (NODE_WIDTH + GROUP_GAP);
+    });
+}
+
+function positionNodesInsideGroups(groups, nodeMap) {
+    const positioned = new Map();
+
+    groups.forEach(group => {
+        const members = group.memberIds
+            .map(nodeId => nodeMap.get(nodeId))
+            .filter(Boolean)
+            .sort(compareNodesForSpouseOrder);
+        const totalWidth = members.length * NODE_WIDTH + Math.max(0, members.length - 1) * SPOUSE_GAP;
+        let cursor = group.x - totalWidth / 2;
+
+        members.forEach(node => {
+            positioned.set(node.id, {
+                ...node,
+                x: cursor + NODE_WIDTH / 2,
+                y: group.y,
+                width: NODE_WIDTH,
+                height: NODE_HEIGHT,
+                groupId: group.id
+            });
+            cursor += NODE_WIDTH + SPOUSE_GAP;
+        });
+    });
+
+    return positioned;
+}
+
+function drawGenerationGuides(state) {
+    if (!state || !state.bounds) return;
+
+    const levelLabels = new Map();
+    state.groups.forEach(group => {
+        const hasPerson = group.memberIds.some(nodeId => state.nodeMap.get(nodeId)?.type === 'Person');
+        if (hasPerson && !levelLabels.has(group.level)) {
+            levelLabels.set(group.level, group.y);
+        }
+    });
+
+    const left = state.bounds.minX - 120;
+    const right = state.bounds.maxX + 120;
+
+    Array.from(levelLabels.keys()).sort((a, b) => a - b).forEach(level => {
+        const y = levelLabels.get(level);
+        const line = createSvgElement('line', {
+            class: 'generation-guide',
+            x1: left,
+            y1: y,
+            x2: right,
+            y2: y
+        });
+        edgeLayer.appendChild(line);
+
+        const label = createSvgElement('text', {
+            class: 'generation-label',
+            x: left,
+            y: y - NODE_HEIGHT / 2 - 14
+        });
+        label.textContent = `Generation ${level + 1}`;
+        edgeLayer.appendChild(label);
+    });
+}
+
+function drawEdges(state, edgesToRender) {
+    const drawnParentChildren = new Set();
+    const drawnMarriages = new Set();
+
+    edgesToRender.forEach(edge => {
+        const fromNode = state.nodes.get(edge.from);
+        const toNode = state.nodes.get(edge.to);
+        if (!fromNode || !toNode) return;
+
+        if (edge.type === 'MARRIED_TO') {
+            const key = [edge.from, edge.to].sort().join('::');
+            if (drawnMarriages.has(key)) return;
+            drawnMarriages.add(key);
+            drawMarriageEdge(fromNode, toNode);
+        } else if (edge.type === 'PARENT_OF') {
+            const childParents = Array.from(state.relationships.parents.get(edge.to) || [])
+                .filter(parentId => state.nodes.has(parentId));
+            const marriedParentIds = childParents.filter(parentId => {
+                return childParents.some(otherId => otherId !== parentId && (state.relationships.marriages.get(parentId) || new Set()).has(otherId));
+            });
+
+            if (marriedParentIds.length > 1) {
+                const key = `${marriedParentIds.sort().join('::')}=>${edge.to}`;
+                if (drawnParentChildren.has(key)) return;
+                drawnParentChildren.add(key);
+                drawParentChildEdge(marriedParentIds.map(parentId => state.nodes.get(parentId)), toNode, true);
+            } else {
+                drawParentChildEdge([fromNode], toNode, false);
+            }
+        } else if (edge.type === 'FROM_SOURCE') {
+            drawSourceEdge(fromNode, toNode);
+        } else {
+            drawGenericEdge(fromNode, toNode, edge.type);
+        }
+    });
+}
+
+function drawMarriageEdge(fromNode, toNode) {
+    const path = createSvgElement('path', {
+        class: 'graph-edge marriage-edge',
+        d: `M ${fromNode.x} ${fromNode.y} L ${toNode.x} ${toNode.y}`
+    });
+    edgeLayer.appendChild(path);
+
+    const label = createSvgElement('text', {
+        class: 'edge-label marriage-label',
+        x: (fromNode.x + toNode.x) / 2,
+        y: fromNode.y - NODE_HEIGHT / 2 - 8,
+        'text-anchor': 'middle'
+    });
+    label.textContent = '💑';
+    edgeLayer.appendChild(label);
+}
+
+function drawParentChildEdge(parentNodes, childNode, familyConnector) {
+    const visibleParents = parentNodes.filter(Boolean);
+    if (visibleParents.length === 0) return;
+
+    const fromX = average(visibleParents.map(node => node.x));
+    const fromY = Math.max(...visibleParents.map(node => node.y)) + NODE_HEIGHT / 2;
+    const toX = childNode.x;
+    const toY = childNode.y - NODE_HEIGHT / 2;
+    const midY = fromY + Math.max(36, (toY - fromY) / 2);
+
+    if (familyConnector && visibleParents.length > 1) {
+        const minParentX = Math.min(...visibleParents.map(node => node.x));
+        const maxParentX = Math.max(...visibleParents.map(node => node.x));
+        const bridge = createSvgElement('path', {
+            class: 'graph-edge family-bridge-edge',
+            d: `M ${minParentX} ${fromY - 12} L ${maxParentX} ${fromY - 12}`
+        });
+        edgeLayer.appendChild(bridge);
+    }
+
+    const path = createSvgElement('path', {
+        class: 'graph-edge parent-edge',
+        d: `M ${fromX} ${fromY} V ${midY} H ${toX} V ${toY}`
+    });
+    edgeLayer.appendChild(path);
+}
+
+function drawSourceEdge(fromNode, toNode) {
+    const path = createSvgElement('path', {
+        class: 'graph-edge source-edge',
+        d: elbowPath(fromNode, toNode)
+    });
+    edgeLayer.appendChild(path);
+}
+
+function drawGenericEdge(fromNode, toNode, type) {
+    const path = createSvgElement('path', {
+        class: 'graph-edge generic-edge',
+        d: elbowPath(fromNode, toNode)
+    });
+    path.appendChild(createSvgElement('title', {})).textContent = type || 'RELATED_TO';
+    edgeLayer.appendChild(path);
+}
+
+function elbowPath(fromNode, toNode) {
+    const fromY = fromNode.y + (fromNode.y <= toNode.y ? NODE_HEIGHT / 2 : -NODE_HEIGHT / 2);
+    const toY = toNode.y + (fromNode.y <= toNode.y ? -NODE_HEIGHT / 2 : NODE_HEIGHT / 2);
+    const midY = (fromY + toY) / 2;
+    return `M ${fromNode.x} ${fromY} V ${midY} H ${toNode.x} V ${toY}`;
+}
+
+function drawNodes(state) {
+    state.nodes.forEach(node => {
+        const group = createSvgElement('g', {
+            class: `graph-node${node.id === currentRootId ? ' root-node' : ''}`,
+            transform: `translate(${node.x - NODE_WIDTH / 2}, ${node.y - NODE_HEIGHT / 2})`,
+            tabindex: '0',
+            role: 'button',
+            'data-node-id': node.id
+        });
+
+        const color = getNodeColor(node);
+        const rect = createSvgElement('rect', {
+            width: NODE_WIDTH,
+            height: NODE_HEIGHT,
+            rx: 8,
+            ry: 8,
+            fill: color.background,
+            stroke: node.id === currentRootId ? '#FFD700' : color.border,
+            'stroke-width': node.id === currentRootId ? 5 : 2
+        });
+        group.appendChild(rect);
+
+        const title = createSvgElement('title', {});
+        title.textContent = getNodeTooltipText(node);
+        group.appendChild(title);
+
+        const labelLines = getNodeLabelLines(node);
+        labelLines.forEach((line, index) => {
+            const text = createSvgElement('text', {
+                class: index === 0 ? 'node-label node-label-name' : 'node-label node-label-years',
+                x: NODE_WIDTH / 2,
+                y: NODE_HEIGHT / 2 - ((labelLines.length - 1) * 9) + index * 18,
+                'text-anchor': 'middle'
+            });
+            text.textContent = line;
+            group.appendChild(text);
+        });
+
+        group.addEventListener('click', function(event) {
+            event.stopPropagation();
+            selectNode(node.id);
+            showNodeInfo(node.id);
+        });
+
+        group.addEventListener('dblclick', function(event) {
+            event.stopPropagation();
+            setAsRoot(node.id);
+        });
+
+        group.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectNode(node.id);
+                showNodeInfo(node.id);
+            }
+        });
+
+        nodeLayer.appendChild(group);
+        nodesById.set(node.id, group);
+    });
+}
+
+function getNodeLabelLines(node) {
+    let name = node.label || 'Unknown';
+    if (node.id === currentRootId) name = `⭐ ${name}`;
+
+    const lines = [truncateLabel(name, 24)];
+
+    if (node.type === 'Person') {
+        const birthYear = extractYear(node.birth_date);
+        const deathYear = extractYear(node.death_date);
+        if (birthYear || deathYear) {
+            lines.push(`(${birthYear || ''} - ${deathYear || ''})`);
+        }
+    } else if (node.type) {
+        lines.push(node.type);
+    }
+
+    return lines;
+}
+
 function getNodeColor(node) {
     if (node.type !== 'Person') {
         return {
@@ -636,7 +673,7 @@ function getNodeColor(node) {
             border: '#ff9800'
         };
     }
-    
+
     switch (node.gender?.toLowerCase()) {
         case 'm':
         case 'male':
@@ -658,78 +695,159 @@ function getNodeColor(node) {
     }
 }
 
-// Get edge color based on relationship type
-function getEdgeColor(type) {
-    switch (type) {
-        case 'PARENT_OF':
-            return { color: '#2e7d32', highlight: '#1b5e20' };
-        case 'MARRIED_TO':
-            return { color: '#c2185b', highlight: '#880e4f' };
-        case 'FROM_SOURCE':
-            return { color: '#ff9800', highlight: '#f57c00' };
-        default:
-            return { color: '#757575', highlight: '#424242' };
+function getNodeTooltipText(node) {
+    const parts = [node.label || 'Unknown'];
+
+    if (node.birth_date) parts.push(`${t.born}: ${node.birth_date}`);
+    if (node.death_date) parts.push(`${t.died}: ${node.death_date}`);
+    if (node.birth_place) parts.push(`${t.place}: ${node.birth_place}`);
+    if (node.occupation) parts.push(`${t.occupation}: ${node.occupation}`);
+    if (node.source) parts.push(`${t.source}: ${node.source}`);
+    parts.push(t.doubleClickToSetAsAncestor);
+
+    return parts.join('\n');
+}
+
+function getNodeTooltip(node) {
+    let tooltip = `<strong>${escapeHtml(node.label || 'Unknown')}</strong><br>`;
+
+    if (node.birth_date) tooltip += `${t.born}: ${escapeHtml(node.birth_date)}<br>`;
+    if (node.death_date) tooltip += `${t.died}: ${escapeHtml(node.death_date)}<br>`;
+    if (node.birth_place) tooltip += `${t.place}: ${escapeHtml(node.birth_place)}<br>`;
+    if (node.occupation) tooltip += `${t.occupation}: ${escapeHtml(node.occupation)}<br>`;
+    if (node.source) tooltip += `${t.source}: ${escapeHtml(node.source)}<br>`;
+
+    tooltip += `<br><em>${t.doubleClickToSetAsAncestor}</em>`;
+
+    return tooltip;
+}
+
+function selectNode(nodeId) {
+    if (selectedNodeId && nodesById.has(selectedNodeId)) {
+        nodesById.get(selectedNodeId).classList.remove('selected');
+    }
+
+    selectedNodeId = nodeId;
+
+    if (nodesById.has(nodeId)) {
+        nodesById.get(nodeId).classList.add('selected');
     }
 }
 
-// Get node tooltip
-function getNodeTooltip(node) {
-    let tooltip = `<strong>${node.label}</strong><br>`;
-    
-    if (node.birth_date) {
-        tooltip += `${t.born}: ${node.birth_date}<br>`;
+function focusNode(nodeId, scale) {
+    if (!layoutState || !layoutState.nodes.has(nodeId)) return;
+
+    const container = document.getElementById('graph');
+    const node = layoutState.nodes.get(nodeId);
+    const nextScale = clamp(scale || Math.max(viewTransform.scale, 1.2), MIN_SCALE, MAX_SCALE);
+
+    viewTransform = {
+        scale: nextScale,
+        x: container.clientWidth / 2 - node.x * nextScale,
+        y: container.clientHeight / 2 - node.y * nextScale
+    };
+    applyTransform();
+    selectNode(nodeId);
+}
+
+function applyTransform() {
+    if (!graphLayer) return;
+    graphLayer.setAttribute('transform', `translate(${viewTransform.x}, ${viewTransform.y}) scale(${viewTransform.scale})`);
+}
+
+function fitToLayout(animate) {
+    if (!layoutState || !layoutState.bounds) return;
+
+    const container = document.getElementById('graph');
+    if (!container || container.clientWidth === 0 || container.clientHeight === 0) return;
+
+    const width = Math.max(1, layoutState.bounds.maxX - layoutState.bounds.minX + FIT_PADDING * 2);
+    const height = Math.max(1, layoutState.bounds.maxY - layoutState.bounds.minY + FIT_PADDING * 2);
+    const scale = clamp(Math.min(container.clientWidth / width, container.clientHeight / height), MIN_SCALE, MAX_SCALE);
+    const centerX = (layoutState.bounds.minX + layoutState.bounds.maxX) / 2;
+    const centerY = (layoutState.bounds.minY + layoutState.bounds.maxY) / 2;
+
+    viewTransform = {
+        scale,
+        x: container.clientWidth / 2 - centerX * scale,
+        y: container.clientHeight / 2 - centerY * scale
+    };
+
+    if (animate) {
+        graphLayer.classList.add('graph-layer-animated');
+        setTimeout(function() {
+            graphLayer?.classList.remove('graph-layer-animated');
+        }, 350);
     }
-    if (node.death_date) {
-        tooltip += `${t.died}: ${node.death_date}<br>`;
-    }
-    if (node.birth_place) {
-        tooltip += `${t.place}: ${node.birth_place}<br>`;
-    }
-    if (node.occupation) {
-        tooltip += `${t.occupation}: ${node.occupation}<br>`;
-    }
-    if (node.source) {
-        tooltip += `${t.source}: ${node.source}<br>`;
-    }
-    
-    tooltip += `<br><em>${t.doubleClickToSetAsAncestor}</em>`;
-    
-    return tooltip;
+
+    applyTransform();
+}
+
+function handleWheel(event) {
+    if (!layoutState) return;
+    event.preventDefault();
+
+    const rect = graphSvg.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const worldX = (mouseX - viewTransform.x) / viewTransform.scale;
+    const worldY = (mouseY - viewTransform.y) / viewTransform.scale;
+    const zoomFactor = event.deltaY < 0 ? 1.12 : 0.88;
+    const nextScale = clamp(viewTransform.scale * zoomFactor, MIN_SCALE, MAX_SCALE);
+
+    viewTransform = {
+        scale: nextScale,
+        x: mouseX - worldX * nextScale,
+        y: mouseY - worldY * nextScale
+    };
+    applyTransform();
+}
+
+function startPan(event) {
+    if (event.button !== 0 || event.target.closest('.graph-node')) return;
+    panState = {
+        startX: event.clientX,
+        startY: event.clientY,
+        transformX: viewTransform.x,
+        transformY: viewTransform.y
+    };
+    graphSvg.classList.add('panning');
+}
+
+function movePan(event) {
+    if (!panState) return;
+
+    viewTransform.x = panState.transformX + event.clientX - panState.startX;
+    viewTransform.y = panState.transformY + event.clientY - panState.startY;
+    applyTransform();
+}
+
+function endPan() {
+    if (!panState) return;
+    panState = null;
+    graphSvg?.classList.remove('panning');
 }
 
 // Show node information in side panel
 function showNodeInfo(nodeId) {
     const node = allData.nodes.find(n => n.id === nodeId);
     if (!node) return;
-    
+
     const infoPanel = document.getElementById('infoPanel');
     const infoTitle = document.getElementById('infoTitle');
     const infoContent = document.getElementById('infoContent');
-    
+
     infoTitle.textContent = node.label;
-    
+
     let content = '<div class="info-details">';
-    
-    if (node.gender) {
-        content += `<p><strong>${t.gender}:</strong> ${node.gender}</p>`;
-    }
-    if (node.birth_date) {
-        content += `<p><strong>${t.birthDate}:</strong> ${node.birth_date}</p>`;
-    }
-    if (node.death_date) {
-        content += `<p><strong>${t.deathDate}:</strong> ${node.death_date}</p>`;
-    }
-    if (node.birth_place) {
-        content += `<p><strong>${t.birthPlace}:</strong> ${node.birth_place}</p>`;
-    }
-    if (node.occupation) {
-        content += `<p><strong>${t.occupation}:</strong> ${node.occupation}</p>`;
-    }
-    if (node.source) {
-        content += `<p><strong>${t.source}:</strong> ${node.source}</p>`;
-    }
-    
-    // Find relationships
+
+    if (node.gender) content += `<p><strong>${t.gender}:</strong> ${escapeHtml(node.gender)}</p>`;
+    if (node.birth_date) content += `<p><strong>${t.birthDate}:</strong> ${escapeHtml(node.birth_date)}</p>`;
+    if (node.death_date) content += `<p><strong>${t.deathDate}:</strong> ${escapeHtml(node.death_date)}</p>`;
+    if (node.birth_place) content += `<p><strong>${t.birthPlace}:</strong> ${escapeHtml(node.birth_place)}</p>`;
+    if (node.occupation) content += `<p><strong>${t.occupation}:</strong> ${escapeHtml(node.occupation)}</p>`;
+    if (node.source) content += `<p><strong>${t.source}:</strong> ${escapeHtml(node.source)}</p>`;
+
     const relationships = allData.edges.filter(e => e.from === nodeId || e.to === nodeId);
     if (relationships.length > 0) {
         content += `<p><strong>${t.relationships}:</strong></p><ul class="relationships-list">`;
@@ -738,18 +856,17 @@ function showNodeInfo(nodeId) {
             const otherNode = allData.nodes.find(n => n.id === otherId);
             if (otherNode) {
                 const direction = rel.from === nodeId ? '→' : '←';
-                content += `<li>${direction} ${rel.type}: <span class="person-link" data-person-id="${otherId}">${otherNode.label}</span></li>`;
+                content += `<li>${direction} ${escapeHtml(rel.type)}: <span class="person-link" data-person-id="${escapeAttribute(otherId)}">${escapeHtml(otherNode.label)}</span></li>`;
             }
         });
         content += '</ul>';
     }
-    
+
     content += '</div>';
     infoContent.innerHTML = content;
-    
+
     infoPanel.classList.add('active');
-    
-    // Add click event listeners to person links
+
     const personLinks = infoContent.querySelectorAll('.person-link');
     personLinks.forEach(link => {
         link.addEventListener('click', function() {
@@ -759,108 +876,168 @@ function showNodeInfo(nodeId) {
     });
 }
 
-// Handle click on a person link in the relationships list
 function handlePersonClick(personId) {
-    // First, try to focus on the node in the graph
-    if (network && nodes.get(personId)) {
-        // Select and focus on the node
-        network.selectNodes([personId]);
-        network.focus(personId, {
-            scale: 1.5,
-            animation: {
-                duration: 1000,
-                easingFunction: 'easeInOutQuad'
-            }
-        });
-        
-        // Show the node's information in the panel
-        showNodeInfo(personId);
-    } else {
-        // If node is not in the current graph view, just show its info
-        showNodeInfo(personId);
+    if (nodesById.has(personId)) {
+        focusNode(personId, 1.35);
     }
+    showNodeInfo(personId);
 }
 
-// Close info panel
 function closeInfo() {
     const infoPanel = document.getElementById('infoPanel');
     infoPanel.classList.remove('active');
 }
 
-// Set node as root ancestor
 function setAsRoot(nodeId) {
     const node = allData.nodes.find(n => n.id === nodeId);
-    if (!node) return;
-    
+    if (!node || node.type !== 'Person') return;
+
     currentRootId = nodeId;
-    
-    // Update UI
+
     document.getElementById('rootName').textContent = node.label;
     document.getElementById('rootIndicator').style.display = 'flex';
     document.getElementById('clearRootBtn').style.display = 'inline-block';
-    
-    // Reload graph with new root
+
     loadGraph();
 }
 
-// Clear root ancestor
 function clearRoot() {
     currentRootId = null;
-    
-    // Update UI
+
     document.getElementById('rootIndicator').style.display = 'none';
     document.getElementById('clearRootBtn').style.display = 'none';
-    
-    // Reload graph
+
     loadGraph();
 }
 
-// Reset view
 function resetView() {
-    if (network) {
-        network.fit({
-            animation: {
-                duration: 1000,
-                easingFunction: 'easeInOutQuad'
-            }
-        });
-    }
+    fitToLayout(true);
 }
 
-// Toggle source edges and source nodes
 function toggleSourceEdges() {
-    // Re-render the graph with updated visibility settings
-    // This ensures edges are filtered out completely, not just hidden
     if (allData && allData.nodes && allData.edges) {
         renderGraph(allData);
     }
 }
 
-// Check if edge should be hidden
 function shouldHideEdge(edgeType) {
     const hideSource = document.getElementById('hideSourceEdges')?.checked;
-    if (hideSource && edgeType === 'FROM_SOURCE') return true;
-    return false;
+    return Boolean(hideSource && edgeType === 'FROM_SOURCE');
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Wait for vis library to be available
-    if (typeof vis !== 'undefined') {
-        initGraph();
-        loadGraph();
-    } else {
-        // Retry after a short delay if vis is not yet loaded
-        setTimeout(function() {
-            if (typeof vis !== 'undefined') {
-                initGraph();
-                loadGraph();
-            } else {
-                console.error('vis-network library failed to load');
-                const errorDiv = document.getElementById('error');
-                errorDiv.textContent = 'Error: Graph visualization library failed to load. Please refresh the page.';
-                errorDiv.style.display = 'block';
-            }
-        }, 500);
+function calculateBounds(positionedNodes) {
+    const nodes = Array.from(positionedNodes.values());
+    if (nodes.length === 0) {
+        return { minX: -100, maxX: 100, minY: -100, maxY: 100 };
     }
+
+    return nodes.reduce((bounds, node) => {
+        bounds.minX = Math.min(bounds.minX, node.x - NODE_WIDTH / 2);
+        bounds.maxX = Math.max(bounds.maxX, node.x + NODE_WIDTH / 2);
+        bounds.minY = Math.min(bounds.minY, node.y - NODE_HEIGHT / 2);
+        bounds.maxY = Math.max(bounds.maxY, node.y + NODE_HEIGHT / 2);
+        return bounds;
+    }, {
+        minX: Number.POSITIVE_INFINITY,
+        maxX: Number.NEGATIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY
+    });
+}
+
+function compareGroups(a, b, nodeMap) {
+    const yearA = groupBirthYear(a, nodeMap);
+    const yearB = groupBirthYear(b, nodeMap);
+    if (yearA !== yearB) return yearA - yearB;
+    return groupLabel(a, nodeMap).localeCompare(groupLabel(b, nodeMap));
+}
+
+function compareNodesForSpouseOrder(a, b) {
+    const rankA = genderRank(a.gender);
+    const rankB = genderRank(b.gender);
+    if (rankA !== rankB) return rankA - rankB;
+
+    const yearA = parseBirthYear(a);
+    const yearB = parseBirthYear(b);
+    if (yearA !== yearB) return yearA - yearB;
+
+    return (a.label || '').localeCompare(b.label || '');
+}
+
+function groupBirthYear(group, nodeMap) {
+    const years = group.memberIds
+        .map(nodeId => parseBirthYear(nodeMap.get(nodeId)))
+        .filter(year => year !== Number.POSITIVE_INFINITY);
+    return years.length > 0 ? Math.round(average(years)) : Number.POSITIVE_INFINITY;
+}
+
+function groupLabel(group, nodeMap) {
+    return group.memberIds
+        .map(nodeId => nodeMap.get(nodeId)?.label || '')
+        .sort()
+        .join(' ');
+}
+
+function genderRank(gender) {
+    switch (gender?.toLowerCase()) {
+        case 'm':
+        case 'male':
+            return 0;
+        case 'f':
+        case 'female':
+            return 1;
+        default:
+            return 2;
+    }
+}
+
+function parseBirthYear(node) {
+    if (!node || !node.birth_date) return Number.POSITIVE_INFINITY;
+    const year = parseInt(String(node.birth_date).split('-')[0], 10);
+    return Number.isFinite(year) ? year : Number.POSITIVE_INFINITY;
+}
+
+function extractYear(dateValue) {
+    if (!dateValue) return '';
+    const match = String(dateValue).match(/\d{3,4}/);
+    return match ? match[0] : '';
+}
+
+function average(values) {
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function truncateLabel(label, maxLength) {
+    if (!label || label.length <= maxLength) return label;
+    return `${label.slice(0, maxLength - 1)}…`;
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function escapeAttribute(value) {
+    return escapeHtml(value).replace(/`/g, '&#096;');
+}
+
+function debounce(callback, wait) {
+    let timeoutId;
+    return function() {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(callback, wait);
+    };
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initGraph();
+    loadGraph();
 });
