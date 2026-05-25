@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ocr-image-service
+    # Removed container_name to allow scaling
     env_file:
       - .env
     environment:
@@ -29,6 +29,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    deploy:
+      replicas: 3
 
 volumes:
   ocr-temp:
