@@ -29,5 +29,15 @@ services:
       - korzen-db-data:/var/lib/postgresql
       - ./docker/initdb:/docker-entrypoint-initdb.d
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@db:5432/korzen?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - db
+
 volumes:
   korzen-db-data:
