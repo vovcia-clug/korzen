@@ -92,7 +92,8 @@ def process_message(
         app_result = None
         if Config.APP_UPLOAD_ENABLED:
             if not gedcom_content:
-                logger.warning("Cannot upload to application: no GEDCOM content available")
+                logger.error("Cannot upload to application: no GEDCOM content available")
+                return False
             else:
                 logger.info("Uploading GEDCOM to hosted application...")
                 app_result = app_uploader.upload_and_parse(
@@ -105,8 +106,9 @@ def process_message(
                 if app_result.get("success"):
                     logger.info(f"Application upload successful: {app_result}")
                 else:
-                    logger.warning(f"Application upload failed: {app_result}")
-                    # Don't fail the entire process if app upload fails
+                    logger.error(f"Application upload failed: {app_result}")
+                    # Fail the process so message can be retried
+                    return False
         else:
             logger.info("Application upload disabled, skipping")
         
@@ -117,7 +119,7 @@ def process_message(
             f"App: {app_result.get('success') if app_result else 'skipped'}"
         )
         
-        # Delete message from queue
+        # Delete message from queue only after successful processing
         sqs_consumer.delete_message(receipt_handle)
         
         return True
