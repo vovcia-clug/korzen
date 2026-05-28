@@ -147,7 +147,7 @@ def create_app() -> Flask:
 
         try:
             # Step 4: Initialize file processor queue for asynchronous file processing
-            initialize_file_processor()
+            initialize_file_processor(app)
             app.logger.info("File processor queue initialized successfully")
         except Exception as e:
             app.logger.error(f"Error initializing file processor: {e}")

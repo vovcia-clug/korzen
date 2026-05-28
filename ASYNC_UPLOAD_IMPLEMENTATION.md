@@ -4,6 +4,14 @@
 
 This document describes the implementation of queue-based asynchronous file processing for the Flask genealogy application. The changes allow file uploads to return immediately while processing happens in the background.
 
+## Important Fix Applied
+
+**Issue**: Processing would only work for the first file, subsequent files would remain in 'queued' status.
+
+**Root Cause**: The worker thread was trying to use `current_app.app_context()` which is a proxy that only works within request contexts. The worker thread needs a direct reference to the Flask app instance.
+
+**Solution**: Modified `FileProcessorQueue` to accept and store the Flask app instance via `init_app()` method, then use `self._app.app_context()` in the worker thread.
+
 ## Problem Statement
 
 **Before**: The upload endpoint ([`/upload`](src/app/routes/main.py:84)) processed files synchronously:
