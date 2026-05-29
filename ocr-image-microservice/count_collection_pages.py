@@ -108,17 +108,17 @@ class S3PageScanner:
         session = boto3.Session(**session_kwargs)
         self.s3_client = session.client("s3", config=boto_config)
     
-    def extract_document_and_page(self, ocr_key: str) -> Tuple[Optional[str], Optional[int]]:
-        """Extract document_id and page_number from OCR result S3 path.
+    def extract_document_and_page(self, ocr_key: str) -> Tuple[Optional[str], Optional[str], Optional[int]]:
+        """Extract collection_id, document_id and page_number from OCR result S3 path.
         
-        The path structure is: ocr-results/{document-path}/{filename}.md
-        We extract document_id from the parent directory and page_number from filename.
+        The path structure is: ocr-results/{collection-id}/{document-id}/{filename}.md
+        We extract collection_id and document_id from the path and page_number from filename.
         
         Args:
             ocr_key: S3 key of the OCR result file
             
         Returns:
-            Tuple of (document_id, page_number) or (None, None) if extraction fails
+            Tuple of (collection_id, document_id, page_number) or (None, None, None) if extraction fails
         """
         # Remove the output prefix to get the relative path
         relative_path = ocr_key
@@ -129,14 +129,25 @@ class S3PageScanner:
         path_obj = Path(relative_path)
         filename_base = path_obj.stem
         
-        # Get parent directory as document_id
+        # Get parent directory structure
         parent_parts = path_obj.parent.parts
-        if parent_parts:
-            # Use the last directory as document_id
+        
+        # Extract collection_id and document_id from path
+        collection_id = None
+        document_id = None
+        
+        if len(parent_parts) >= 2:
+            # Path structure: collection-id/document-id/filename.md
+            collection_id = parent_parts[0]
             document_id = parent_parts[-1]
+        elif len(parent_parts) == 1:
+            # Only one directory level - use as document_id
+            document_id = parent_parts[0]
+            collection_id = parent_parts[0]
         else:
-            # Use filename as document_id if no parent directory
+            # No parent directory - use filename as document_id
             document_id = filename_base
+            collection_id = filename_base
         
         # Try to extract page number from filename
         # Patterns: page-005, page_005, 005, p005, etc.
@@ -149,19 +160,19 @@ class S3PageScanner:
         else:
             page_number = None
         
-        return document_id, page_number
+        return collection_id, document_id, page_number
     
     def scan_all_pages(
         self,
         prefix: Optional[str] = None,
-    ) -> Dict[str, Set[int]]:
+    ) -> Dict[str, Dict[str, any]]:
         """Scan S3 output bucket and collect all pages per document.
         
         Args:
             prefix: Optional S3 prefix to filter objects
             
         Returns:
-            Dictionary mapping document_id to set of page numbers
+            Dictionary mapping document_id to dict with collection_id and set of page numbers
         """
         # Use provided prefix or default output prefix
         if prefix:
@@ -171,7 +182,7 @@ class S3PageScanner:
         
         print(f"Scanning S3 output bucket: s3://{self.config.s3_output_bucket}/{scan_prefix}")
         
-        document_pages = defaultdict(set)
+        document_pages = defaultdict(lambda: {"collection_id": None, "pages": set(), "s3_path": None})
         total_files = 0
         skipped_files = 0
         
@@ -195,11 +206,16 @@ class S3PageScanner:
                     
                     total_files += 1
                     
-                    # Extract document_id and page_number
-                    document_id, page_number = self.extract_document_and_page(key)
+                    # Extract collection_id, document_id and page_number
+                    collection_id, document_id, page_number = self.extract_document_and_page(key)
                     
                     if document_id and page_number is not None:
-                        document_pages[document_id].add(page_number)
+                        document_pages[document_id]["collection_id"] = collection_id
+                        document_pages[document_id]["pages"].add(page_number)
+                        # Store S3 path (parent directory of the file)
+                        if document_pages[document_id]["s3_path"] is None:
+                            s3_parent = str(Path(key).parent)
+                            document_pages[document_id]["s3_path"] = f"s3://{self.config.s3_output_bucket}/{s3_parent}/"
                     else:
                         skipped_files += 1
             
@@ -278,18 +294,23 @@ class PageAnalyzer:
         }
     
     @staticmethod
-    def analyze_all_documents(document_pages: Dict[str, Set[int]]) -> List[Dict]:
+    def analyze_all_documents(document_pages: Dict[str, Dict[str, any]]) -> List[Dict]:
         """Analyze all documents.
         
         Args:
-            document_pages: Dictionary mapping document_id to set of page numbers
+            document_pages: Dictionary mapping document_id to dict with collection_id and set of page numbers
             
         Returns:
             List of analysis results for all documents
         """
         results = []
-        for document_id, pages in document_pages.items():
+        for document_id, data in document_pages.items():
+            pages = data["pages"]
+            collection_id = data["collection_id"]
+            s3_path = data.get("s3_path")
             analysis = PageAnalyzer.analyze_document(document_id, pages)
+            analysis["collection_id"] = collection_id
+            analysis["s3_path"] = s3_path
             results.append(analysis)
         
         return results
@@ -371,6 +392,10 @@ class ReportGenerator:
             
             print(f"{i}. {status_emoji} {analysis['document_id']}")
             print(f"   {'─' * 76}")
+            if analysis.get("collection_id"):
+                print(f"   Collection ID: {analysis['collection_id']}")
+            if analysis.get("s3_path"):
+                print(f"   S3 Path: {analysis['s3_path']}")
             print(f"   Total Pages Uploaded: {analysis['total_pages']}")
             
             if analysis["page_range"]:

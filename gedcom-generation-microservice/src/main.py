@@ -25,6 +25,7 @@ from .services.s3_handler import S3Handler
 from .services.openrouter_client import OpenRouterClient
 from .services.document_grouper import DocumentGrouper
 from .services.gedcom_generator import GedcomGenerator
+from .services.context_extractor import ContextExtractor
 from .services.gedcom_validator import GedcomValidator
 from .utils.logger import setup_logger, get_logger
 from .utils import langfuse_tracer
@@ -95,10 +96,18 @@ class GedcomGenerationService:
             redis_key_prefix=Config.REDIS_KEY_PREFIX
         )
         
+        # Context Extractor (carry-forward document-level context between pages)
+        self.context_extractor = ContextExtractor(
+            openrouter_client=self.openrouter_client,
+            enabled=Config.ENABLE_CONTEXT_EXTRACTION,
+            max_context_chars=Config.MAX_CONTEXT_CHARS,
+        )
+        
         # GEDCOM Generator
         self.gedcom_generator = GedcomGenerator(
             openrouter_client=self.openrouter_client,
-            gedcom_version=Config.GEDCOM_VERSION
+            gedcom_version=Config.GEDCOM_VERSION,
+            context_extractor=self.context_extractor
         )
         
         # GEDCOM Validator
@@ -203,8 +212,21 @@ class GedcomGenerationService:
                 )
                 return
             
-            # Get sorted messages
-            sorted_messages = group.get_sorted_messages()
+            # Filter to only unprocessed pages
+            unprocessed_messages = group.get_unprocessed_messages()
+            if not unprocessed_messages:
+                logger.info(f"All pages already processed for document {document_id}")
+                self.document_grouper.remove_group(document_id)
+                return
+            
+            # Get sorted messages (only unprocessed ones)
+            sorted_messages = sorted(
+                unprocessed_messages,
+                key=lambda m: (
+                    m.get("metadata", {}).get("page_number") is None,
+                    m.get("metadata", {}).get("page_number") or 0
+                )
+            )
             document_metadata = group.metadata
             
             # Create span for document group processing with metadata
@@ -260,10 +282,12 @@ class GedcomGenerationService:
                             f"cannot verify completeness"
                         )
                 
-                # Generate GEDCOM (automatically traced by @observe decorator)
+                # Generate GEDCOM per page, sequentially (automatically traced by
+                # @observe decorator). Each grouped page is sent to the LLM one by
+                # one and produces its own independent GEDCOM output.
                 start_time = time.time()
                 try:
-                    gedcom_content = await self.gedcom_generator.generate_from_document_group(
+                    page_results = await self.gedcom_generator.generate_pages_from_document_group(
                         sorted_messages,
                         document_metadata
                     )
@@ -280,168 +304,239 @@ class GedcomGenerationService:
                     )
                     raise
                 
-                # Count records
-                record_counts = self.gedcom_generator.count_gedcom_records(gedcom_content)
+                num_pages_total = group.expected_pages or len(sorted_messages)
                 
-                # Add Langfuse score metrics for tracking all entity types
-                langfuse_tracer.add_score(
-                    name="total_persons",
-                    value=record_counts["total_persons"],
-                    comment=f"Total persons (individuals) in document {document_id}"
-                )
-                langfuse_tracer.add_score(
-                    name="individuals_processed",
-                    value=record_counts["individuals"],
-                    comment=f"Number of individuals processed in document {document_id}"
-                )
-                langfuse_tracer.add_score(
-                    name="families_processed",
-                    value=record_counts["families"],
-                    comment=f"Number of families processed in document {document_id}"
-                )
-                langfuse_tracer.add_score(
-                    name="baptisms_processed",
-                    value=record_counts["baptisms"],
-                    comment=f"Number of baptisms processed in document {document_id}"
-                )
-                langfuse_tracer.add_score(
-                    name="deaths_processed",
-                    value=record_counts["deaths"],
-                    comment=f"Number of deaths processed in document {document_id}"
-                )
-                langfuse_tracer.add_score(
-                    name="marriages_processed",
-                    value=record_counts["marriages"],
-                    comment=f"Number of marriages processed in document {document_id}"
-                )
-                langfuse_tracer.add_score(
-                    name="total_events",
-                    value=record_counts["total_events"],
-                    comment=f"Total events (baptisms + deaths + marriages) in document {document_id}"
-                )
-                
-                # Validate GEDCOM
-                validation_status = "valid"
-                if Config.ENABLE_GEDCOM_VALIDATION:
+                # Process each page result independently: count, validate, upload
+                # to its own S3 file, and publish its own GEDCOM-ready message.
+                for page_result in page_results:
+                    page_index = page_result["page_index"]
+                    page_number = page_result["page_number"]
+                    gedcom_content = page_result["gedcom_content"]
+                    page_message = page_result["message"]
+                    
+                    # Label used for filenames and logging
+                    page_suffix = (
+                        f"p{page_number}" if page_number is not None
+                        else f"p{page_index}"
+                    )
+                    page_label = page_number if page_number is not None else f"#{page_index}"
+                    
+                    # Wrap per-page processing in try-except for failure recovery
                     try:
-                        is_valid, errors = await self._validate_gedcom(gedcom_content)
-                        validation_status = "valid" if is_valid else "invalid"
+                        # Count records for this page
+                        record_counts = self.gedcom_generator.count_gedcom_records(gedcom_content)
                         
-                        if not is_valid:
-                            logger.warning(
-                                f"GEDCOM validation failed for {document_id}: "
-                                f"{len(errors)} error(s)"
-                            )
-                            for error in errors[:5]:
-                                logger.warning(f"  - {error}")
-                            
-                            # Log validation errors to Langfuse
-                            langfuse_tracer.log_error(
-                                ValueError(f"GEDCOM validation failed: {len(errors)} errors"),
-                                context={
-                                    "document_id": document_id,
-                                    "operation": "gedcom_validation",
-                                    "error_count": len(errors),
-                                    "sample_errors": errors[:5]
-                                },
-                                level="WARNING"
-                            )
-                    except Exception as e:
-                        logger.error(f"GEDCOM validation error for {document_id}: {e}")
+                        # Add Langfuse score metrics for tracking all entity types (per page)
+                        langfuse_tracer.add_score(
+                            name="total_persons",
+                            value=record_counts["total_persons"],
+                            comment=f"Total persons in document {document_id} page {page_label}"
+                        )
+                        langfuse_tracer.add_score(
+                            name="individuals_processed",
+                            value=record_counts["individuals"],
+                            comment=f"Individuals in document {document_id} page {page_label}"
+                        )
+                        langfuse_tracer.add_score(
+                            name="families_processed",
+                            value=record_counts["families"],
+                            comment=f"Families in document {document_id} page {page_label}"
+                        )
+                        langfuse_tracer.add_score(
+                            name="baptisms_processed",
+                            value=record_counts["baptisms"],
+                            comment=f"Baptisms in document {document_id} page {page_label}"
+                        )
+                        langfuse_tracer.add_score(
+                            name="deaths_processed",
+                            value=record_counts["deaths"],
+                            comment=f"Deaths in document {document_id} page {page_label}"
+                        )
+                        langfuse_tracer.add_score(
+                            name="marriages_processed",
+                            value=record_counts["marriages"],
+                            comment=f"Marriages in document {document_id} page {page_label}"
+                        )
+                        langfuse_tracer.add_score(
+                            name="total_events",
+                            value=record_counts["total_events"],
+                            comment=f"Total events in document {document_id} page {page_label}"
+                        )
+                        
+                        # Validate GEDCOM for this page
+                        validation_status = "valid"
+                        if Config.ENABLE_GEDCOM_VALIDATION:
+                            try:
+                                is_valid, errors = await self._validate_gedcom(gedcom_content)
+                                validation_status = "valid" if is_valid else "invalid"
+                                
+                                if not is_valid:
+                                    logger.warning(
+                                        f"GEDCOM validation failed for {document_id} "
+                                        f"page {page_label}: {len(errors)} error(s)"
+                                    )
+                                    for error in errors[:5]:
+                                        logger.warning(f"  - {error}")
+                                    
+                                    # Log validation errors to Langfuse
+                                    langfuse_tracer.log_error(
+                                        ValueError(f"GEDCOM validation failed: {len(errors)} errors"),
+                                        context={
+                                            "document_id": document_id,
+                                            "page_number": page_number,
+                                            "operation": "gedcom_validation",
+                                            "error_count": len(errors),
+                                            "sample_errors": errors[:5]
+                                        },
+                                        level="WARNING"
+                                    )
+                            except Exception as e:
+                                logger.error(
+                                    f"GEDCOM validation error for {document_id} "
+                                    f"page {page_label}: {e}"
+                                )
+                                langfuse_tracer.log_error(
+                                    e,
+                                    context={
+                                        "document_id": document_id,
+                                        "page_number": page_number,
+                                        "operation": "gedcom_validation"
+                                    }
+                                )
+                                # Continue processing even if validation fails
+                        
+                        # Per-page filename
+                        page_filename = f"{document_id}_{page_suffix}.ged"
+                        
+                        # Upload this page's GEDCOM to its own S3 file (preserve
+                        # directory structure from this page's source image)
+                        source_image_uri = page_message.get("source_image", {}).get("s3_uri")
+                        
+                        s3_uri = await self._upload_to_s3(
+                            document_id,
+                            gedcom_content,
+                            filename=page_filename,
+                            source_image_uri=source_image_uri
+                        )
+                        
+                        # Prepare GEDCOM ready message for this page
+                        gedcom_ready_message = {
+                            "document_metadata": {
+                                "document_id": document_id,
+                                "document_title": document_metadata.get("document_title", ""),
+                                "date_range": document_metadata.get("date_range", ""),
+                                "location": document_metadata.get("location", ""),
+                                "total_pages": num_pages_total,
+                                "page_number": page_number,
+                                "page_index": page_index,
+                                "pages_processed": len(page_results),
+                                "completion_reason": completion_reason
+                            },
+                            "gedcom_data": {
+                                "content": gedcom_content,
+                                "filename": page_filename,
+                                "s3_uri": s3_uri,
+                                "validation_status": validation_status,
+                                "individual_count": record_counts["individuals"],
+                                "family_count": record_counts["families"],
+                                "baptism_count": record_counts["baptisms"],
+                                "death_count": record_counts["deaths"],
+                                "marriage_count": record_counts["marriages"],
+                                "total_events": record_counts["total_events"]
+                            },
+                            "source_ocr_uris": [
+                                page_message.get("ocr_result", {}).get("s3_uri", "")
+                            ],
+                            "metadata": {
+                                "processing_time_ms": int(generation_time * 1000),
+                                "openrouter_model": Config.OPENROUTER_MODEL
+                            }
+                        }
+                        
+                        # Publish GEDCOM ready message for this page
+                        await self._publish_to_sqs(gedcom_ready_message)
+                        
+                        # Mark page as successfully processed
+                        if page_number is not None:
+                            self.document_grouper.get_group(document_id).mark_page_processed(page_number)
+                        
+                        logger.info(
+                            f"Successfully processed document {document_id} "
+                            f"page {page_label}: "
+                            f"{record_counts['individuals']} individuals, "
+                            f"{record_counts['families']} families, "
+                            f"{record_counts['baptisms']} baptisms, "
+                            f"{record_counts['deaths']} deaths, "
+                            f"{record_counts['marriages']} marriages, "
+                            f"validation: {validation_status}"
+                        )
+                    
+                    except Exception as page_error:
+                        # Per-page error handling - log and continue to next page
+                        logger.error(
+                            f"Failed to process page {page_label} of document {document_id}: {page_error}",
+                            exc_info=True
+                        )
                         langfuse_tracer.log_error(
-                            e,
+                            page_error,
                             context={
                                 "document_id": document_id,
-                                "operation": "gedcom_validation"
+                                "page_number": page_number,
+                                "page_index": page_index,
+                                "operation": "per_page_processing"
                             }
                         )
-                        # Continue processing even if validation fails
+                        
+                        # Increment retry count for this page
+                        if page_number is not None:
+                            retry_count = self.document_grouper.get_group(document_id).increment_page_retry(page_number)
+                            
+                            # Check if should retry
+                            if not self.document_grouper.get_group(document_id).should_retry_page(
+                                page_number,
+                                max_retries=Config.MAX_PAGE_RETRIES
+                            ):
+                                logger.error(
+                                    f"Page {page_label} of document {document_id} has exceeded "
+                                    f"max retries ({Config.MAX_PAGE_RETRIES}). Marking as permanently failed."
+                                )
+                                langfuse_tracer.log_error(
+                                    ValueError(f"Page {page_label} permanently failed after {retry_count} retries"),
+                                    context={
+                                        "document_id": document_id,
+                                        "page_number": page_number,
+                                        "retry_count": retry_count,
+                                        "max_retries": Config.MAX_PAGE_RETRIES,
+                                        "operation": "max_retries_exceeded"
+                                    },
+                                    level="ERROR"
+                                )
+                                # Mark as processed to prevent infinite retries
+                                self.document_grouper.get_group(document_id).mark_page_processed(page_number)
+                            else:
+                                logger.warning(
+                                    f"Page {page_label} of document {document_id} will be retried "
+                                    f"(attempt {retry_count}/{Config.MAX_PAGE_RETRIES})"
+                                )
+                        
+                        # Continue to next page instead of aborting entire document
+                        continue
                 
-                # Upload to S3 (preserve directory structure from first source image)
-                try:
-                    # Get the first source image URI to preserve directory structure
-                    source_image_uri = None
-                    if sorted_messages:
-                        source_image_uri = sorted_messages[0].get("source_image", {}).get("s3_uri")
-                    
-                    s3_uri = await self._upload_to_s3(
-                        document_id,
-                        gedcom_content,
-                        source_image_uri=source_image_uri
+                # Check if all pages are processed
+                group = self.document_grouper.get_group(document_id)
+                if group and len(group.processed_pages) == len(group.messages):
+                    logger.info(f"All pages successfully processed for document {document_id}")
+                    self.document_grouper.remove_group(document_id)
+                else:
+                    unprocessed_count = len(group.messages) - len(group.processed_pages) if group else 0
+                    logger.warning(
+                        f"Document {document_id} has {unprocessed_count} unprocessed page(s), "
+                        f"will retry on next timeout"
                     )
-                except Exception as e:
-                    logger.error(f"S3 upload failed for {document_id}: {e}")
-                    langfuse_tracer.log_error(
-                        e,
-                        context={
-                            "document_id": document_id,
-                            "operation": "s3_upload",
-                            "gedcom_size_bytes": len(gedcom_content)
-                        }
-                    )
-                    raise
-                
-                # Prepare GEDCOM ready message
-                gedcom_ready_message = {
-                    "document_metadata": {
-                        "document_id": document_id,
-                        "document_title": document_metadata.get("document_title", ""),
-                        "date_range": document_metadata.get("date_range", ""),
-                        "location": document_metadata.get("location", ""),
-                        "total_pages": group.expected_pages or len(sorted_messages),
-                        "pages_processed": len(sorted_messages),
-                        "completion_reason": completion_reason
-                    },
-                    "gedcom_data": {
-                        "content": gedcom_content,
-                        "filename": f"{document_id}.ged",
-                        "s3_uri": s3_uri,
-                        "validation_status": validation_status,
-                        "individual_count": record_counts["individuals"],
-                        "family_count": record_counts["families"],
-                        "baptism_count": record_counts["baptisms"],
-                        "death_count": record_counts["deaths"],
-                        "marriage_count": record_counts["marriages"],
-                        "total_events": record_counts["total_events"]
-                    },
-                    "source_ocr_uris": [
-                        msg.get("ocr_result", {}).get("s3_uri", "")
-                        for msg in sorted_messages
-                    ],
-                    "metadata": {
-                        "processing_time_ms": int(generation_time * 1000),
-                        "openrouter_model": Config.OPENROUTER_MODEL
-                    }
-                }
-                
-                # Publish GEDCOM ready message
-                try:
-                    await self._publish_to_sqs(gedcom_ready_message)
-                except Exception as e:
-                    logger.error(f"SQS publish failed for {document_id}: {e}")
-                    langfuse_tracer.log_error(
-                        e,
-                        context={
-                            "document_id": document_id,
-                            "operation": "sqs_publish"
-                        }
-                    )
-                    raise
-                
-                # Remove document group
-                self.document_grouper.remove_group(document_id)
-                
-                logger.info(
-                    f"Successfully processed document {document_id}: "
-                    f"{record_counts['individuals']} individuals, "
-                    f"{record_counts['families']} families, "
-                    f"{record_counts['baptisms']} baptisms, "
-                    f"{record_counts['deaths']} deaths, "
-                    f"{record_counts['marriages']} marriages, "
-                    f"validation: {validation_status}"
-                )
             
         except Exception as e:
+            # Only log top-level errors that weren't already handled per-page
+            # (e.g., errors in GEDCOM generation that affect all pages)
             logger.error(
                 f"Error processing complete document {document_id}: {e}",
                 exc_info=True
@@ -455,7 +550,8 @@ class GedcomGenerationService:
                     "completion_reason": completion_reason
                 }
             )
-            # Don't remove group - allow retry
+            # Don't remove group - allow retry on next timeout
+            # Per-page errors are already handled in the loop above
     
     async def _validate_gedcom(self, gedcom_content: str) -> tuple[bool, list]:
         """
@@ -474,6 +570,7 @@ class GedcomGenerationService:
         self,
         document_id: str,
         gedcom_content: str,
+        filename: Optional[str] = None,
         source_image_uri: Optional[str] = None
     ) -> str:
         """
@@ -482,12 +579,14 @@ class GedcomGenerationService:
         Args:
             document_id: Document identifier
             gedcom_content: GEDCOM file content
+            filename: Optional output filename (defaults to "{document_id}.ged")
             source_image_uri: Optional source image URI to preserve directory structure
             
         Returns:
             S3 URI of uploaded file
         """
-        filename = f"{document_id}.ged"
+        if filename is None:
+            filename = f"{document_id}.ged"
         s3_uri = self.s3_handler.upload_gedcom(
             content=gedcom_content,
             document_id=document_id,

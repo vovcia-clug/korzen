@@ -30,6 +30,7 @@ except ImportError as e:
         
         def score_current_trace(self, *args, **kwargs):
             pass
+    
 
 # Re-export for convenience
 __all__ = [
@@ -40,7 +41,9 @@ __all__ = [
     'flush',
     'add_score',
     'create_span',
-    'log_error'
+    'log_error',
+    'update_current_observation',
+    'update_current_trace'
 ]
 
 def is_available() -> bool:
@@ -66,6 +69,122 @@ def flush():
                 logger.info("Langfuse traces flushed")
         except Exception as e:
             logger.error(f"Error flushing Langfuse traces: {e}")
+
+def update_current_observation(**kwargs) -> None:
+    """
+    Update the current observation with additional metadata.
+    
+    In Langfuse v4.x, this uses the client's update_current_span() or
+    update_current_generation() methods depending on the observation type.
+    
+    Args:
+        **kwargs: Keyword arguments to pass to update methods
+                  Common args: model, input, output, usage, metadata, model_parameters
+    
+    Example:
+        update_current_observation(
+            model="google/gemini-flash-1.5",
+            model_parameters={"temperature": 0.0},
+            usage={"input": 100, "output": 50, "total": 150}
+        )
+    """
+    if _langfuse_available:
+        try:
+            client = get_client()
+            if client:
+                # Separate parameters for generation vs span
+                # update_current_generation accepts: name, input, output, metadata, version,
+                # level, status_message, completion_start_time, model, model_parameters,
+                # usage_details, cost_details, prompt
+                generation_params = {}
+                span_params = {}
+                
+                # Map 'usage' to 'usage_details' for generation
+                # Langfuse v4.x expects: prompt_tokens, completion_tokens, total_tokens
+                if 'usage' in kwargs:
+                    usage = kwargs['usage']
+                    # Transform from our format to Langfuse format
+                    if isinstance(usage, dict):
+                        usage_details = {}
+                        # Map 'input' -> 'prompt_tokens'
+                        if 'input' in usage:
+                            usage_details['prompt_tokens'] = usage['input']
+                        elif 'prompt_tokens' in usage:
+                            usage_details['prompt_tokens'] = usage['prompt_tokens']
+                        
+                        # Map 'output' -> 'completion_tokens'
+                        if 'output' in usage:
+                            usage_details['completion_tokens'] = usage['output']
+                        elif 'completion_tokens' in usage:
+                            usage_details['completion_tokens'] = usage['completion_tokens']
+                        
+                        # Map 'total' -> 'total_tokens' (optional)
+                        if 'total' in usage:
+                            usage_details['total_tokens'] = usage['total']
+                        elif 'total_tokens' in usage:
+                            usage_details['total_tokens'] = usage['total_tokens']
+                        
+                        generation_params['usage_details'] = usage_details
+                    else:
+                        generation_params['usage_details'] = usage
+                
+                # Common parameters for both
+                for key in ['name', 'input', 'output', 'metadata', 'version', 'level', 'status_message']:
+                    if key in kwargs:
+                        generation_params[key] = kwargs[key]
+                        span_params[key] = kwargs[key]
+                
+                # Generation-specific parameters
+                for key in ['model', 'model_parameters', 'completion_start_time', 'cost_details', 'prompt']:
+                    if key in kwargs:
+                        generation_params[key] = kwargs[key]
+                
+                # Try updating as generation first (most common for LLM calls)
+                try:
+                    if generation_params:
+                        client.update_current_generation(**generation_params)
+                        logger.debug(f"Updated current generation with: {list(generation_params.keys())}")
+                except Exception as gen_error:
+                    # Fall back to updating as span (only with span-compatible params)
+                    try:
+                        if span_params:
+                            client.update_current_span(**span_params)
+                            logger.debug(f"Updated current span with: {list(span_params.keys())}")
+                    except Exception as span_error:
+                        logger.debug(f"Could not update as generation or span: {gen_error}, {span_error}")
+        except Exception as e:
+            logger.error(f"Error updating current observation: {e}")
+
+def update_current_trace(**kwargs) -> None:
+    """
+    Update the current trace with additional metadata.
+    
+    In Langfuse v4.x, trace updates are handled through the client instance.
+    Note: Direct trace updates may have limited support in v4.x; use observation
+    updates or trace-level methods like set_current_trace_io() instead.
+    
+    Args:
+        **kwargs: Keyword arguments for trace metadata
+                  Common args: session_id, tags, metadata, user_id
+    
+    Example:
+        update_current_trace(
+            session_id="document-123",
+            tags=["document-processing"],
+            metadata={"document_type": "baptism"}
+        )
+    """
+    if _langfuse_available:
+        try:
+            client = get_client()
+            if client:
+                # In v4.x, trace updates are more limited
+                # Log the metadata for now; actual trace updates happen via observations
+                logger.debug(f"Trace metadata (v4.x): {list(kwargs.keys())}")
+                # Note: v4.x doesn't have a direct update_current_trace method
+                # Trace metadata should be set via @observe decorator or observation updates
+        except Exception as e:
+            logger.error(f"Error updating current trace: {e}")
 
 def add_score(name: str, value: float, comment: Optional[str] = None) -> None:
     """

@@ -38,6 +38,19 @@ class Config:
     )
     OPENROUTER_TIMEOUT: int = int(os.getenv("OPENROUTER_TIMEOUT", "300"))
     
+    # Context Extraction Configuration (carry-forward document-level context)
+    ENABLE_CONTEXT_EXTRACTION: bool = os.getenv(
+        "ENABLE_CONTEXT_EXTRACTION", "true"
+    ).lower() == "true"
+    CONTEXT_EXTRACTION_MODEL: str = os.getenv(
+        "CONTEXT_EXTRACTION_MODEL",
+        os.getenv("OPENROUTER_MODEL", "google/gemini-flash-1.5")
+    )
+    MAX_CONTEXT_CHARS: int = int(os.getenv("MAX_CONTEXT_CHARS", "4000"))
+    
+    # Per-Page Failure Recovery Configuration
+    MAX_PAGE_RETRIES: int = int(os.getenv("MAX_PAGE_RETRIES", "3"))
+    
     # Document Grouping Configuration
     GROUPING_TIMEOUT_SECONDS: int = int(os.getenv("GROUPING_TIMEOUT_SECONDS", "300"))
     GROUPING_CHECK_INTERVAL: int = int(os.getenv("GROUPING_CHECK_INTERVAL", "30"))
@@ -128,6 +141,9 @@ class Config:
             "s3_output_bucket": cls.S3_OUTPUT_BUCKET,
             "s3_gedcom_prefix": cls.S3_GEDCOM_PREFIX,
             "openrouter_model": cls.OPENROUTER_MODEL,
+            "enable_context_extraction": cls.ENABLE_CONTEXT_EXTRACTION,
+            "context_extraction_model": cls.CONTEXT_EXTRACTION_MODEL,
+            "max_context_chars": cls.MAX_CONTEXT_CHARS,
             "grouping_timeout_seconds": cls.GROUPING_TIMEOUT_SECONDS,
             "use_redis": cls.USE_REDIS,
             "redis_host": cls.REDIS_HOST if cls.USE_REDIS else "N/A",

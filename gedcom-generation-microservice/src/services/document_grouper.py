@@ -26,6 +26,8 @@ class DocumentGroup:
     last_updated: float = field(default_factory=time.time)
     expected_pages: Optional[int] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    processed_pages: set = field(default_factory=set)
+    page_retry_counts: Dict[int, int] = field(default_factory=dict)
     
     def add_message(self, message: Dict[str, Any]) -> None:
         """Add a message to the group and reset the timeout timer."""
@@ -92,6 +94,65 @@ class DocumentGroup:
         ]
         return len(set(page_numbers))
     
+    def mark_page_processed(self, page_number: int) -> None:
+        """Mark a page as successfully processed.
+        
+        Args:
+            page_number: Page number to mark as processed
+        """
+        self.processed_pages.add(page_number)
+        logger.debug(f"Marked page {page_number} as processed for document {self.document_id}")
+    
+    def get_unprocessed_messages(self) -> List[Dict[str, Any]]:
+        """Get only messages for pages that haven't been processed yet.
+        
+        Returns:
+            List of messages for unprocessed pages
+        """
+        unprocessed = []
+        for message in self.messages:
+            page_number = message.get("metadata", {}).get("page_number")
+            if page_number is None or page_number not in self.processed_pages:
+                unprocessed.append(message)
+        return unprocessed
+    
+    def increment_page_retry(self, page_number: int) -> int:
+        """Increment and return retry count for a page.
+        
+        Args:
+            page_number: Page number to increment retry count for
+            
+        Returns:
+            New retry count for the page
+        """
+        current_count = self.page_retry_counts.get(page_number, 0)
+        new_count = current_count + 1
+        self.page_retry_counts[page_number] = new_count
+        logger.debug(
+            f"Incremented retry count for page {page_number} "
+            f"of document {self.document_id} to {new_count}"
+        )
+        return new_count
+    
+    def should_retry_page(self, page_number: int, max_retries: int = 3) -> bool:
+        """Check if a page should be retried.
+        
+        Args:
+            page_number: Page number to check
+            max_retries: Maximum number of retries allowed
+            
+        Returns:
+            True if page should be retried, False if max retries exceeded
+        """
+        retry_count = self.page_retry_counts.get(page_number, 0)
+        should_retry = retry_count < max_retries
+        logger.debug(
+            f"Page {page_number} of document {self.document_id}: "
+            f"retry_count={retry_count}, max_retries={max_retries}, "
+            f"should_retry={should_retry}"
+        )
+        return should_retry
+    
     def is_complete(self, timeout_seconds: int) -> tuple[bool, str]:
         """
         Check if document group is complete.
@@ -137,7 +198,9 @@ class DocumentGroup:
             "first_seen": self.first_seen,
             "last_updated": self.last_updated,
             "expected_pages": self.expected_pages,
-            "metadata": self.metadata
+            "metadata": self.metadata,
+            "processed_pages": list(self.processed_pages),
+            "page_retry_counts": self.page_retry_counts
         }
     
     @classmethod
@@ -149,7 +212,9 @@ class DocumentGroup:
             first_seen=data.get("first_seen", time.time()),
             last_updated=data.get("last_updated", time.time()),
             expected_pages=data.get("expected_pages"),
-            metadata=data.get("metadata", {})
+            metadata=data.get("metadata", {}),
+            processed_pages=set(data.get("processed_pages", [])),
+            page_retry_counts=data.get("page_retry_counts", {})
         )
 
 

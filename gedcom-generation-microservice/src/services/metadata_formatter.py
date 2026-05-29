@@ -49,6 +49,51 @@ class MetadataFormatter:
         
         return formatted
     
+    def format_single_page(
+        self,
+        message: Dict[str, Any],
+        document_metadata: Dict[str, Any],
+        page_index: int,
+        total_pages: int
+    ) -> str:
+        """
+        Format a single page with the document metadata header.
+        
+        This is used when pages are processed one-by-one (sequentially) rather
+        than as a single combined document. The document-level metadata header is
+        included so the LLM has full document context for each page, but only the
+        OCR text of the given page is included.
+        
+        Args:
+            message: A single OCR message (one page)
+            document_metadata: Document-level metadata
+            page_index: 1-based index of this page within the document group
+            total_pages: Total number of pages in the document group
+        
+        Returns:
+            Formatted single-page document string ready for LLM
+        """
+        if not message:
+            raise ValueError("No message to format")
+        
+        logger.info(
+            f"Formatting single page {page_index}/{total_pages} for document: "
+            f"{document_metadata.get('document_id')}"
+        )
+        
+        # Build metadata header (reports the full document page count for context)
+        header = self._build_metadata_header(document_metadata, total_pages)
+        
+        # Build the single page section (reuse the shared page builder)
+        page = self._build_pages_section([message])
+        
+        # Combine
+        formatted = f"{header}\n\n{page}"
+        
+        logger.debug(f"Formatted single page: {len(formatted)} characters")
+        
+        return formatted
+    
     def _build_metadata_header(
         self,
         metadata: Dict[str, Any],

@@ -24,6 +24,13 @@ This service is part of a three-service architecture:
 - **Metadata enrichment**: Prepends document metadata to improve accuracy
 - **Cross-page relationships**: Identifies same individuals across multiple pages
 
+### Context Extraction (Carry-Forward Context)
+- **Rolling document-level context**: An LLM carries forward a small, document-level summary between the pages of a single document, so later pages are interpreted with the conventions established by earlier ones
+- **Input → output**: Each step takes the *current context* + the *current page* and produces the *updated context* used when generating the next page
+- **Deliberately small**: Tracks only document/register-level information (active places, date range, language/terminology/layout conventions, naming conventions, continuation notes). It does **not** accumulate per-person, per-family, or per-relationship data, so the context stays bounded as pages accumulate
+- **Non-breaking & fail-soft**: A context-extraction failure never blocks per-page GEDCOM generation — the prior context is simply carried forward unchanged. The feature can be disabled entirely with no effect on existing behavior
+- See [`src/services/context_extractor.py`](src/services/context_extractor.py) and the prompts in [`src/prompts/context_extraction.py`](src/prompts/context_extraction.py)
+
 ### Validation & Quality
 - **GEDCOM validation**: Checks syntax, structure, and references
 - **Record counting**: Tracks individuals and families generated
@@ -39,7 +46,8 @@ This service is part of a three-service architecture:
    - Timeout reached? → Process
    - Otherwise → Wait for more pages
 4. Format document with metadata header
-5. Generate GEDCOM via OpenRouter LLM
+5. Generate GEDCOM via OpenRouter LLM (per page, prepending the carried-forward context)
+   - Update the rolling document-level context from the page (if context extraction is enabled)
 6. Validate GEDCOM syntax
 7. Upload GEDCOM to S3
 8. Publish GEDCOM ready message to SQS
@@ -121,9 +129,24 @@ STRICT_VALIDATION=false
 OPENROUTER_MODEL=google/gemini-flash-1.5
 OPENROUTER_TIMEOUT=300
 
+# Context Extraction (carry-forward document-level context between pages)
+ENABLE_CONTEXT_EXTRACTION=true              # Master on/off switch (set "false" to disable)
+CONTEXT_EXTRACTION_MODEL=google/gemini-flash-1.5  # Defaults to OPENROUTER_MODEL when unset
+MAX_CONTEXT_CHARS=4000                       # Hard cap on the carried-forward context length
+
 # Logging
 LOG_LEVEL=INFO
 ```
+
+#### Context Extraction Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_CONTEXT_EXTRACTION` | `true` | Master on/off switch for the carry-forward context feature. Set to `false` to disable; per-page GEDCOM generation then behaves exactly as before (no extra LLM calls). |
+| `CONTEXT_EXTRACTION_MODEL` | value of `OPENROUTER_MODEL` (`google/gemini-flash-1.5`) | Intended model for context extraction. **Currently informational / future-proofing**: the extractor shares the single `OpenRouterClient` (and thus `OPENROUTER_MODEL`). To use a dedicated model, construct a second `OpenRouterClient` with `model=CONTEXT_EXTRACTION_MODEL` and pass it to `ContextExtractor` (see [`CONTEXT_EXTRACTOR_DESIGN.md`](CONTEXT_EXTRACTOR_DESIGN.md) §6.2). It is surfaced in `Config.to_dict()` for observability. |
+| `MAX_CONTEXT_CHARS` | `4000` | Hard cap on the carried-forward context length. Kept small because the context is document-level only; if the LLM returns more, the most-recent tail is retained. |
+
+**To disable** the feature, set `ENABLE_CONTEXT_EXTRACTION=false`. When disabled (or when no `ContextExtractor` is injected), no context-extraction LLM calls are made and the page input is unchanged.
 
 ## Input Message Format
 
@@ -371,9 +394,11 @@ gedcom-generation-microservice/
 │   │   ├── metadata_formatter.py    # Format metadata for LLM
 │   │   ├── gedcom_generator.py      # GEDCOM generation orchestration
 │   │   ├── gedcom_validator.py      # GEDCOM validation
+│   │   ├── context_extractor.py     # Carry-forward document-level context
 │   │   └── openrouter_client.py     # OpenRouter API client
 │   ├── prompts/
-│   │   └── gedcom_generation.py     # LLM prompts
+│   │   ├── gedcom_generation.py     # LLM prompts
+│   │   └── context_extraction.py    # Context carry-forward prompts
 │   └── utils/
 │       └── logger.py                # Logging utilities
 ├── .env.example                     # Example environment variables
