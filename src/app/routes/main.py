@@ -12,6 +12,7 @@ from ..extensions import db
 from ..models import UploadedFile, Person, BaptismRecord, MarriageRecord, DeathRecord, SocialStatus, DuplicateCandidate, DuplicateResolution
 from ..gedcom_parser import GedcomParser
 from ..services.age_graph_importer import AgeGraphImporter
+from ..services.file_processor import get_file_processor_queue
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,15 @@ def index():
 
 @bp.route("/upload", methods=["POST"])
 def upload_file():
-    """Handle GEDCOM file upload and automatic parsing."""
+    """
+    Handle GEDCOM file upload and queue for asynchronous processing.
+    
+    This endpoint:
+    1. Validates and saves the uploaded file
+    2. Creates a database record with status 'queued'
+    3. Adds the file to the processing queue
+    4. Returns immediately without waiting for processing to complete
+    """
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
     
@@ -115,48 +124,47 @@ def upload_file():
         # Get relative path from project root
         relative_filepath = os.path.relpath(filepath, start=os.getcwd())
         
-        # Create database record for uploaded file
+        # Create database record for uploaded file with 'queued' status
         uploaded_file = UploadedFile(
             filename=filename,
             original_filename=original_filename,
             filepath=relative_filepath,
             file_size=file_size,
             mime_type=file.content_type,
-            processing_status='uploaded'
+            processing_status='queued'
         )
         
         db.session.add(uploaded_file)
         db.session.commit()
         
-        # Automatically parse the uploaded file
         file_id = str(uploaded_file.id)
-        logger.info(f"Automatically parsing uploaded file {file_id}: {filename}")
         
-        try:
-            # Create parser and import data
-            parser = GedcomParser(relative_filepath, file_id)
-            stats = parser.parse_and_import()
-            
-            logger.info(f"File {file_id} parsed successfully. Statistics: {stats}")
-            
-            return jsonify({
-                "message": "File uploaded and parsed successfully",
-                "filename": filename,
-                "file_id": file_id,
-                "statistics": stats
-            }), 201
-            
-        except Exception as parse_error:
-            logger.error(f"Failed to parse uploaded file {file_id}: {parse_error}", exc_info=True)
-            # Update file status to failed
+        # Queue the file for asynchronous processing
+        processor_queue = get_file_processor_queue()
+        queued = processor_queue.enqueue_file(file_id, relative_filepath)
+        
+        if not queued:
+            # If queueing failed, update status and return error
             uploaded_file.processing_status = 'failed'
             db.session.commit()
             
+            logger.error(f"Failed to queue file {file_id} for processing")
             return jsonify({
-                "error": f"File uploaded but parsing failed: {str(parse_error)}",
+                "error": "File uploaded but could not be queued for processing",
                 "filename": filename,
                 "file_id": file_id
             }), 500
+        
+        logger.info(f"File {file_id} uploaded and queued for processing: {filename}")
+        
+        # Return immediately - processing will happen asynchronously
+        return jsonify({
+            "message": "File uploaded successfully and queued for processing",
+            "filename": filename,
+            "file_id": file_id,
+            "status": "queued",
+            "queue_size": processor_queue.get_queue_size()
+        }), 202  # 202 Accepted - request accepted for processing
     
     except Exception as e:
         # Rollback any database changes on error

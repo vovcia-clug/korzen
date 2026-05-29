@@ -18,6 +18,7 @@ from .models import (
 )
 from .routes import health, main
 from .services.age_initializer import initialize_age_database
+from .services.file_processor import initialize_file_processor, shutdown_file_processor
 
 
 def initialize_pgvector_extension(app):
@@ -143,5 +144,18 @@ def create_app() -> Flask:
             app.logger.error(f"Error initializing AGE database: {e}")
             # AGE initialization failure is non-fatal - app can still run without graph features
             # Uncomment to make it fatal: raise
+
+        try:
+            # Step 4: Initialize file processor queue for asynchronous file processing
+            initialize_file_processor(app)
+            app.logger.info("File processor queue initialized successfully")
+        except Exception as e:
+            app.logger.error(f"Error initializing file processor: {e}")
+            # File processor initialization failure is non-fatal
+            # Uncomment to make it fatal: raise
+
+    # Register cleanup handler for graceful shutdown
+    import atexit
+    atexit.register(lambda: shutdown_file_processor())
 
     return app
