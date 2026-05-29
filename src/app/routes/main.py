@@ -1,10 +1,11 @@
 import os
 import json
 import logging
+import time
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app, session, redirect, url_for
 from werkzeug.utils import secure_filename
-from sqlalchemy import text, or_, and_
+from sqlalchemy import text, or_, and_, event
 from sqlalchemy.orm import joinedload, selectinload
 
 from ..extensions import db
@@ -258,6 +259,21 @@ def list_uploaded_files():
 @bp.route("/persons")
 def list_persons():
     """Display list of all persons in the database."""
+    request_start = time.perf_counter()
+    sql_stats = {"count": 0, "total_seconds": 0.0}
+
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        conn.info.setdefault("persons_page_query_start_time", []).append(time.perf_counter())
+
+    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        start_times = conn.info.get("persons_page_query_start_time")
+        if start_times:
+            sql_stats["total_seconds"] += time.perf_counter() - start_times.pop(-1)
+        sql_stats["count"] += 1
+
+    event.listen(db.engine, "before_cursor_execute", before_cursor_execute)
+    event.listen(db.engine, "after_cursor_execute", after_cursor_execute)
+
     try:
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
@@ -358,14 +374,51 @@ def list_persons():
         
         # Paginate results
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        paginate_elapsed = time.perf_counter() - request_start
+        sql_count_after_paginate = sql_stats["count"]
+        sql_time_after_paginate = sql_stats["total_seconds"]
         
         if search_query:
             logger.info(f"Search results: {pagination.total} total persons found, showing {len(pagination.items)} on page {page}")
         
-        return render_template("persons.html", persons=pagination.items, pagination=pagination, now=datetime.now)
+        render_start = time.perf_counter()
+        response = render_template("persons.html", persons=pagination.items, pagination=pagination, now=datetime.now)
+        render_elapsed = time.perf_counter() - render_start
+        total_elapsed = time.perf_counter() - request_start
+
+        logger.info(
+            "PERSONS_PAGE_TIMING "
+            "page=%s per_page=%s sort_by=%s sort_order=%s search=%s gender=%s "
+            "items=%s total=%s paginate_seconds=%.4f render_seconds=%.4f total_seconds=%.4f "
+            "sql_count_total=%s sql_count_paginate=%s sql_count_render=%s "
+            "sql_seconds_total=%.4f sql_seconds_paginate=%.4f sql_seconds_render=%.4f",
+            page,
+            per_page,
+            sort_by,
+            sort_order,
+            bool(search_query),
+            gender_filter or "all",
+            len(pagination.items),
+            pagination.total,
+            paginate_elapsed,
+            render_elapsed,
+            total_elapsed,
+            sql_stats["count"],
+            sql_count_after_paginate,
+            sql_stats["count"] - sql_count_after_paginate,
+            sql_stats["total_seconds"],
+            sql_time_after_paginate,
+            sql_stats["total_seconds"] - sql_time_after_paginate,
+        )
+
+        return response
         
     except Exception as e:
+        logger.error(f"Error loading persons page: {e}", exc_info=True)
         return render_template("persons.html", persons=[], error=str(e), pagination=None, now=datetime.now)
+    finally:
+        event.remove(db.engine, "before_cursor_execute", before_cursor_execute)
+        event.remove(db.engine, "after_cursor_execute", after_cursor_execute)
 
 
 @bp.route("/api/persons", methods=["GET"])
