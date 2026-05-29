@@ -1,15 +1,13 @@
 """
 Document grouper for buffering and grouping OCR results by document_id.
 
-Supports both in-memory (single instance) and Redis (distributed) state storage.
+Uses in-memory state storage (single instance).
 """
 
-import json
 import time
 import threading
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 
 from ..utils.logger import get_logger
 from ..utils import langfuse_tracer
@@ -189,63 +187,24 @@ class DocumentGroup:
             return True, "timeout_reached"
         
         return False, "incomplete"
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        return {
-            "document_id": self.document_id,
-            "messages": self.messages,
-            "first_seen": self.first_seen,
-            "last_updated": self.last_updated,
-            "expected_pages": self.expected_pages,
-            "metadata": self.metadata,
-            "processed_pages": list(self.processed_pages),
-            "page_retry_counts": self.page_retry_counts
-        }
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DocumentGroup":
-        """Create from dictionary."""
-        return cls(
-            document_id=data["document_id"],
-            messages=data.get("messages", []),
-            first_seen=data.get("first_seen", time.time()),
-            last_updated=data.get("last_updated", time.time()),
-            expected_pages=data.get("expected_pages"),
-            metadata=data.get("metadata", {}),
-            processed_pages=set(data.get("processed_pages", [])),
-            page_retry_counts=data.get("page_retry_counts", {})
-        )
 
 
 class DocumentGrouper:
     """
-    Groups OCR results by document_id with support for in-memory or Redis storage.
+    Groups OCR results by document_id using in-memory state storage.
     """
     
     def __init__(
         self,
-        timeout_seconds: int = 10,
-        use_redis: bool = False,
-        redis_host: str = "localhost",
-        redis_port: int = 6379,
-        redis_db: int = 0,
-        redis_key_prefix: str = "gedcom:docgroup:"
+        timeout_seconds: int = 10
     ):
         """
         Initialize document grouper.
         
         Args:
             timeout_seconds: Timeout for document completion (default: 5 minutes)
-            use_redis: Whether to use Redis for distributed state
-            redis_host: Redis host
-            redis_port: Redis port
-            redis_db: Redis database number
-            redis_key_prefix: Prefix for Redis keys
         """
         self.timeout_seconds = timeout_seconds
-        self.use_redis = use_redis
-        self.redis_key_prefix = redis_key_prefix
         
         # In-memory storage
         self.groups: Dict[str, DocumentGroup] = {}
@@ -254,28 +213,7 @@ class DocumentGrouper:
         # Idempotency tracking - stores document IDs that have been successfully processed
         self.processed_documents: set = set()
         
-        # Redis storage (optional)
-        self.redis_client = None
-        if use_redis:
-            try:
-                import redis
-                self.redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    db=redis_db,
-                    decode_responses=True
-                )
-                # Test connection
-                self.redis_client.ping()
-                logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
-            except ImportError:
-                logger.error("Redis library not installed. Install with: pip install redis")
-                raise
-            except Exception as e:
-                logger.error(f"Failed to connect to Redis: {e}")
-                raise
-        else:
-            logger.info("Using in-memory document grouping (single instance only)")
+        logger.info("Using in-memory document grouping (single instance only)")
     
     def add_message(self, message: Dict[str, Any]) -> None:
         """
@@ -304,10 +242,7 @@ class DocumentGrouper:
         logger.info(f"Adding message to document group: {document_id}, page {page_number}")
         
         try:
-            if self.use_redis:
-                self._add_message_redis(document_id, message)
-            else:
-                self._add_message_memory(document_id, message)
+            self._add_message_memory(document_id, message)
         except Exception as e:
             logger.error(f"Failed to add message to group {document_id}: {e}")
             langfuse_tracer.log_error(
@@ -315,8 +250,7 @@ class DocumentGrouper:
                 context={
                     "operation": "add_message_to_group",
                     "document_id": document_id,
-                    "page_number": page_number,
-                    "use_redis": self.use_redis
+                    "page_number": page_number
                 }
             )
             raise
@@ -335,74 +269,6 @@ class DocumentGrouper:
                 f"Document {document_id}: {unique_pages} unique pages ({total_messages} total messages) buffered"
             )
     
-    def _add_message_redis(self, document_id: str, message: Dict[str, Any]) -> None:
-        """Add message to Redis storage with distributed locking."""
-        redis_key = f"{self.redis_key_prefix}{document_id}"
-        lock_key = f"{redis_key}:lock"
-        
-        try:
-            # Acquire distributed lock
-            lock_acquired = self.redis_client.set(lock_key, "1", nx=True, ex=10)
-            
-            try:
-                if not lock_acquired:
-                    # Wait briefly and retry
-                    time.sleep(0.1)
-                    lock_acquired = self.redis_client.set(lock_key, "1", nx=True, ex=10)
-                
-                if not lock_acquired:
-                    logger.warning(f"Could not acquire lock for document {document_id}")
-                    langfuse_tracer.log_error(
-                        ValueError(f"Could not acquire Redis lock for document {document_id}"),
-                        context={
-                            "operation": "redis_lock_acquisition",
-                            "document_id": document_id,
-                            "lock_key": lock_key
-                        },
-                        level="WARNING"
-                    )
-                    # Fall back to adding without lock (may cause race conditions)
-                
-                # Get existing group or create new
-                group_data = self.redis_client.get(redis_key)
-                if group_data:
-                    group = DocumentGroup.from_dict(json.loads(group_data))
-                else:
-                    group = DocumentGroup(document_id=document_id)
-                
-                # Add message
-                group.add_message(message)
-                
-                # Save back to Redis with TTL (2x timeout to allow for processing)
-                self.redis_client.setex(
-                    redis_key,
-                    self.timeout_seconds * 2,
-                    json.dumps(group.to_dict())
-                )
-                
-                unique_pages = group.get_unique_page_count()
-                total_messages = len(group.messages)
-                logger.debug(
-                    f"Document {document_id}: {unique_pages} unique pages ({total_messages} total messages) buffered (Redis)"
-                )
-                
-            finally:
-                # Release lock
-                if lock_acquired:
-                    self.redis_client.delete(lock_key)
-                    
-        except Exception as e:
-            logger.error(f"Redis operation failed for document {document_id}: {e}")
-            langfuse_tracer.log_error(
-                e,
-                context={
-                    "operation": "redis_add_message",
-                    "document_id": document_id,
-                    "redis_key": redis_key
-                }
-            )
-            raise
-    
     def is_complete(self, document_id: str) -> tuple[bool, str]:
         """
         Check if a document group is complete.
@@ -413,10 +279,7 @@ class DocumentGrouper:
         Returns:
             Tuple of (is_complete, reason)
         """
-        if self.use_redis:
-            return self._is_complete_redis(document_id)
-        else:
-            return self._is_complete_memory(document_id)
+        return self._is_complete_memory(document_id)
     
     def _is_complete_memory(self, document_id: str) -> tuple[bool, str]:
         """Check completion in memory storage."""
@@ -425,17 +288,6 @@ class DocumentGrouper:
                 return False, "not_found"
             
             return self.groups[document_id].is_complete(self.timeout_seconds)
-    
-    def _is_complete_redis(self, document_id: str) -> tuple[bool, str]:
-        """Check completion in Redis storage."""
-        redis_key = f"{self.redis_key_prefix}{document_id}"
-        group_data = self.redis_client.get(redis_key)
-        
-        if not group_data:
-            return False, "not_found"
-        
-        group = DocumentGroup.from_dict(json.loads(group_data))
-        return group.is_complete(self.timeout_seconds)
     
     def get_group(self, document_id: str) -> Optional[DocumentGroup]:
         """
@@ -447,25 +299,12 @@ class DocumentGrouper:
         Returns:
             DocumentGroup or None if not found
         """
-        if self.use_redis:
-            return self._get_group_redis(document_id)
-        else:
-            return self._get_group_memory(document_id)
+        return self._get_group_memory(document_id)
     
     def _get_group_memory(self, document_id: str) -> Optional[DocumentGroup]:
         """Get group from memory storage."""
         with self.lock:
             return self.groups.get(document_id)
-    
-    def _get_group_redis(self, document_id: str) -> Optional[DocumentGroup]:
-        """Get group from Redis storage."""
-        redis_key = f"{self.redis_key_prefix}{document_id}"
-        group_data = self.redis_client.get(redis_key)
-        
-        if not group_data:
-            return None
-        
-        return DocumentGroup.from_dict(json.loads(group_data))
     
     def remove_group(self, document_id: str) -> None:
         """
@@ -474,11 +313,7 @@ class DocumentGrouper:
         Args:
             document_id: Document identifier
         """
-        if self.use_redis:
-            self._remove_group_redis(document_id)
-        else:
-            self._remove_group_memory(document_id)
-        
+        self._remove_group_memory(document_id)
         logger.info(f"Removed document group: {document_id}")
     
     def _remove_group_memory(self, document_id: str) -> None:
@@ -487,11 +322,6 @@ class DocumentGrouper:
             if document_id in self.groups:
                 del self.groups[document_id]
     
-    def _remove_group_redis(self, document_id: str) -> None:
-        """Remove group from Redis storage."""
-        redis_key = f"{self.redis_key_prefix}{document_id}"
-        self.redis_client.delete(redis_key)
-    
     def get_all_document_ids(self) -> List[str]:
         """
         Get all document IDs currently being tracked.
@@ -499,30 +329,12 @@ class DocumentGrouper:
         Returns:
             List of document IDs
         """
-        if self.use_redis:
-            return self._get_all_document_ids_redis()
-        else:
-            return self._get_all_document_ids_memory()
+        return self._get_all_document_ids_memory()
     
     def _get_all_document_ids_memory(self) -> List[str]:
         """Get all document IDs from memory storage."""
         with self.lock:
             return list(self.groups.keys())
-    
-    def _get_all_document_ids_redis(self) -> List[str]:
-        """Get all document IDs from Redis storage."""
-        pattern = f"{self.redis_key_prefix}*"
-        keys = self.redis_client.keys(pattern)
-        
-        # Extract document IDs from keys
-        prefix_len = len(self.redis_key_prefix)
-        document_ids = []
-        
-        for key in keys:
-            if not key.endswith(":lock"):
-                document_ids.append(key[prefix_len:])
-        
-        return document_ids
     
     def check_timeouts(self) -> List[str]:
         """

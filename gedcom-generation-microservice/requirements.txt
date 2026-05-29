@@ -8,9 +8,6 @@ openai
 # which was removed in httpx>=0.28.0 (https://github.com/openai/openai-python/issues/1683)
 httpx
 
-# Redis (optional, for distributed document grouping)
-redis==5.0.1
-
 # Environment variables
 python-dotenv==1.0.1
 

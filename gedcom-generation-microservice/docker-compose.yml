@@ -7,12 +7,6 @@ services:
     container_name: gedcom-generation-service
     env_file:
       - .env
-    environment:
-      # Override Redis host for Docker network
-      - REDIS_HOST=redis
-      - USE_REDIS=true
-    depends_on:
-      - redis
     restart: unless-stopped
     networks:
       - gedcom-network
@@ -22,28 +16,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Redis (for distributed document grouping)
-  redis:
-    image: redis:7-alpine
-    container_name: gedcom-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes
-    restart: unless-stopped
-    networks:
-      - gedcom-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-
 networks:
   gedcom-network:
     driver: bridge
-
-volumes:
-  redis-data:
-    driver: local

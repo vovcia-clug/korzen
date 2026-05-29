@@ -115,7 +115,7 @@ def test_document_grouper_error_handling():
     """Test error handling in DocumentGrouper."""
     print("\n=== Testing DocumentGrouper Error Handling ===")
     
-    grouper = DocumentGrouper(timeout_seconds=10, use_redis=False)
+    grouper = DocumentGrouper(timeout_seconds=10)
     
     # Test 1: Missing document_id
     print("\n1. Testing missing document_id error:")

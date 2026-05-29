@@ -95,8 +95,6 @@ process-document-group (outer span from @observe)
 **`src/services/document_grouper.py` - `add_message()`**:
 - Missing document_id errors
 - Message addition failures
-- Redis lock acquisition warnings
-- Redis operation failures
 
 #### Error Context Examples:
 
@@ -160,8 +158,6 @@ langfuse_tracer.log_error(
 5. **`src/services/document_grouper.py`**
    - Added error logging for missing document_id
    - Added error logging for message addition failures
-   - Added warning-level logging for Redis lock issues
-   - Added error logging for Redis operation failures
 
 ## Testing
 

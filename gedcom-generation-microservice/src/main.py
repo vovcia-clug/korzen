@@ -88,12 +88,7 @@ class GedcomGenerationService:
         
         # Document Grouper
         self.document_grouper = DocumentGrouper(
-            timeout_seconds=Config.GROUPING_TIMEOUT_SECONDS,
-            use_redis=Config.USE_REDIS,
-            redis_host=Config.REDIS_HOST,
-            redis_port=Config.REDIS_PORT,
-            redis_db=Config.REDIS_DB,
-            redis_key_prefix=Config.REDIS_KEY_PREFIX
+            timeout_seconds=Config.GROUPING_TIMEOUT_SECONDS
         )
         
         # Context Extractor (carry-forward document-level context between pages)

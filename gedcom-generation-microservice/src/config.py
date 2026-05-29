@@ -56,13 +56,6 @@ class Config:
     GROUPING_CHECK_INTERVAL: int = int(os.getenv("GROUPING_CHECK_INTERVAL", "30"))
     MAX_PAGES_PER_GROUP: int = int(os.getenv("MAX_PAGES_PER_GROUP", "1000"))
     
-    # Redis Configuration (optional, for distributed grouping)
-    USE_REDIS: bool = os.getenv("USE_REDIS", "false").lower() == "true"
-    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
-    REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
-    REDIS_KEY_PREFIX: str = os.getenv("REDIS_KEY_PREFIX", "gedcom:docgroup:")
-    
     # GEDCOM Configuration
     GEDCOM_VERSION: str = os.getenv("GEDCOM_VERSION", "5.5.1")
     ENABLE_GEDCOM_VALIDATION: bool = os.getenv(
@@ -145,8 +138,6 @@ class Config:
             "context_extraction_model": cls.CONTEXT_EXTRACTION_MODEL,
             "max_context_chars": cls.MAX_CONTEXT_CHARS,
             "grouping_timeout_seconds": cls.GROUPING_TIMEOUT_SECONDS,
-            "use_redis": cls.USE_REDIS,
-            "redis_host": cls.REDIS_HOST if cls.USE_REDIS else "N/A",
             "gedcom_version": cls.GEDCOM_VERSION,
             "enable_validation": cls.ENABLE_GEDCOM_VALIDATION,
             "log_level": cls.LOG_LEVEL,

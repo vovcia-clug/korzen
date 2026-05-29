@@ -16,7 +16,7 @@ This service is part of a three-service architecture:
 - **Buffers OCR results by document_id**: Groups multiple pages from the same document
 - **Completion detection**: Processes when all pages received OR timeout reached
 - **Page sorting**: Ensures pages are processed in correct order
-- **Distributed support**: Optional Redis backend for multi-instance deployment
+- **In-memory state**: Single-instance grouping with no external dependencies
 
 ### Direct GEDCOM Generation
 - **Single-step generation**: LLM generates GEDCOM directly (no intermediate JSON)
@@ -76,15 +76,8 @@ This service is part of a three-service architecture:
 ### State Storage
 
 **In-Memory (Single Instance)**
-- Default mode: `USE_REDIS=false`
 - Fast, simple, no external dependencies
 - Limited to single service instance
-
-**Redis (Distributed)**
-- Distributed mode: `USE_REDIS=true`
-- Supports multiple service instances
-- Distributed locking for coordination
-- Persistent state across restarts
 
 ## Configuration
 
@@ -114,11 +107,6 @@ OPENROUTER_API_KEY=your_openrouter_api_key
 GROUPING_TIMEOUT_SECONDS=300        # 5 minutes
 GROUPING_CHECK_INTERVAL=30          # Check timeouts every 30s
 MAX_PAGES_PER_GROUP=100             # Max pages per document
-
-# Redis (for distributed mode)
-USE_REDIS=false
-REDIS_HOST=localhost
-REDIS_PORT=6379
 
 # GEDCOM Settings
 GEDCOM_VERSION=5.5.1
@@ -217,8 +205,6 @@ The service publishes GEDCOM ready messages:
 - Python 3.11+
 - AWS credentials with SQS and S3 access
 - OpenRouter API key
-- (Optional) Redis for distributed mode
-
 ### Setup
 
 1. **Clone and navigate to directory**:
@@ -250,8 +236,6 @@ The service publishes GEDCOM ready messages:
 
 ## Running with Docker
 
-### Single Instance (In-Memory)
-
 ```bash
 # Build image
 docker build -t gedcom-generation-service .
@@ -260,19 +244,16 @@ docker build -t gedcom-generation-service .
 docker run --env-file .env gedcom-generation-service
 ```
 
-### Multi-Instance (Redis)
+### Using Docker Compose
 
 ```bash
-# Start services with docker-compose
+# Start service with docker-compose
 docker-compose up -d
 
 # View logs
 docker-compose logs -f gedcom-generation
 
-# Scale to multiple instances
-docker-compose up -d --scale gedcom-generation=3
-
-# Stop services
+# Stop service
 docker-compose down
 ```
 
@@ -297,16 +278,10 @@ docker-compose down
 
 ### Scaling Considerations
 
-**Single Instance (In-Memory)**:
+**In-Memory (Single Instance)**:
 - Simple, fast, no external dependencies
 - Limited to one service instance
 - Suitable for low-volume processing
-
-**Multi-Instance (Redis)**:
-- Supports horizontal scaling
-- Distributed state coordination
-- Suitable for high-volume processing
-- Requires Redis cluster for production
 
 ## Monitoring
 
@@ -353,16 +328,6 @@ Log level can be configured via `LOG_LEVEL` environment variable.
 - Adjust model parameters
 - Enable strict validation for debugging
 
-### Redis Connection Issues
-
-**Check**:
-1. Is Redis running? (`redis-cli ping`)
-2. Is `REDIS_HOST` correct?
-3. Are network ports open?
-4. Check Redis logs
-
-**Fallback**: Set `USE_REDIS=false` to use in-memory mode
-
 ### High Memory Usage
 
 **Causes**:
@@ -373,7 +338,6 @@ Log level can be configured via `LOG_LEVEL` environment variable.
 **Solutions**:
 - Reduce `GROUPING_TIMEOUT_SECONDS`
 - Reduce `MAX_PAGES_PER_GROUP`
-- Enable Redis mode to offload state
 - Increase container memory
 
 ## Development
