@@ -8,12 +8,13 @@ logger = logging.getLogger(__name__)
 
 try:
     from langfuse import observe, Langfuse
+    from langfuse._client.get_client import get_client as _langfuse_get_client
     _langfuse_available = True
-    _langfuse_client = None
     logger.info("Langfuse v4.x successfully imported")
 except ImportError as e:
     logger.warning(f"Langfuse not available: {e}")
     _langfuse_available = False
+    _langfuse_get_client = None
     
     # Provide no-op decorator if Langfuse not installed
     def observe(*args, **kwargs):
@@ -51,12 +52,23 @@ def is_available() -> bool:
     return _langfuse_available
 
 def get_client() -> Optional[Langfuse]:
-    """Get Langfuse client for advanced operations."""
-    global _langfuse_client
-    if _langfuse_available:
-        if _langfuse_client is None:
-            _langfuse_client = Langfuse()
-        return _langfuse_client
+    """Get the active Langfuse client instance.
+
+    Uses langfuse's internal get_client() to return the same client instance
+    that the @observe decorator uses. This ensures update_current_generation()
+    operates on the same OTel span context as the active @observe span.
+
+    Previously this function created its own Langfuse() instance, which caused
+    a subtle bug: when called without credentials the client was disabled
+    (tracing_enabled=False), and even with credentials the new instance would
+    create NonRecordingSpans that don't propagate to the OTel context, so
+    update_current_generation() always saw INVALID_SPAN and silently skipped.
+    """
+    if _langfuse_available and _langfuse_get_client is not None:
+        try:
+            return _langfuse_get_client()
+        except Exception as e:
+            logger.error(f"Error getting Langfuse client: {e}")
     return None
 
 def flush():
