@@ -251,9 +251,11 @@ class MetadataJsonLoader:
         Extract page number from page field.
         
         Examples:
-            "301.jpg (301 z 303)" -> 301
-            "005.jpg (5 z 175)" -> 5
+            "573-582.jpg (77 z 86)"  -> 77  (parenthetical "X z Y" takes priority)
+            "301.jpg (301 z 303)"    -> 301
+            "005.jpg (5 z 175)"      -> 5
             "page-042.jpg (42 z 100)" -> 42
+            "77"                     -> 77  (pure integer string)
         
         Args:
             page: Page string from Skanoteka
@@ -262,23 +264,27 @@ class MetadataJsonLoader:
             Page number or None
         """
         try:
-            # Pattern: "filename (X z Y)" where X is the page number
+            # Primary pattern: "filename (X z Y)" where X is the page number.
+            # This is the authoritative source — "X z Y" means "page X of Y" in Polish.
             match = re.search(r'\((\d+)\s+z\s+\d+\)', page)
             if match:
                 page_number = int(match.group(1))
-                logger.debug(f"Extracted page_number {page_number} from page '{page}'")
+                logger.debug(f"Extracted page_number {page_number} from '(X z Y)' in '{page}'")
                 return page_number
-            
-            # Fallback: try to extract number from filename
-            match = re.search(r'(\d+)\.', page)
-            if match:
-                page_number = int(match.group(1))
-                logger.debug(f"Extracted page_number {page_number} from filename in '{page}'")
+
+            # Secondary fallback: pure integer string (e.g. "77" with no filename part).
+            # NOTE: The old fallback r'(\d+)\.' was intentionally removed because it
+            # extracted the first number before a dot in the filename (e.g. 582 from
+            # "573-582.jpg") instead of the actual page number.
+            stripped = page.strip()
+            if stripped.isdigit():
+                page_number = int(stripped)
+                logger.debug(f"Extracted page_number {page_number} from pure integer '{page}'")
                 return page_number
-                
+
         except Exception as e:
             logger.warning(f"Failed to extract page_number from page '{page}': {e}")
-        
+
         return None
     
     def _extract_total_pages_from_page_field(self, page: str) -> Optional[int]:

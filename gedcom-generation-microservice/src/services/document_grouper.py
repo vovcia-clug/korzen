@@ -212,6 +212,11 @@ class DocumentGrouper:
         
         # Idempotency tracking - stores document IDs that have been successfully processed
         self.processed_documents: set = set()
+
+        # Pipeline parallelism: per-document queues and processor task handles.
+        # Keyed by document_id; managed by GedcomGenerationService.
+        self.page_queues: Dict[str, asyncio.Queue] = {}
+        self.processor_tasks: Dict[str, "asyncio.Task[None]"] = {}
         
         logger.info("Using in-memory document grouping (single instance only)")
     
@@ -384,3 +389,50 @@ class DocumentGrouper:
         async with self._lock:
             self.processed_documents.add(document_id)
             logger.debug(f"Marked document {document_id} as processed")
+
+    # ------------------------------------------------------------------
+    # Pipeline parallelism helpers
+    # ------------------------------------------------------------------
+
+    async def get_or_create_queue(
+        self,
+        document_id: str,
+        maxsize: int = 0
+    ) -> asyncio.Queue:
+        """
+        Return the existing per-document page queue, or create a new one.
+
+        Args:
+            document_id: Document identifier
+            maxsize: Maximum queue size (0 = unlimited).  Ignored if the queue
+                     already exists.
+
+        Returns:
+            asyncio.Queue for the given document_id
+        """
+        async with self._lock:
+            if document_id not in self.page_queues:
+                self.page_queues[document_id] = asyncio.Queue(maxsize=maxsize)
+                logger.debug(
+                    f"Created page queue for document {document_id} "
+                    f"(maxsize={maxsize})"
+                )
+            return self.page_queues[document_id]
+
+    async def remove_queue(self, document_id: str) -> None:
+        """
+        Remove the per-document page queue and processor task handle.
+
+        Should be called by the PageProcessorTask when it finishes so that
+        memory is released and a fresh queue can be created if the document
+        ever re-appears (e.g. after a crash-recovery scenario).
+
+        Args:
+            document_id: Document identifier
+        """
+        async with self._lock:
+            self.page_queues.pop(document_id, None)
+            self.processor_tasks.pop(document_id, None)
+            logger.debug(
+                f"Removed page queue and task handle for document {document_id}"
+            )

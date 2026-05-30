@@ -2,7 +2,7 @@
 GEDCOM generator service that uses OpenRouter LLM to generate GEDCOM directly.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from .openrouter_client import OpenRouterClient
 from .metadata_formatter import MetadataFormatter
 from .context_extractor import ContextExtractor
@@ -39,7 +39,126 @@ class GedcomGenerator:
         self.context_extractor = context_extractor
         
         logger.info(f"Initialized GEDCOM generator (version {gedcom_version})")
-    
+
+    @langfuse_tracer.observe(name="gedcom-generation-page")
+    async def generate_single_page(
+        self,
+        message: Dict[str, Any],
+        document_metadata: Dict[str, Any],
+        page_index: int,
+        total_pages: int,
+        rolling_context: str,
+        document_id: str,
+    ) -> Tuple[str, str]:
+        """
+        Generate GEDCOM for a single page and return the updated rolling context.
+
+        This is the extracted inner-loop body of
+        ``generate_pages_from_document_group()``, made callable independently
+        so that the pipeline-parallelism layer in ``main.py`` can invoke it
+        one page at a time without waiting for the full document to arrive.
+
+        Args:
+            message: Parsed SQS message for this page (contains metadata +
+                ocr_result).
+            document_metadata: Document-level metadata (title, location, …).
+            page_index: 1-based index of this page within the document group.
+            total_pages: Total number of pages expected in the document group.
+                Pass the current best-known value; it may be updated as more
+                pages arrive.
+            rolling_context: Accumulated context string from all previous pages
+                (empty string for the very first page).
+            document_id: Document identifier used for logging and tracing.
+
+        Returns:
+            A 2-tuple ``(gedcom_content, updated_rolling_context)`` where
+            *gedcom_content* is the raw GEDCOM string produced by the LLM and
+            *updated_rolling_context* is the new context to carry forward to
+            the next page (unchanged on context-extraction failure).
+
+        Raises:
+            ValueError: If page formatting or the LLM API call fails.
+        """
+        page_number = message.get("metadata", {}).get("page_number")
+        page_label = page_number if page_number is not None else f"#{page_index}"
+
+        system_prompt = get_gedcom_system_prompt(self.gedcom_version)
+
+        # --- Format this single page (document metadata header + OCR text) ---
+        try:
+            formatted_page = self.metadata_formatter.format_single_page(
+                message,
+                document_metadata,
+                page_index=page_index,
+                total_pages=total_pages,
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to format page {page_label} of document {document_id}: {e}"
+            )
+            langfuse_tracer.log_error(
+                e,
+                context={
+                    "document_id": document_id,
+                    "operation": "format_single_page",
+                    "page_index": page_index,
+                    "page_number": page_number,
+                },
+            )
+            raise ValueError(f"Page formatting failed: {e}")
+
+        # --- Prepend carried-forward context (if any) ---
+        if rolling_context:
+            page_input = (
+                "CONTEXT FROM PREVIOUS PAGES:\n"
+                f"{rolling_context}\n\n"
+                "---\n\n"
+                f"{formatted_page}"
+            )
+        else:
+            page_input = formatted_page
+
+        # --- LLM call ---
+        try:
+            logger.info(
+                f"Sending page {page_index}/{total_pages} "
+                f"(page {page_label}) of document {document_id} to LLM"
+            )
+            page_gedcom = await self.openrouter_client.generate_gedcom(
+                page_input,
+                system_prompt,
+            )
+        except Exception as e:
+            logger.error(
+                f"OpenRouter API call failed for page {page_label} "
+                f"of document {document_id}: {e}"
+            )
+            langfuse_tracer.log_error(
+                e,
+                context={
+                    "document_id": document_id,
+                    "operation": "openrouter_api_call",
+                    "page_index": page_index,
+                    "page_number": page_number,
+                    "formatted_page_length": len(formatted_page),
+                    "model": self.openrouter_client.model,
+                },
+            )
+            raise ValueError(f"LLM API call failed for page {page_label}: {e}")
+
+        # --- Update rolling context for the next page (fail-soft) ---
+        updated_context = rolling_context
+        if self.context_extractor is not None:
+            updated_context = await self.context_extractor.update_context(
+                current_context=rolling_context,
+                page_content=formatted_page,
+                page_index=page_index,
+                total_pages=total_pages,
+                document_id=document_id,
+            )
+
+        return page_gedcom, updated_context
+
     @langfuse_tracer.observe(name="gedcom-generation")
     async def generate_pages_from_document_group(
         self,
@@ -49,11 +168,10 @@ class GedcomGenerator:
         """
         Generate one GEDCOM per page from a complete document group.
         
-        Pages are processed SEQUENTIALLY: each page (already grouped by the
-        document grouper) is formatted and sent to the LLM one at a time. Each
-        page produces its own independent GEDCOM output. The grouping logic
-        itself is unchanged - this method still receives a fully grouped,
-        page-sorted document and simply emits a separate result per page.
+        Pages are processed SEQUENTIALLY by delegating to
+        ``generate_single_page()`` for each page.  Kept for backward
+        compatibility; the pipeline-parallelism path in ``main.py`` calls
+        ``generate_single_page()`` directly.
         
         Args:
             sorted_messages: List of OCR messages sorted by page number
@@ -80,9 +198,6 @@ class GedcomGenerator:
         if not sorted_messages:
             raise ValueError("No messages to generate GEDCOM from")
         
-        # Get system prompt once (shared across all page calls)
-        system_prompt = get_gedcom_system_prompt(self.gedcom_version)
-        
         # Initialize rolling, carried-forward context for the first page.
         rolling_context = (
             self.context_extractor.initial_context()
@@ -95,80 +210,16 @@ class GedcomGenerator:
         # Process each grouped page one by one (sequentially)
         for idx, message in enumerate(sorted_messages, start=1):
             page_number = message.get("metadata", {}).get("page_number")
-            page_label = page_number if page_number is not None else f"#{idx}"
-            
-            # Format this single page (reuses document metadata header)
-            try:
-                formatted_page = self.metadata_formatter.format_single_page(
-                    message,
-                    document_metadata,
-                    page_index=idx,
-                    total_pages=total_pages
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to format page {page_label} of document {document_id}: {e}"
-                )
-                langfuse_tracer.log_error(
-                    e,
-                    context={
-                        "document_id": document_id,
-                        "operation": "format_single_page",
-                        "page_index": idx,
-                        "page_number": page_number
-                    }
-                )
-                raise ValueError(f"Page formatting failed: {e}")
-            
-            # Generate GEDCOM for this page via LLM (sequential call)
-            try:
-                logger.info(
-                    f"Sending page {idx}/{total_pages} "
-                    f"(page {page_label}) of document {document_id} to LLM"
-                )
-                # Prepend carried-forward context (if any) to the page content.
-                if rolling_context:
-                    page_input = (
-                        "CONTEXT FROM PREVIOUS PAGES:\n"
-                        f"{rolling_context}\n\n"
-                        "---\n\n"
-                        f"{formatted_page}"
-                    )
-                else:
-                    page_input = formatted_page
-                
-                page_gedcom = await self.openrouter_client.generate_gedcom(
-                    page_input,
-                    system_prompt
-                )
-            except Exception as e:
-                logger.error(
-                    f"OpenRouter API call failed for page {page_label} "
-                    f"of document {document_id}: {e}"
-                )
-                langfuse_tracer.log_error(
-                    e,
-                    context={
-                        "document_id": document_id,
-                        "operation": "openrouter_api_call",
-                        "page_index": idx,
-                        "page_number": page_number,
-                        "formatted_page_length": len(formatted_page),
-                        "model": self.openrouter_client.model
-                    }
-                )
-                raise ValueError(f"LLM API call failed for page {page_label}: {e}")
-            
-            # Carry context forward for the next page (fail-soft inside).
-            if self.context_extractor is not None:
-                rolling_context = await self.context_extractor.update_context(
-                    current_context=rolling_context,
-                    page_content=formatted_page,
-                    page_index=idx,
-                    total_pages=total_pages,
-                    document_id=document_id,
-                )
-            
+
+            page_gedcom, rolling_context = await self.generate_single_page(
+                message=message,
+                document_metadata=document_metadata,
+                page_index=idx,
+                total_pages=total_pages,
+                rolling_context=rolling_context,
+                document_id=document_id,
+            )
+
             page_results.append({
                 "page_index": idx,
                 "page_number": page_number,

@@ -276,6 +276,105 @@ class S3OCRScanner:
         metadata["filename"] = path_obj.name
         
         return metadata
+
+    def load_json_metadata_for_ocr_key(self, ocr_key: str) -> Optional[Dict]:
+        """Load companion JSON metadata file from the input S3 bucket.
+
+        The OCR result key mirrors the input image path under the output prefix.
+        For example:
+            ocr_key  = "ocr-results/pow-24/2472/3595/573-582.md"
+            image key = "pow-24/2472/3595/573-582.jpg"
+            json key  = "pow-24/2472/3595/573-582.json"
+
+        The JSON file is expected to contain Skanoteka metadata with a ``page``
+        field like ``"573-582.jpg (77 z 86)"``.  Page numbers are extracted
+        exclusively from that field — never from the filename or S3 path.
+
+        Args:
+            ocr_key: S3 key of the OCR result (.md) file
+
+        Returns:
+            Parsed JSON dict, or None if the file does not exist / cannot be parsed
+        """
+        try:
+            # Strip output prefix to recover the original relative path
+            relative_path = ocr_key
+            if ocr_key.startswith(self.config.s3_output_prefix):
+                relative_path = ocr_key[len(self.config.s3_output_prefix):]
+
+            # Replace .md extension with .json to get the companion metadata key
+            json_key = str(Path(relative_path).with_suffix(".json"))
+
+            response = self.s3_client.get_object(
+                Bucket=self.config.s3_input_bucket,
+                Key=json_key,
+            )
+            raw = response["Body"].read().decode("utf-8")
+            data = json.loads(raw)
+            print(f"  [JSON] Loaded metadata from s3://{self.config.s3_input_bucket}/{json_key}")
+            return data
+
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            if error_code in ("NoSuchKey", "404"):
+                # Companion JSON file simply does not exist — that is normal
+                return None
+            print(f"  [JSON] Warning: could not load JSON metadata for {ocr_key}: {error_code} - {e}")
+            return None
+        except Exception as e:
+            print(f"  [JSON] Warning: could not parse JSON metadata for {ocr_key}: {e}")
+            return None
+
+    @staticmethod
+    def _extract_page_number_from_json_page_field(page: str) -> Optional[int]:
+        """Extract page number from a Skanoteka JSON ``page`` field value.
+
+        The authoritative source is the parenthetical ``(X z Y)`` suffix which
+        means "page X of Y" in Polish.  A bare integer string is also accepted
+        as a fallback.  Extracting numbers from the filename portion of the
+        string (e.g. ``573`` or ``582`` from ``"573-582.jpg"``) is intentionally
+        avoided because those are image-range identifiers, not page numbers.
+
+        Examples::
+
+            "573-582.jpg (77 z 86)"  -> 77
+            "573.jpg (5 z 86)"       -> 5
+            "301.jpg (301 z 303)"    -> 301
+            "77"                     -> 77
+            "573-582.jpg"            -> None  (no parenthetical, not a plain int)
+
+        Args:
+            page: Value of the ``page`` field from the JSON metadata file.
+
+        Returns:
+            Integer page number, or None if it cannot be determined.
+        """
+        # Primary: "(X z Y)" parenthetical — "page X of Y" in Polish
+        m = re.search(r'\((\d+)\s+z\s+\d+\)', page)
+        if m:
+            return int(m.group(1))
+
+        # Secondary: bare integer string (e.g. "77")
+        stripped = page.strip()
+        if stripped.isdigit():
+            return int(stripped)
+
+        return None
+
+    @staticmethod
+    def _extract_total_pages_from_json_page_field(page: str) -> Optional[int]:
+        """Extract total page count from a Skanoteka JSON ``page`` field value.
+
+        Args:
+            page: Value of the ``page`` field from the JSON metadata file.
+
+        Returns:
+            Integer total page count, or None if it cannot be determined.
+        """
+        m = re.search(r'\(\d+\s+z\s+(\d+)\)', page)
+        if m:
+            return int(m.group(1))
+        return None
     
     def get_source_image_uri(self, ocr_key: str) -> str:
         """Construct source image URI from OCR result key.
@@ -717,7 +816,22 @@ Examples:
                 try:
                     # Extract metadata from path
                     metadata = scanner.extract_metadata_from_path(ocr_key)
-                    
+
+                    # Attempt to load companion JSON metadata from the input bucket.
+                    # Page numbers MUST come from the JSON "page" field (e.g.
+                    # "573-582.jpg (77 z 86)"), NOT from the filename or S3 path.
+                    json_data = scanner.load_json_metadata_for_ocr_key(ocr_key)
+                    if json_data and "page" in json_data:
+                        page_field = json_data["page"]
+                        json_page_number = scanner._extract_page_number_from_json_page_field(page_field)
+                        if json_page_number is not None:
+                            metadata["page_number"] = json_page_number
+                            if args.verbose:
+                                print(f"  [JSON] page_number={json_page_number} from page field: {repr(page_field)}")
+                        json_total_pages = scanner._extract_total_pages_from_json_page_field(page_field)
+                        if json_total_pages is not None:
+                            metadata["total_pages"] = json_total_pages
+
                     # Add collection analysis info to metadata if available
                     document_id = metadata.get("document_id")
                     if document_id in collection_analyses:

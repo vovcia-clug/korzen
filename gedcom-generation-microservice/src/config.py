@@ -55,6 +55,9 @@ class Config:
     GROUPING_TIMEOUT_SECONDS: int = int(os.getenv("GROUPING_TIMEOUT_SECONDS", "300"))
     GROUPING_CHECK_INTERVAL: int = int(os.getenv("GROUPING_CHECK_INTERVAL", "30"))
     MAX_PAGES_PER_GROUP: int = int(os.getenv("MAX_PAGES_PER_GROUP", "1000"))
+    # Maximum number of pages that can be queued per document before back-pressure
+    # is applied to the poller (0 = unlimited).
+    PAGE_QUEUE_MAX_SIZE: int = int(os.getenv("PAGE_QUEUE_MAX_SIZE", "0"))
     
     # GEDCOM Configuration
     GEDCOM_VERSION: str = os.getenv("GEDCOM_VERSION", "5.5.1")
@@ -138,6 +141,7 @@ class Config:
             "context_extraction_model": cls.CONTEXT_EXTRACTION_MODEL,
             "max_context_chars": cls.MAX_CONTEXT_CHARS,
             "grouping_timeout_seconds": cls.GROUPING_TIMEOUT_SECONDS,
+            "page_queue_max_size": cls.PAGE_QUEUE_MAX_SIZE,
             "gedcom_version": cls.GEDCOM_VERSION,
             "enable_validation": cls.ENABLE_GEDCOM_VALIDATION,
             "log_level": cls.LOG_LEVEL,
