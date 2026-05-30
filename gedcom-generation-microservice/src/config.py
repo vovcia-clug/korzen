@@ -18,7 +18,7 @@ class Config:
     # SQS Configuration
     OCR_RESULTS_QUEUE_URL: str = os.getenv("OCR_RESULTS_QUEUE_URL", "")
     GEDCOM_READY_QUEUE_URL: str = os.getenv("GEDCOM_READY_QUEUE_URL", "")
-    SQS_MAX_MESSAGES: int = int(os.getenv("SQS_MAX_MESSAGES", "1"))
+    SQS_MAX_MESSAGES: int = int(os.getenv("SQS_MAX_MESSAGES", "10"))
     SQS_WAIT_TIME_SECONDS: int = int(os.getenv("SQS_WAIT_TIME_SECONDS", "20"))
     SQS_VISIBILITY_TIMEOUT: int = int(os.getenv("SQS_VISIBILITY_TIMEOUT", "300"))
     

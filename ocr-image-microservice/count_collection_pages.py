@@ -149,16 +149,25 @@ class S3PageScanner:
             document_id = filename_base
             collection_id = filename_base
         
-        # Try to extract page number from filename
-        # Patterns: page-005, page_005, 005, p005, etc.
-        page_match = re.search(r'(?:page[-_]?)?(\d+)', filename_base, re.IGNORECASE)
-        if page_match:
-            try:
-                page_number = int(page_match.group(1))
-            except ValueError:
-                page_number = None
-        else:
-            page_number = None
+        # Try to extract page number from filename using explicit patterns in priority order.
+        # Patterns tried: page-005 / page_005, p005, pure numeric stem.
+        # The generic r'(?:page[-_]?)?(\d+)' is intentionally NOT used because the
+        # optional prefix makes it degenerate to r'(\d+)', which would match the first
+        # digit sequence in any filename (e.g. extracting 1784 from krakowski_1784_3500_001).
+        _page_patterns = [
+            r'page[-_](\d+)',  # page-005 or page_005
+            r'\bp(\d+)\b',     # p005 (word-boundary anchored to avoid partial matches)
+            r'^(\d+)$',        # pure numeric stem: 005 (no extension at this point)
+        ]
+        page_number = None
+        for _pat in _page_patterns:
+            _m = re.search(_pat, filename_base, re.IGNORECASE)
+            if _m:
+                try:
+                    page_number = int(_m.group(1))
+                except ValueError:
+                    pass
+                break
         
         return collection_id, document_id, page_number
     

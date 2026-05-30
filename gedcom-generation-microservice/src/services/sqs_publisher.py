@@ -3,7 +3,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any
-import boto3
+import aioboto3
 from botocore.exceptions import ClientError
 
 from ..utils.logger import get_logger
@@ -27,13 +27,14 @@ class SQSPublisher:
             queue_url: SQS queue URL for publishing messages
         """
         self.queue_url = queue_url
+        self.aws_config = aws_config
         
-        # Create SQS client
-        self.sqs_client = boto3.client("sqs", **aws_config)
+        # Create aioboto3 session (client opened lazily inside each async method)
+        self.session = aioboto3.Session()
         
         logger.info(f"SQSPublisher initialized - Queue: {queue_url}")
     
-    def publish_gedcom_ready(
+    async def publish_gedcom_ready(
         self,
         document_metadata: Dict[str, Any],
         gedcom_data: Dict[str, Any],
@@ -75,10 +76,11 @@ class SQSPublisher:
                 f"{document_metadata.get('document_id')}"
             )
             
-            response = self.sqs_client.send_message(
-                QueueUrl=self.queue_url,
-                MessageBody=json.dumps(message)
-            )
+            async with self.session.client("sqs", **self.aws_config) as client:
+                response = await client.send_message(
+                    QueueUrl=self.queue_url,
+                    MessageBody=json.dumps(message)
+                )
             
             message_id = response.get("MessageId")
             logger.info(f"Successfully published message: {message_id}")
@@ -89,7 +91,7 @@ class SQSPublisher:
             logger.error(f"Failed to publish message to SQS: {e}")
             raise
     
-    def publish_message(
+    async def publish_message(
         self,
         message_body: Dict[str, Any]
     ) -> str:
@@ -108,10 +110,11 @@ class SQSPublisher:
         try:
             logger.debug(f"Publishing message to SQS")
             
-            response = self.sqs_client.send_message(
-                QueueUrl=self.queue_url,
-                MessageBody=json.dumps(message_body)
-            )
+            async with self.session.client("sqs", **self.aws_config) as client:
+                response = await client.send_message(
+                    QueueUrl=self.queue_url,
+                    MessageBody=json.dumps(message_body)
+                )
             
             message_id = response.get("MessageId")
             logger.debug(f"Successfully published message: {message_id}")

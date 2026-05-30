@@ -51,12 +51,16 @@ class MetadataExtractor:
             
             metadata['filename'] = filename
             
-            # Try to extract page number from filename
-            # Patterns: page-005.jpg, page_005.jpg, 005.jpg, p005.jpg
+            # Try to extract page number from filename using explicit patterns in priority order.
+            # Patterns: page-005.jpg / page_005.jpg, p005.jpg (word-boundary anchored),
+            # 005.jpg (pure numeric stem anchored at start before the extension dot).
+            # NOTE: r'p(\d+)' without word-boundary anchoring is intentionally avoided because
+            # it would match any 'p' followed by digits anywhere in the filename stem
+            # (e.g. 'baptisms_p1784_001.jpg' would yield 1784 instead of 001).
             page_patterns = [
                 r'page[-_](\d+)',  # page-005 or page_005
-                r'p(\d+)',         # p005
-                r'^(\d+)\.',       # 005.jpg (number at start)
+                r'\bp(\d+)\b',     # p005 — word-boundary anchored to avoid partial matches
+                r'^(\d+)\.',       # 005.jpg — number at start of filename before extension
             ]
             
             for pattern in page_patterns:

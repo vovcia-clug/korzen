@@ -4,8 +4,8 @@ Document grouper for buffering and grouping OCR results by document_id.
 Uses in-memory state storage (single instance).
 """
 
+import asyncio
 import time
-import threading
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
@@ -208,14 +208,14 @@ class DocumentGrouper:
         
         # In-memory storage
         self.groups: Dict[str, DocumentGroup] = {}
-        self.lock = threading.Lock()
+        self._lock = asyncio.Lock()
         
         # Idempotency tracking - stores document IDs that have been successfully processed
         self.processed_documents: set = set()
         
         logger.info("Using in-memory document grouping (single instance only)")
     
-    def add_message(self, message: Dict[str, Any]) -> None:
+    async def add_message(self, message: Dict[str, Any]) -> None:
         """
         Add a message to the appropriate document group.
         
@@ -242,7 +242,7 @@ class DocumentGrouper:
         logger.info(f"Adding message to document group: {document_id}, page {page_number}")
         
         try:
-            self._add_message_memory(document_id, message)
+            await self._add_message_memory(document_id, message)
         except Exception as e:
             logger.error(f"Failed to add message to group {document_id}: {e}")
             langfuse_tracer.log_error(
@@ -255,9 +255,9 @@ class DocumentGrouper:
             )
             raise
     
-    def _add_message_memory(self, document_id: str, message: Dict[str, Any]) -> None:
+    async def _add_message_memory(self, document_id: str, message: Dict[str, Any]) -> None:
         """Add message to in-memory storage."""
-        with self.lock:
+        async with self._lock:
             if document_id not in self.groups:
                 self.groups[document_id] = DocumentGroup(document_id=document_id)
             
@@ -269,7 +269,7 @@ class DocumentGrouper:
                 f"Document {document_id}: {unique_pages} unique pages ({total_messages} total messages) buffered"
             )
     
-    def is_complete(self, document_id: str) -> tuple[bool, str]:
+    async def is_complete(self, document_id: str) -> tuple[bool, str]:
         """
         Check if a document group is complete.
         
@@ -279,17 +279,17 @@ class DocumentGrouper:
         Returns:
             Tuple of (is_complete, reason)
         """
-        return self._is_complete_memory(document_id)
+        return await self._is_complete_memory(document_id)
     
-    def _is_complete_memory(self, document_id: str) -> tuple[bool, str]:
+    async def _is_complete_memory(self, document_id: str) -> tuple[bool, str]:
         """Check completion in memory storage."""
-        with self.lock:
+        async with self._lock:
             if document_id not in self.groups:
                 return False, "not_found"
             
             return self.groups[document_id].is_complete(self.timeout_seconds)
     
-    def get_group(self, document_id: str) -> Optional[DocumentGroup]:
+    async def get_group(self, document_id: str) -> Optional[DocumentGroup]:
         """
         Get a document group.
         
@@ -299,44 +299,44 @@ class DocumentGrouper:
         Returns:
             DocumentGroup or None if not found
         """
-        return self._get_group_memory(document_id)
+        return await self._get_group_memory(document_id)
     
-    def _get_group_memory(self, document_id: str) -> Optional[DocumentGroup]:
+    async def _get_group_memory(self, document_id: str) -> Optional[DocumentGroup]:
         """Get group from memory storage."""
-        with self.lock:
+        async with self._lock:
             return self.groups.get(document_id)
     
-    def remove_group(self, document_id: str) -> None:
+    async def remove_group(self, document_id: str) -> None:
         """
         Remove a document group after processing.
         
         Args:
             document_id: Document identifier
         """
-        self._remove_group_memory(document_id)
+        await self._remove_group_memory(document_id)
         logger.info(f"Removed document group: {document_id}")
     
-    def _remove_group_memory(self, document_id: str) -> None:
+    async def _remove_group_memory(self, document_id: str) -> None:
         """Remove group from memory storage."""
-        with self.lock:
+        async with self._lock:
             if document_id in self.groups:
                 del self.groups[document_id]
     
-    def get_all_document_ids(self) -> List[str]:
+    async def get_all_document_ids(self) -> List[str]:
         """
         Get all document IDs currently being tracked.
         
         Returns:
             List of document IDs
         """
-        return self._get_all_document_ids_memory()
+        return await self._get_all_document_ids_memory()
     
-    def _get_all_document_ids_memory(self) -> List[str]:
+    async def _get_all_document_ids_memory(self) -> List[str]:
         """Get all document IDs from memory storage."""
-        with self.lock:
+        async with self._lock:
             return list(self.groups.keys())
     
-    def check_timeouts(self) -> List[str]:
+    async def check_timeouts(self) -> List[str]:
         """
         Check for timed-out documents and return their IDs.
         
@@ -345,8 +345,8 @@ class DocumentGrouper:
         """
         timed_out = []
         
-        for document_id in self.get_all_document_ids():
-            is_complete, reason = self.is_complete(document_id)
+        for document_id in await self.get_all_document_ids():
+            is_complete, reason = await self.is_complete(document_id)
             if is_complete and reason == "timeout_reached":
                 timed_out.append(document_id)
                 logger.warning(
@@ -355,7 +355,7 @@ class DocumentGrouper:
         
         return timed_out
     
-    def is_already_processed(self, document_id: str) -> bool:
+    async def is_already_processed(self, document_id: str) -> bool:
         """
         Check if a document has already been successfully processed.
         
@@ -368,10 +368,10 @@ class DocumentGrouper:
         Returns:
             True if document was already processed, False otherwise
         """
-        with self.lock:
+        async with self._lock:
             return document_id in self.processed_documents
     
-    def mark_as_processed(self, document_id: str) -> None:
+    async def mark_as_processed(self, document_id: str) -> None:
         """
         Mark a document as successfully processed.
         
@@ -381,6 +381,6 @@ class DocumentGrouper:
         Args:
             document_id: Document identifier
         """
-        with self.lock:
+        async with self._lock:
             self.processed_documents.add(document_id)
             logger.debug(f"Marked document {document_id} as processed")

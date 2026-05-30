@@ -130,16 +130,16 @@ class GedcomGenerationService:
         
         try:
             # Check if already processed (idempotency)
-            if self.document_grouper.is_already_processed(document_id):
+            if await self.document_grouper.is_already_processed(document_id):
                 logger.info(f"Document {document_id} already processed. Skipping.")
-                self.sqs_consumer.delete_message(parsed["receipt_handle"])
+                await self.sqs_consumer.delete_message(parsed["receipt_handle"])
                 return
             
             # Add to document group (automatically traced by @observe decorator)
-            self.document_grouper.add_message(parsed)
+            await self.document_grouper.add_message(parsed)
             
             # Check if document is complete
-            is_complete, reason = self.document_grouper.is_complete(document_id)
+            is_complete, reason = await self.document_grouper.is_complete(document_id)
             
             if is_complete:
                 logger.info(
@@ -148,12 +148,12 @@ class GedcomGenerationService:
                 )
                 await self.process_complete_document(document_id, reason)
                 # Mark as processed AFTER successful processing
-                self.document_grouper.mark_as_processed(document_id)
+                await self.document_grouper.mark_as_processed(document_id)
                 # Delete message ONLY after successful processing
-                self.sqs_consumer.delete_message(parsed["receipt_handle"])
+                await self.sqs_consumer.delete_message(parsed["receipt_handle"])
             else:
                 # Get detailed state for debugging
-                group = self.document_grouper.get_group(document_id)
+                group = await self.document_grouper.get_group(document_id)
                 if group:
                     page_numbers = sorted([
                         m.get("metadata", {}).get("page_number")
@@ -173,7 +173,7 @@ class GedcomGenerationService:
                         f"Waiting for more pages..."
                     )
                 # Delete incomplete messages immediately (they're buffered in memory)
-                self.sqs_consumer.delete_message(parsed["receipt_handle"])
+                await self.sqs_consumer.delete_message(parsed["receipt_handle"])
             
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
@@ -194,7 +194,7 @@ class GedcomGenerationService:
         """
         try:
             # Get document group
-            group = self.document_grouper.get_group(document_id)
+            group = await self.document_grouper.get_group(document_id)
             if not group:
                 error_msg = f"Document group not found: {document_id}"
                 logger.error(error_msg)
@@ -211,7 +211,7 @@ class GedcomGenerationService:
             unprocessed_messages = group.get_unprocessed_messages()
             if not unprocessed_messages:
                 logger.info(f"All pages already processed for document {document_id}")
-                self.document_grouper.remove_group(document_id)
+                await self.document_grouper.remove_group(document_id)
                 return
             
             # Get sorted messages (only unprocessed ones)
@@ -453,7 +453,9 @@ class GedcomGenerationService:
                         
                         # Mark page as successfully processed
                         if page_number is not None:
-                            self.document_grouper.get_group(document_id).mark_page_processed(page_number)
+                            group = await self.document_grouper.get_group(document_id)
+                            if group:
+                                group.mark_page_processed(page_number)
                         
                         logger.info(
                             f"Successfully processed document {document_id} "
@@ -484,44 +486,46 @@ class GedcomGenerationService:
                         
                         # Increment retry count for this page
                         if page_number is not None:
-                            retry_count = self.document_grouper.get_group(document_id).increment_page_retry(page_number)
-                            
-                            # Check if should retry
-                            if not self.document_grouper.get_group(document_id).should_retry_page(
-                                page_number,
-                                max_retries=Config.MAX_PAGE_RETRIES
-                            ):
-                                logger.error(
-                                    f"Page {page_label} of document {document_id} has exceeded "
-                                    f"max retries ({Config.MAX_PAGE_RETRIES}). Marking as permanently failed."
-                                )
-                                langfuse_tracer.log_error(
-                                    ValueError(f"Page {page_label} permanently failed after {retry_count} retries"),
-                                    context={
-                                        "document_id": document_id,
-                                        "page_number": page_number,
-                                        "retry_count": retry_count,
-                                        "max_retries": Config.MAX_PAGE_RETRIES,
-                                        "operation": "max_retries_exceeded"
-                                    },
-                                    level="ERROR"
-                                )
-                                # Mark as processed to prevent infinite retries
-                                self.document_grouper.get_group(document_id).mark_page_processed(page_number)
-                            else:
-                                logger.warning(
-                                    f"Page {page_label} of document {document_id} will be retried "
-                                    f"(attempt {retry_count}/{Config.MAX_PAGE_RETRIES})"
-                                )
+                            group = await self.document_grouper.get_group(document_id)
+                            if group:
+                                retry_count = group.increment_page_retry(page_number)
+                                
+                                # Check if should retry
+                                if not group.should_retry_page(
+                                    page_number,
+                                    max_retries=Config.MAX_PAGE_RETRIES
+                                ):
+                                    logger.error(
+                                        f"Page {page_label} of document {document_id} has exceeded "
+                                        f"max retries ({Config.MAX_PAGE_RETRIES}). Marking as permanently failed."
+                                    )
+                                    langfuse_tracer.log_error(
+                                        ValueError(f"Page {page_label} permanently failed after {retry_count} retries"),
+                                        context={
+                                            "document_id": document_id,
+                                            "page_number": page_number,
+                                            "retry_count": retry_count,
+                                            "max_retries": Config.MAX_PAGE_RETRIES,
+                                            "operation": "max_retries_exceeded"
+                                        },
+                                        level="ERROR"
+                                    )
+                                    # Mark as processed to prevent infinite retries
+                                    group.mark_page_processed(page_number)
+                                else:
+                                    logger.warning(
+                                        f"Page {page_label} of document {document_id} will be retried "
+                                        f"(attempt {retry_count}/{Config.MAX_PAGE_RETRIES})"
+                                    )
                         
                         # Continue to next page instead of aborting entire document
                         continue
                 
                 # Check if all pages are processed
-                group = self.document_grouper.get_group(document_id)
+                group = await self.document_grouper.get_group(document_id)
                 if group and len(group.processed_pages) == len(group.messages):
                     logger.info(f"All pages successfully processed for document {document_id}")
-                    self.document_grouper.remove_group(document_id)
+                    await self.document_grouper.remove_group(document_id)
                 else:
                     unprocessed_count = len(group.messages) - len(group.processed_pages) if group else 0
                     logger.warning(
@@ -582,7 +586,7 @@ class GedcomGenerationService:
         """
         if filename is None:
             filename = f"{document_id}.ged"
-        s3_uri = self.s3_handler.upload_gedcom(
+        s3_uri = await self.s3_handler.upload_gedcom(
             content=gedcom_content,
             document_id=document_id,
             filename=filename,
@@ -598,7 +602,7 @@ class GedcomGenerationService:
         Args:
             gedcom_ready_message: Message to publish
         """
-        self.sqs_publisher.publish_gedcom_ready(
+        await self.sqs_publisher.publish_gedcom_ready(
             document_metadata=gedcom_ready_message["document_metadata"],
             gedcom_data=gedcom_ready_message["gedcom_data"],
             source_ocr_uris=gedcom_ready_message["source_ocr_uris"],
@@ -608,11 +612,13 @@ class GedcomGenerationService:
     async def check_timeouts(self) -> None:
         """Check for timed-out documents and process them."""
         try:
-            timed_out = self.document_grouper.check_timeouts()
+            timed_out = await self.document_grouper.check_timeouts()
             
-            for document_id in timed_out:
-                logger.info(f"Processing timed-out document: {document_id}")
-                await self.process_complete_document(document_id, "timeout_reached")
+            if timed_out:
+                await asyncio.gather(*[
+                    self.process_complete_document(doc_id, "timeout_reached")
+                    for doc_id in timed_out
+                ])
                 
         except Exception as e:
             logger.error(f"Error checking timeouts: {e}", exc_info=True)
@@ -625,11 +631,11 @@ class GedcomGenerationService:
         while self.running:
             try:
                 # Receive messages from SQS
-                messages = self.sqs_consumer.receive_messages()
+                messages = await self.sqs_consumer.receive_messages()
                 
                 # Process each message
-                for message in messages:
-                    await self.process_message(message)
+                if messages:
+                    await asyncio.gather(*[self.process_message(m) for m in messages])
                 
                 # Periodically check for timeouts
                 if time.time() - self.last_timeout_check > Config.GROUPING_CHECK_INTERVAL:

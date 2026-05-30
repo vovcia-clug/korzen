@@ -1,5 +1,5 @@
-# AWS SDK
-boto3==1.34.51
+# AWS SDK (async)
+aioboto3>=12.0.0
 
 # OpenAI SDK (for OpenRouter)
 openai

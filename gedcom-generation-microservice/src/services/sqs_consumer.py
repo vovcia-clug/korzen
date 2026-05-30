@@ -2,7 +2,7 @@
 import json
 import re
 from typing import Optional, List, Dict, Any
-import boto3
+import aioboto3
 from botocore.exceptions import ClientError
 
 from ..utils.logger import get_logger
@@ -35,6 +35,10 @@ class SQSConsumer:
         self.max_messages = min(max_messages, 10)  # AWS limit is 10
         self.wait_time_seconds = min(wait_time_seconds, 20)  # AWS limit is 20
         self.visibility_timeout = visibility_timeout
+        self.aws_config = aws_config
+        
+        # Create aioboto3 session (client opened lazily inside each async method)
+        self.session = aioboto3.Session()
         
         # Extract region from queue URL for diagnostics
         queue_region = self._extract_region_from_queue_url(queue_url)
@@ -56,11 +60,8 @@ class SQSConsumer:
                 f"is in region '{queue_region}'. This will cause 'QueueDoesNotExist' errors. "
                 f"Please update AWS_REGION in your .env file to match the queue region."
             )
-        
-        # Create SQS client
-        self.sqs_client = boto3.client("sqs", **aws_config)
     
-    def receive_messages(self) -> List[Dict[str, Any]]:
+    async def receive_messages(self) -> List[Dict[str, Any]]:
         """
         Poll SQS queue for messages using long polling.
         
@@ -73,14 +74,15 @@ class SQSConsumer:
         try:
             logger.debug(f"Polling SQS queue: {self.queue_url}")
             
-            response = self.sqs_client.receive_message(
-                QueueUrl=self.queue_url,
-                MaxNumberOfMessages=self.max_messages,
-                WaitTimeSeconds=self.wait_time_seconds,
-                VisibilityTimeout=self.visibility_timeout,
-                AttributeNames=["All"],
-                MessageAttributeNames=["All"]
-            )
+            async with self.session.client("sqs", **self.aws_config) as client:
+                response = await client.receive_message(
+                    QueueUrl=self.queue_url,
+                    MaxNumberOfMessages=self.max_messages,
+                    WaitTimeSeconds=self.wait_time_seconds,
+                    VisibilityTimeout=self.visibility_timeout,
+                    AttributeNames=["All"],
+                    MessageAttributeNames=["All"]
+                )
             
             messages = response.get("Messages", [])
             
@@ -163,7 +165,7 @@ class SQSConsumer:
             logger.error(f"Failed to parse message: {e}")
             raise ValueError(f"Message parsing failed: {e}")
     
-    def delete_message(self, receipt_handle: str) -> None:
+    async def delete_message(self, receipt_handle: str) -> None:
         """
         Delete a message from the SQS queue after successful processing.
         
@@ -176,10 +178,11 @@ class SQSConsumer:
         try:
             logger.debug(f"Deleting message from SQS")
             
-            self.sqs_client.delete_message(
-                QueueUrl=self.queue_url,
-                ReceiptHandle=receipt_handle
-            )
+            async with self.session.client("sqs", **self.aws_config) as client:
+                await client.delete_message(
+                    QueueUrl=self.queue_url,
+                    ReceiptHandle=receipt_handle
+                )
             
             logger.debug("Message deleted successfully")
             
@@ -187,7 +190,7 @@ class SQSConsumer:
             logger.error(f"Failed to delete message from SQS: {e}")
             raise
     
-    def change_message_visibility(
+    async def change_message_visibility(
         self,
         receipt_handle: str,
         visibility_timeout: int
@@ -205,11 +208,12 @@ class SQSConsumer:
             ClientError: If SQS operation fails
         """
         try:
-            self.sqs_client.change_message_visibility(
-                QueueUrl=self.queue_url,
-                ReceiptHandle=receipt_handle,
-                VisibilityTimeout=visibility_timeout
-            )
+            async with self.session.client("sqs", **self.aws_config) as client:
+                await client.change_message_visibility(
+                    QueueUrl=self.queue_url,
+                    ReceiptHandle=receipt_handle,
+                    VisibilityTimeout=visibility_timeout
+                )
             
             logger.debug(
                 f"Changed message visibility timeout to {visibility_timeout}s"

@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 from typing import Optional
-import boto3
+import aioboto3
 from botocore.exceptions import ClientError
 
 from ..utils.logger import get_logger
@@ -29,15 +29,16 @@ class S3Handler:
         """
         self.output_bucket = output_bucket
         self.output_prefix = output_prefix
+        self.aws_config = aws_config
         
-        # Create S3 client
-        self.s3_client = boto3.client("s3", **aws_config)
+        # Create aioboto3 session (client opened lazily inside each async method)
+        self.session = aioboto3.Session()
         
         logger.info(
             f"S3Handler initialized - Output: {output_bucket}/{output_prefix}"
         )
     
-    def upload_gedcom(
+    async def upload_gedcom(
         self,
         content: str,
         document_id: str,
@@ -118,12 +119,13 @@ class S3Handler:
             )
             
             # Upload string content directly
-            self.s3_client.put_object(
-                Bucket=self.output_bucket,
-                Key=output_key,
-                Body=content.encode('utf-8'),
-                ContentType='text/x-gedcom'
-            )
+            async with self.session.client("s3", **self.aws_config) as client:
+                await client.put_object(
+                    Bucket=self.output_bucket,
+                    Key=output_key,
+                    Body=content.encode('utf-8'),
+                    ContentType='text/x-gedcom'
+                )
             
             s3_uri = f"s3://{self.output_bucket}/{output_key}"
             logger.info(f"Successfully uploaded GEDCOM to {s3_uri}")
@@ -133,7 +135,7 @@ class S3Handler:
             logger.error(f"Failed to upload GEDCOM: {e}")
             raise
     
-    def upload_content(
+    async def upload_content(
         self,
         content: str,
         s3_key: str,
@@ -159,12 +161,13 @@ class S3Handler:
                 f"s3://{self.output_bucket}/{s3_key}"
             )
             
-            self.s3_client.put_object(
-                Bucket=self.output_bucket,
-                Key=s3_key,
-                Body=content.encode('utf-8'),
-                ContentType=content_type
-            )
+            async with self.session.client("s3", **self.aws_config) as client:
+                await client.put_object(
+                    Bucket=self.output_bucket,
+                    Key=s3_key,
+                    Body=content.encode('utf-8'),
+                    ContentType=content_type
+                )
             
             s3_uri = f"s3://{self.output_bucket}/{s3_key}"
             logger.info(f"Successfully uploaded content to {s3_uri}")
