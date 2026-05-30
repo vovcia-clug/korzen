@@ -118,7 +118,7 @@ OPENROUTER_MODEL=google/gemini-flash-1.5
 OPENROUTER_TIMEOUT=300
 
 # Context Extraction (carry-forward document-level context between pages)
-ENABLE_CONTEXT_EXTRACTION=true              # Master on/off switch (set "false" to disable)
+# Context extraction is always enabled
 CONTEXT_EXTRACTION_MODEL=google/gemini-flash-1.5  # Defaults to OPENROUTER_MODEL when unset
 MAX_CONTEXT_CHARS=4000                       # Hard cap on the carried-forward context length
 
@@ -128,13 +128,12 @@ LOG_LEVEL=INFO
 
 #### Context Extraction Variables
 
+Context extraction is always enabled and cannot be disabled.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ENABLE_CONTEXT_EXTRACTION` | `true` | Master on/off switch for the carry-forward context feature. Set to `false` to disable; per-page GEDCOM generation then behaves exactly as before (no extra LLM calls). |
 | `CONTEXT_EXTRACTION_MODEL` | value of `OPENROUTER_MODEL` (`google/gemini-flash-1.5`) | Intended model for context extraction. **Currently informational / future-proofing**: the extractor shares the single `OpenRouterClient` (and thus `OPENROUTER_MODEL`). To use a dedicated model, construct a second `OpenRouterClient` with `model=CONTEXT_EXTRACTION_MODEL` and pass it to `ContextExtractor` (see [`CONTEXT_EXTRACTOR_DESIGN.md`](CONTEXT_EXTRACTOR_DESIGN.md) §6.2). It is surfaced in `Config.to_dict()` for observability. |
 | `MAX_CONTEXT_CHARS` | `4000` | Hard cap on the carried-forward context length. Kept small because the context is document-level only; if the LLM returns more, the most-recent tail is retained. |
-
-**To disable** the feature, set `ENABLE_CONTEXT_EXTRACTION=false`. When disabled (or when no `ContextExtractor` is injected), no context-extraction LLM calls are made and the page input is unchanged.
 
 ## Input Message Format
 

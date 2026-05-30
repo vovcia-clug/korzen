@@ -97,9 +97,9 @@ class GedcomGenerationService:
         )
 
         # Context Extractor (carry-forward document-level context between pages)
+        # Context extraction is always enabled
         self.context_extractor = ContextExtractor(
             openrouter_client=self.openrouter_client,
-            enabled=Config.ENABLE_CONTEXT_EXTRACTION,
             max_context_chars=Config.MAX_CONTEXT_CHARS,
         )
 
@@ -275,7 +275,24 @@ class GedcomGenerationService:
                 "is_last": is_complete,
                 "completion_reason": completion_reason,
             }
-            await queue.put(work_item)
+            
+            # Use non-blocking queue put to prevent SQS poller from blocking
+            # when queue is full. Apply back-pressure by delaying message retry.
+            try:
+                queue.put_nowait(work_item)
+            except asyncio.QueueFull:
+                logger.warning(
+                    f"Queue full for document {document_id} "
+                    f"(size: {queue.qsize()}/{queue.maxsize}), "
+                    f"applying back-pressure - message will retry in "
+                    f"{Config.QUEUE_BACKPRESSURE_VISIBILITY_TIMEOUT}s"
+                )
+                # Change message visibility to delay retry
+                await self.sqs_consumer.change_message_visibility(
+                    receipt_handle=parsed["receipt_handle"],
+                    visibility_timeout=Config.QUEUE_BACKPRESSURE_VISIBILITY_TIMEOUT
+                )
+                return  # Don't delete message, let SQS retry
 
             # Spawn a PageProcessorTask for this document if one is not
             # already running (or if the previous one has already finished).
@@ -439,6 +456,8 @@ class GedcomGenerationService:
                                         f"(attempt {retry_count}/"
                                         f"{Config.MAX_PAGE_RETRIES})"
                                     )
+                                    await queue.put(work_item)
+                                    continue
                         # Continue to next page — do not abort the whole document.
                         if is_last:
                             break
@@ -526,6 +545,8 @@ class GedcomGenerationService:
                                         f"(attempt {retry_count}/"
                                         f"{Config.MAX_PAGE_RETRIES})"
                                     )
+                                    await queue.put(work_item)
+                                    continue
 
                     if is_last:
                         logger.info(

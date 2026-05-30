@@ -39,9 +39,7 @@ class Config:
     OPENROUTER_TIMEOUT: int = int(os.getenv("OPENROUTER_TIMEOUT", "300"))
     
     # Context Extraction Configuration (carry-forward document-level context)
-    ENABLE_CONTEXT_EXTRACTION: bool = os.getenv(
-        "ENABLE_CONTEXT_EXTRACTION", "true"
-    ).lower() == "true"
+    # Context extraction is always enabled
     CONTEXT_EXTRACTION_MODEL: str = os.getenv(
         "CONTEXT_EXTRACTION_MODEL",
         os.getenv("OPENROUTER_MODEL", "google/gemini-flash-1.5")
@@ -57,7 +55,11 @@ class Config:
     MAX_PAGES_PER_GROUP: int = int(os.getenv("MAX_PAGES_PER_GROUP", "1000"))
     # Maximum number of pages that can be queued per document before back-pressure
     # is applied to the poller (0 = unlimited).
-    PAGE_QUEUE_MAX_SIZE: int = int(os.getenv("PAGE_QUEUE_MAX_SIZE", "0"))
+    PAGE_QUEUE_MAX_SIZE: int = int(os.getenv("PAGE_QUEUE_MAX_SIZE", "1000"))
+    # Visibility timeout (in seconds) to apply when queue is full (back-pressure)
+    QUEUE_BACKPRESSURE_VISIBILITY_TIMEOUT: int = int(
+        os.getenv("QUEUE_BACKPRESSURE_VISIBILITY_TIMEOUT", "60")
+    )
     
     # GEDCOM Configuration
     GEDCOM_VERSION: str = os.getenv("GEDCOM_VERSION", "5.5.1")
@@ -137,7 +139,6 @@ class Config:
             "s3_output_bucket": cls.S3_OUTPUT_BUCKET,
             "s3_gedcom_prefix": cls.S3_GEDCOM_PREFIX,
             "openrouter_model": cls.OPENROUTER_MODEL,
-            "enable_context_extraction": cls.ENABLE_CONTEXT_EXTRACTION,
             "context_extraction_model": cls.CONTEXT_EXTRACTION_MODEL,
             "max_context_chars": cls.MAX_CONTEXT_CHARS,
             "grouping_timeout_seconds": cls.GROUPING_TIMEOUT_SECONDS,

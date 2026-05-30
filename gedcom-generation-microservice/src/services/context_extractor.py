@@ -22,23 +22,20 @@ class ContextExtractor:
     def __init__(
         self,
         openrouter_client: OpenRouterClient,
-        enabled: bool = True,
         max_context_chars: int = 4000,
     ):
         """
         Args:
             openrouter_client: OpenRouter client for LLM calls (shared instance).
-            enabled: Master on/off switch (Config.ENABLE_CONTEXT_EXTRACTION).
             max_context_chars: Hard cap on the carried-forward context length;
                 the returned context is truncated if it exceeds this. Kept small
                 because the context is document-level only (no per-person data).
         """
         self.openrouter_client = openrouter_client
-        self.enabled = enabled
         self.max_context_chars = max_context_chars
         logger.info(
             f"Initialized ContextExtractor "
-            f"(enabled={enabled}, max_context_chars={max_context_chars})"
+            f"(max_context_chars={max_context_chars})"
         )
 
     @staticmethod
@@ -71,10 +68,6 @@ class ContextExtractor:
             The updated context string. On any failure, returns current_context
             unchanged (fail-soft) so page GEDCOM generation is never blocked.
         """
-        # Master switch: skip the LLM call entirely if disabled.
-        if not self.enabled:
-            return current_context
-
         # First-page short-circuit is NOT required: the prompt builder handles
         # empty context. We still log it for observability.
         is_first_page = not (current_context and current_context.strip())

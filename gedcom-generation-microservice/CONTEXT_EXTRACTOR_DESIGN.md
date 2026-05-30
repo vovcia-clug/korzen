@@ -267,17 +267,15 @@ class ContextExtractor:
         """
         Args:
             openrouter_client: OpenRouter client for LLM calls (shared instance).
-            enabled: Master on/off switch (Config.ENABLE_CONTEXT_EXTRACTION).
             max_context_chars: Hard cap on the carried-forward context length;
                 the returned context is truncated if it exceeds this. Kept small
                 because the context is document-level only (no per-person data).
         """
         self.openrouter_client = openrouter_client
-        self.enabled = enabled
         self.max_context_chars = max_context_chars
         logger.info(
             f"Initialized ContextExtractor "
-            f"(enabled={enabled}, max_context_chars={max_context_chars})"
+            f"(max_context_chars={max_context_chars})"
         )
 
     @staticmethod
@@ -412,9 +410,7 @@ following the existing `os.getenv(...)` typed-attribute pattern:
 
 ```python
     # Context Extraction Configuration (carry-forward document-level context)
-    ENABLE_CONTEXT_EXTRACTION: bool = os.getenv(
-        "ENABLE_CONTEXT_EXTRACTION", "true"
-    ).lower() == "true"
+    # Context extraction is always enabled
     CONTEXT_EXTRACTION_MODEL: str = os.getenv(
         "CONTEXT_EXTRACTION_MODEL",
         os.getenv("OPENROUTER_MODEL", "google/gemini-flash-1.5")
@@ -433,7 +429,6 @@ Notes:
   [`Config.to_dict()`](src/config.py:117) for observability:
 
 ```python
-            "enable_context_extraction": cls.ENABLE_CONTEXT_EXTRACTION,
             "context_extraction_model": cls.CONTEXT_EXTRACTION_MODEL,
             "max_context_chars": cls.MAX_CONTEXT_CHARS,
 ```
@@ -489,9 +484,9 @@ In [`GedcomGenerationService.__init__`](src/main.py:39), after the
 
 ```python
         # Context Extractor (carry-forward document-level context between pages)
+        # Context extraction is always enabled
         self.context_extractor = ContextExtractor(
             openrouter_client=self.openrouter_client,
-            enabled=Config.ENABLE_CONTEXT_EXTRACTION,
             max_context_chars=Config.MAX_CONTEXT_CHARS,
         )
 
@@ -682,7 +677,7 @@ __all__ = [
 | [`src/services/openrouter_client.py`](src/services/openrouter_client.py) | **EDIT (additive)** — add `async generate_text(...)` returning raw text. |
 | [`src/services/gedcom_generator.py`](src/services/gedcom_generator.py) | **EDIT** — constructor accepts optional `context_extractor`; loop initializes/prepends/updates rolling context. |
 | [`src/main.py`](src/main.py) | **EDIT** — construct `ContextExtractor`, pass into `GedcomGenerator`, add import. |
-| [`src/config.py`](src/config.py) | **EDIT** — add `ENABLE_CONTEXT_EXTRACTION`, `CONTEXT_EXTRACTION_MODEL`, `MAX_CONTEXT_CHARS`; extend `to_dict()`. |
+| [`src/config.py`](src/config.py) | **EDIT** — add `CONTEXT_EXTRACTION_MODEL`, `MAX_CONTEXT_CHARS`; extend `to_dict()`. Context extraction is always enabled. |
 | [`src/prompts/__init__.py`](src/prompts/__init__.py) | **EDIT (optional)** — re-export prompt builders. |
 | [`src/services/__init__.py`](src/services/__init__.py) | **EDIT (optional)** — re-export `ContextExtractor`. |
 | `.env.example` | **EDIT (optional)** — document the new env vars. |
